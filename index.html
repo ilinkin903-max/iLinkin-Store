@@ -2,60 +2,71 @@
 <html lang="id">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="color-scheme" content="dark" />
-  <title>iLink Admin</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#6c2cff" />
+  <title>iLink Auto Order - Dashboard Owner</title>
   <link rel="stylesheet" href="/app.css" />
 </head>
 <body>
-  <div id="loginView" class="login-shell">
-    <form id="loginForm" class="login-card">
-      <div class="brand-badge">iL</div>
-      <div>
-        <h1>iLink Admin</h1>
-        <p>Dashboard Pterodactyl + SQLite</p>
-      </div>
-      <label>Username<input id="loginUsername" autocomplete="username" value="admin" required /></label>
-      <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
-      <button class="btn primary" type="submit">Masuk Dashboard</button>
-      <div id="loginError" class="form-error"></div>
-    </form>
-  </div>
+  <section id="loginView" class="login-screen">
+    <div class="login-card neo-card">
+      <div class="login-brand"><div class="brand-icon">🏪</div><div><strong>iLink Auto Order</strong><span>Dashboard Owner</span></div></div>
+      <h1>Masuk Dashboard</h1>
+      <p>Kelola produk, stok, pesanan, pelanggan, bot, dan laporan dari satu panel.</p>
+      <form id="loginForm">
+        <label>Username<input id="loginUsername" autocomplete="username" value="admin" required /></label>
+        <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
+        <button class="neo-btn purple wide" type="submit">Masuk Dashboard →</button>
+        <div id="loginError" class="form-error"></div>
+      </form>
+    </div>
+  </section>
 
-  <div id="appView" class="app-shell hidden">
-    <aside class="sidebar">
-      <div class="side-brand"><div class="brand-badge small">iL</div><div><strong>iLink Admin</strong><span>Owner Panel</span></div></div>
-      <nav id="nav">
-        <button data-view="overview" class="active">Overview</button>
-        <button data-view="transactions">Transaksi</button>
-        <button data-view="users">Pengguna</button>
-        <button data-view="products">Produk</button>
-        <button data-view="redeem">Redeem</button>
-        <button data-view="broadcast">Broadcast</button>
-        <button data-view="backups">Backup</button>
-        <button data-view="settings">Pengaturan</button>
-        <button data-view="system">Sistem & Audit</button>
-      </nav>
-      <div class="side-footer">
-        <button id="refreshBtn" class="ghost">Refresh</button>
-        <button id="logoutBtn" class="danger ghost">Keluar</button>
+  <section id="appView" class="app-shell hidden">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand-block">
+        <div class="brand-icon">🏪</div>
+        <div><b id="brandName">AUTO<br>ORDER</b><span id="brandTagline">Digital Store</span></div>
       </div>
+      <nav id="nav" class="nav-list">
+        <button data-view="dashboard" class="active"><span>🏠</span>Dashboard</button>
+        <button data-view="products"><span>📦</span>Produk</button>
+        <button data-view="orders"><span>🛒</span>Pesanan <em id="orderBadge" class="nav-badge hidden">0</em></button>
+        <button data-view="customers"><span>👥</span>Pelanggan</button>
+        <button data-view="reports"><span>📊</span>Laporan</button>
+        <button data-view="coupons"><span>🎟️</span>Kupon</button>
+        <button data-view="settings"><span>⚙️</span>Pengaturan</button>
+        <button data-view="bot"><span>🤖</span>Bot & Notifikasi</button>
+        <button data-view="users"><span>👤</span>Pengguna</button>
+      </nav>
+      <div class="sidebar-spacer"></div>
+      <div class="owner-card">
+        <div class="owner-avatar">👨‍💼</div>
+        <div><b id="ownerName">Owner</b><small id="ownerUsername">@owneradmin</small><span class="owner-pill">OWNER</span></div>
+      </div>
+      <div class="store-balance"><span>Saldo Toko</span><strong id="storeBalance">Rp 0</strong><b>👛</b></div>
+      <button id="logoutBtn" class="logout-btn">↪ Keluar</button>
     </aside>
 
-    <main class="main">
+    <main class="main-panel">
       <header class="topbar">
-        <div><h2 id="pageTitle">Overview</h2><p id="pageSubtitle">Ringkasan sistem iLink</p></div>
-        <div class="top-status"><span id="botDot" class="dot"></span><span id="botStatus">Bot</span></div>
+        <button id="menuBtn" class="square-btn">☰</button>
+        <div class="page-title"><h1 id="pageTitle">Dashboard</h1><p id="pageSubtitle">Kelola produk dan stok toko Anda</p></div>
+        <div class="top-actions">
+          <a id="telegramBtn" class="telegram-btn" href="#" target="_blank" rel="noreferrer">✈ Telegram Mini App</a>
+          <button id="notifBtn" class="square-btn notify">🔔<i id="notifDot"></i></button>
+        </div>
       </header>
       <section id="content" class="content"></section>
+      <footer class="statusbar"><span>🛡️ <b id="systemSafe">Semua sistem berjalan dengan aman</b></span><span class="status-sep"></span><span id="lastUpdated">Terakhir diperbarui: -</span><button id="refreshBtn" class="neo-btn purple">⟳ Refresh Data</button></footer>
     </main>
-  </div>
+  </section>
 
-  <dialog id="modal" class="modal">
-    <form id="modalForm" method="dialog">
-      <div class="modal-head"><h3 id="modalTitle">Form</h3><button type="button" id="modalClose" class="icon-btn">×</button></div>
+  <dialog id="modal" class="neo-modal">
+    <form method="dialog" id="modalForm">
+      <header><h2 id="modalTitle">Modal</h2><button id="modalClose" type="button">✕</button></header>
       <div id="modalBody" class="modal-body"></div>
-      <div class="modal-actions"><button type="button" id="modalCancel" class="btn">Batal</button><button id="modalSubmit" class="btn primary" type="submit">Simpan</button></div>
+      <footer><button id="modalCancel" type="button" class="neo-btn white">Batal</button><button id="modalSubmit" type="submit" class="neo-btn purple">Simpan</button></footer>
     </form>
   </dialog>
 

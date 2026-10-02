@@ -1,82 +1,76 @@
-# iLink Admin - Vercel Dashboard
+# iLink Auto Order v2.0.0 - Vercel Dashboard
 
-Paket ini hanya berisi:
+Paket Vercel ini berisi **Dashboard Owner neo-brutalism** dan secure gateway menuju backend Pterodactyl.
 
-- Dashboard Admin static
-- Login UI
-- Secure gateway ke Pterodactyl
-- Backend health checker
+Vercel tidak menyimpan database, BOT_TOKEN, AutoGoPay key, atau supplier key.
 
-Tidak ada database atau token bot di Vercel.
+## Tampilan Dashboard
 
-## Environment Variables Vercel
+Tema mengikuti referensi neo-brutalism:
 
-Masuk ke:
+- Sidebar ungu
+- Border hitam tebal + hard shadow
+- Dashboard, Produk, Pesanan, Pelanggan, Laporan, Kupon, Pengaturan, Bot & Notifikasi, Pengguna
+- Owner card + Saldo Toko
+- 5 kartu statistik
+- Search/filter produk
+- Product cards dua kolom
+- Toggle ON/OFF
+- Edit / Stok / Kelola / Hapus
+- Status bar + Refresh Data
+- Responsive untuk desktop/tablet/mobile
 
-```text
-Vercel -> Project -> Settings -> Environment Variables
-```
+Semua komponen adalah UI nyata dan terhubung ke API Pterodactyl, bukan gambar statis.
 
-Isi:
+## Environment Variables
+
+Vercel -> Project -> Settings -> Environment Variables:
 
 ```env
-PTERODACTYL_BACKEND_URL=http://HOSTNAME_PTERODACTYL:2195
+PTERODACTYL_BACKEND_URL=http://HOSTNAME_PTERODACTYL:PORT
 VPS_PROXY_SECRET=SECRET_YANG_SAMA_DENGAN_PTERODACTYL
 GATEWAY_TIMEOUT_MS=50000
 ```
 
-Contoh berdasarkan hostname yang sudah berhasil kamu tes:
+Contoh pola hostname yang sudah terverifikasi:
 
 ```env
-PTERODACTYL_BACKEND_URL=http://legal-private.jhonaleystore.id:PORT_ILINK_ADMIN
+PTERODACTYL_BACKEND_URL=http://legal-private.jhonaleystore.id:PORT_ILINK_AUTOORDER
 ```
 
-Ganti `PORT_ILINK_ADMIN` dengan allocation server iLink Admin. Port `2195` saat ini adalah port server AI Generator yang dipakai untuk tes.
+Jangan memakai port server AI Generator jika dashboard/backend v2 berjalan pada server Pterodactyl berbeda.
 
-`VPS_PROXY_SECRET` harus sama persis dengan yang ada di `.env` Pterodactyl.
+`VPS_PROXY_SECRET` harus sama persis dengan `.env` VPS.
 
 ## Deploy
 
-Upload folder/project ini ke GitHub lalu import ke Vercel, atau deploy dengan Vercel CLI.
+1. Upload seluruh isi ZIP Vercel ke repository GitHub.
+2. Vercel -> Add New -> Project -> Import repository.
+3. Framework Preset: `Other`.
+4. Tambahkan Environment Variables di atas.
+5. Deploy Production.
+6. Tes:
 
-Tidak ada build framework khusus.
+```text
+https://nama-project.vercel.app/api/health
+```
 
-Setelah production aktif:
+7. Buka:
 
 ```text
 https://nama-project.vercel.app
 ```
 
-adalah Dashboard Admin.
-
-Alias berikut juga tersedia:
+Alias berikut juga menuju dashboard:
 
 ```text
 /dashboard
 /admin
 ```
 
-## Test koneksi
+## Login
 
-Buka:
-
-```text
-https://nama-project.vercel.app/api/health
-```
-
-Jika Vercel bisa menjangkau Pterodactyl, respons berisi status backend.
-
-Jika muncul:
-
-```text
-BACKEND_UNREACHABLE
-```
-
-berarti `PTERODACTYL_BACKEND_URL` belum benar, hostname/port tidak publik, atau seller memblokir koneksi dari internet.
-
-## Login Admin
-
-Username/password **bukan disimpan di Vercel**. Login diverifikasi oleh backend Pterodactyl menggunakan:
+Credential admin berada di `.env` Pterodactyl:
 
 ```env
 ADMIN_USERNAME=
@@ -84,14 +78,37 @@ ADMIN_PASSWORD=
 SESSION_SECRET=
 ```
 
-Session token disimpan hanya untuk tab/session browser.
+Browser menerima signed session setelah login. Secret gateway tidak dikirim ke JavaScript frontend.
 
-## Keamanan
+## Koneksi API
 
-Vercel menambahkan header rahasia server-side:
+Frontend memanggil:
+
+```text
+/api/gateway?path=/api/admin/...
+```
+
+Gateway Vercel menambahkan header rahasia server-side:
 
 ```text
 x-ilink-proxy-secret
 ```
 
-Browser tidak menerima nilai secret tersebut. Backend Pterodactyl menolak route `/api/admin/*` jika header ini salah.
+Backend Pterodactyl menolak Admin API bila secret salah.
+
+## Fitur Dashboard
+
+- Overview
+- Produk + varian + stok
+- Pesanan + PRE-ORDER fulfillment
+- Pelanggan
+- Laporan omzet/profit
+- Kupon + redeem
+- Pengaturan bot/store/referral/channel/Nokos/media start
+- Status AutoGoPay dan supplier
+- Broadcast teks/foto/sticker/polling
+- Backup SQLite
+- Pengguna + saldo
+- Telegram direct message
+
+Marketplace web customer belum diaktifkan pada versi ini. Customer order melalui bot Telegram.

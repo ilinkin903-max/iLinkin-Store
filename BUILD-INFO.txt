@@ -1,5 +1,5 @@
-iLink Admin 1.0.0-admin-only
-Frontend: Vercel static Admin Dashboard
-Gateway: Vercel Function -> Pterodactyl
-Database: none on Vercel
-Marketplace: disabled
+iLink Auto Order Vercel Dashboard v2.0.0
+UI: Neo-brutalism Admin Dashboard
+Backend: Pterodactyl secure gateway
+Database/credentials: tidak disimpan di Vercel
+Marketplace web customer: disabled

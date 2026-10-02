@@ -1,5 +1,2 @@
-iLink Auto Order Vercel Dashboard v2.1.0
-UI: Neo-brutalism Admin Dashboard
-Backend: Pterodactyl secure gateway
-Database/credentials: tidak disimpan di Vercel
-Marketplace web customer: disabled
+iLink Auto Order Vercel v2.1.1
+Fix: Vercel NOT_FOUND routing + compact responsive refinement

@@ -1,114 +1,47 @@
-# iLink Auto Order v2.1.0 - Vercel Dashboard
+# iLink Auto Order v2.1.1 — Vercel Dashboard
 
-Paket Vercel ini berisi **Dashboard Owner neo-brutalism** dan secure gateway menuju backend Pterodactyl.
+Dashboard Owner neo-brutalism + secure gateway ke Pterodactyl. Database, bot, pembayaran, supplier, dan credential rahasia tetap berada di Pterodactyl.
 
-Vercel tidak menyimpan database, BOT_TOKEN, AutoGoPay key, atau supplier key.
+## Fix NOT_FOUND v2.1.1
 
-## Tampilan Dashboard
+Versi ini menghapus kombinasi `cleanUrls: true` + rewrite `/index.html` yang menyebabkan route dashboard dapat 404 di Vercel. Semua route SPA sekarang fallback ke `index.html`, sementara file nyata dan Serverless Function API tetap diprioritaskan Vercel.
 
-Tema mengikuti referensi neo-brutalism:
+Route yang harus aktif setelah deploy:
 
-- Sidebar ungu
-- Border hitam tebal + hard shadow
-- Dashboard, Produk, Pesanan, Pelanggan, Laporan, Kupon, Pengaturan, Bot & Notifikasi, Pengguna
-- Owner card + Saldo Toko
-- 5 kartu statistik
-- Search/filter produk
-- Product cards dua kolom
-- Toggle ON/OFF
-- Edit / Stok / Kelola / Hapus
-- Status bar + Refresh Data
-- Responsive untuk desktop/tablet/mobile
+```text
+/
+/dashboard
+/admin
+/api/health
+```
 
-Semua komponen adalah UI nyata dan terhubung ke API Pterodactyl, bukan gambar statis.
+## Pengaturan project Vercel
 
-## Environment Variables
+- Framework Preset: **Other**
+- Root Directory: **.** / folder yang langsung berisi `index.html` dan `vercel.json`
+- Build Command: **kosong**
+- Output Directory: **kosong**
 
-Vercel -> Project -> Settings -> Environment Variables:
+Environment Variables:
 
 ```env
-PTERODACTYL_BACKEND_URL=http://HOSTNAME_PTERODACTYL:PORT
+PTERODACTYL_BACKEND_URL=http://legal-private.jhonaleystore.id:PORT_BACKEND
 VPS_PROXY_SECRET=SECRET_YANG_SAMA_DENGAN_PTERODACTYL
 GATEWAY_TIMEOUT_MS=50000
 ```
 
-Contoh pola hostname yang sudah terverifikasi:
+## Struktur Dashboard yang dipertahankan
 
-```env
-PTERODACTYL_BACKEND_URL=http://legal-private.jhonaleystore.id:PORT_ILINK_AUTOORDER
-```
+- Dashboard: Omset Hari Ini, Profit Hari Ini, Total Order Hari Ini, Total Stok, Grafik 7 Hari, Produk Terlaris.
+- Produk: katalog, tambah/edit produk, varian, Deskripsi dan SNK per produk/varian.
+- Stok: tambah stok produk tunggal atau per varian.
+- Kelola: lihat/edit/hapus stok satu per satu.
+- Pesanan: card responsif tanpa tabel horizontal.
+- User: satu menu gabungan data user Telegram, saldo, referral, status, chat, dan hapus.
+- Laporan, Kupon, Pengaturan, Bot & Notifikasi tetap tersedia.
 
-Jangan memakai port server AI Generator jika dashboard/backend v2 berjalan pada server Pterodactyl berbeda.
+## Upgrade
 
-`VPS_PROXY_SECRET` harus sama persis dengan `.env` VPS.
+Deploy ZIP Vercel v2.1.1 ke **project Vercel yang sama**. Environment Variable tidak perlu diubah. Setelah deployment selesai, buka `/api/health` lalu `/`.
 
-## Deploy
-
-1. Upload seluruh isi ZIP Vercel ke repository GitHub.
-2. Vercel -> Add New -> Project -> Import repository.
-3. Framework Preset: `Other`.
-4. Tambahkan Environment Variables di atas.
-5. Deploy Production.
-6. Tes:
-
-```text
-https://nama-project.vercel.app/api/health
-```
-
-7. Buka:
-
-```text
-https://nama-project.vercel.app
-```
-
-Alias berikut juga menuju dashboard:
-
-```text
-/dashboard
-/admin
-```
-
-## Login
-
-Credential admin berada di `.env` Pterodactyl:
-
-```env
-ADMIN_USERNAME=
-ADMIN_PASSWORD=
-SESSION_SECRET=
-```
-
-Browser menerima signed session setelah login. Secret gateway tidak dikirim ke JavaScript frontend.
-
-## Koneksi API
-
-Frontend memanggil:
-
-```text
-/api/gateway?path=/api/admin/...
-```
-
-Gateway Vercel menambahkan header rahasia server-side:
-
-```text
-x-ilink-proxy-secret
-```
-
-Backend Pterodactyl menolak Admin API bila secret salah.
-
-## Fitur Dashboard
-
-- Overview
-- Produk + varian + stok
-- Pesanan + PRE-ORDER fulfillment
-- Pelanggan
-- Laporan omzet/profit
-- Kupon + redeem
-- Pengaturan bot/store/referral/channel/Nokos/media start
-- Status AutoGoPay dan supplier
-- Broadcast teks/foto/sticker/polling
-- Backup SQLite
-- Pengguna + saldo
-- Telegram direct message
-
-Marketplace web customer belum diaktifkan pada versi ini. Customer order melalui bot Telegram.
+Jika masih muncul Vercel `NOT_FOUND`, cek Project Settings -> Build & Development Settings dan pastikan **Root Directory menunjuk ke folder yang berisi `index.html`**, bukan folder induk yang hanya berisi subfolder ZIP.

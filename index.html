@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>iLink Admin</title>
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+  <div id="loginView" class="login-shell">
+    <form id="loginForm" class="login-card">
+      <div class="brand-badge">iL</div>
+      <div>
+        <h1>iLink Admin</h1>
+        <p>Dashboard Pterodactyl + SQLite</p>
+      </div>
+      <label>Username<input id="loginUsername" autocomplete="username" value="admin" required /></label>
+      <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
+      <button class="btn primary" type="submit">Masuk Dashboard</button>
+      <div id="loginError" class="form-error"></div>
+    </form>
+  </div>
+
+  <div id="appView" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="side-brand"><div class="brand-badge small">iL</div><div><strong>iLink Admin</strong><span>Owner Panel</span></div></div>
+      <nav id="nav">
+        <button data-view="overview" class="active">Overview</button>
+        <button data-view="transactions">Transaksi</button>
+        <button data-view="users">Pengguna</button>
+        <button data-view="products">Produk</button>
+        <button data-view="redeem">Redeem</button>
+        <button data-view="broadcast">Broadcast</button>
+        <button data-view="backups">Backup</button>
+        <button data-view="settings">Pengaturan</button>
+        <button data-view="system">Sistem & Audit</button>
+      </nav>
+      <div class="side-footer">
+        <button id="refreshBtn" class="ghost">Refresh</button>
+        <button id="logoutBtn" class="danger ghost">Keluar</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><h2 id="pageTitle">Overview</h2><p id="pageSubtitle">Ringkasan sistem iLink</p></div>
+        <div class="top-status"><span id="botDot" class="dot"></span><span id="botStatus">Bot</span></div>
+      </header>
+      <section id="content" class="content"></section>
+    </main>
+  </div>
+
+  <dialog id="modal" class="modal">
+    <form id="modalForm" method="dialog">
+      <div class="modal-head"><h3 id="modalTitle">Form</h3><button type="button" id="modalClose" class="icon-btn">×</button></div>
+      <div id="modalBody" class="modal-body"></div>
+      <div class="modal-actions"><button type="button" id="modalCancel" class="btn">Batal</button><button id="modalSubmit" class="btn primary" type="submit">Simpan</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

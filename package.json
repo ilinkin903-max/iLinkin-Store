@@ -1,0 +1,7 @@
+{
+  "name": "ilink-admin-vercel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "iLink Admin dashboard and secure gateway for Vercel",
+  "engines": { "node": "22.x" }
+}

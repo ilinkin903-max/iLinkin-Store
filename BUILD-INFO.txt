@@ -1,0 +1,5 @@
+iLink Admin 1.0.0-admin-only
+Frontend: Vercel static Admin Dashboard
+Gateway: Vercel Function -> Pterodactyl
+Database: none on Vercel
+Marketplace: disabled

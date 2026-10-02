@@ -12,7 +12,7 @@
     <div class="login-card neo-card">
       <div class="login-brand"><div class="brand-icon">🏪</div><div><strong>iLink Auto Order</strong><span>Dashboard Owner</span></div></div>
       <h1>Masuk Dashboard</h1>
-      <p>Kelola produk, stok, pesanan, pelanggan, bot, dan laporan dari satu panel.</p>
+      <p>Kelola produk, varian, stok, pesanan, user, bot, dan laporan dari satu panel.</p>
       <form id="loginForm">
         <label>Username<input id="loginUsername" autocomplete="username" value="admin" required /></label>
         <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
@@ -32,12 +32,11 @@
         <button data-view="dashboard" class="active"><span>🏠</span>Dashboard</button>
         <button data-view="products"><span>📦</span>Produk</button>
         <button data-view="orders"><span>🛒</span>Pesanan <em id="orderBadge" class="nav-badge hidden">0</em></button>
-        <button data-view="customers"><span>👥</span>Pelanggan</button>
         <button data-view="reports"><span>📊</span>Laporan</button>
         <button data-view="coupons"><span>🎟️</span>Kupon</button>
         <button data-view="settings"><span>⚙️</span>Pengaturan</button>
         <button data-view="bot"><span>🤖</span>Bot & Notifikasi</button>
-        <button data-view="users"><span>👤</span>Pengguna</button>
+        <button data-view="users"><span>👤</span>User</button>
       </nav>
       <div class="sidebar-spacer"></div>
       <div class="owner-card">
@@ -47,6 +46,7 @@
       <div class="store-balance"><span>Saldo Toko</span><strong id="storeBalance">Rp 0</strong><b>👛</b></div>
       <button id="logoutBtn" class="logout-btn">↪ Keluar</button>
     </aside>
+    <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
 
     <main class="main-panel">
       <header class="topbar">

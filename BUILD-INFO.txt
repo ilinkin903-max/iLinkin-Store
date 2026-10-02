@@ -1,4 +1,4 @@
-iLink Auto Order Vercel Dashboard v2.0.0
+iLink Auto Order Vercel Dashboard v2.0.1
 UI: Neo-brutalism Admin Dashboard
 Backend: Pterodactyl secure gateway
 Database/credentials: tidak disimpan di Vercel

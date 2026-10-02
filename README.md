@@ -25,11 +25,13 @@ VPS_PROXY_SECRET=SECRET_YANG_SAMA_DENGAN_PTERODACTYL
 GATEWAY_TIMEOUT_MS=50000
 ```
 
-Contoh:
+Contoh berdasarkan hostname yang sudah berhasil kamu tes:
 
 ```env
-PTERODACTYL_BACKEND_URL=http://node1.jhonaleystore.id:2195
+PTERODACTYL_BACKEND_URL=http://legal-private.jhonaleystore.id:PORT_ILINK_ADMIN
 ```
+
+Ganti `PORT_ILINK_ADMIN` dengan allocation server iLink Admin. Port `2195` saat ini adalah port server AI Generator yang dipakai untuk tes.
 
 `VPS_PROXY_SECRET` harus sama persis dengan yang ada di `.env` Pterodactyl.
 

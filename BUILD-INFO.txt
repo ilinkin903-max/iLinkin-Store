@@ -1,2 +1,2 @@
-iLink Auto Order Vercel v2.1.1
-Fix: Vercel NOT_FOUND routing + compact responsive refinement
+iLink Auto Order Vercel v2.2.0
+Responsive dashboard, order detail, flexible reports, organized settings/bot, backup upload/restore

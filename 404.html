@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#6c2cff" />
   <title>iLink Auto Order - Dashboard Owner</title>
-  <link rel="stylesheet" href="/app.css?v=2.4.0" />
+  <link rel="stylesheet" href="/app.css?v=2.4.3" />
 </head>
 <body>
   <section id="loginView" class="login-screen">
@@ -55,9 +55,13 @@
         <div class="page-title"><h1 id="pageTitle">Dashboard</h1><p id="pageSubtitle">Kelola produk dan stok toko Anda</p></div>
         <div class="top-actions">
           <a id="telegramBtn" class="telegram-btn" href="#" target="_blank" rel="noreferrer">✈ Telegram Mini App</a>
-          <button id="notifBtn" class="square-btn notify">🔔<i id="notifDot"></i></button>
+          <button id="notifBtn" class="square-btn notify" type="button" aria-label="Notifikasi" aria-expanded="false">🔔<span id="notifCount" class="notif-count hidden">0</span></button>
         </div>
       </header>
+      <aside id="notificationPanel" class="notification-panel hidden" aria-label="Panel notifikasi">
+        <div class="notification-head"><div><b>🔔 Notifikasi</b><small id="notificationSummary">Tidak ada notifikasi baru</small></div><button id="notifMarkAll" class="neo-btn white tiny" type="button">Tandai dibaca</button></div>
+        <div id="notificationList" class="notification-list"><div class="notification-empty">Memuat notifikasi...</div></div>
+      </aside>
       <section id="content" class="content"></section>
       <footer class="statusbar"><span>🛡️ <b id="systemSafe">Semua sistem berjalan dengan aman</b></span><span class="status-sep"></span><span id="lastUpdated">Terakhir diperbarui: -</span><button id="refreshBtn" class="neo-btn purple">⟳ Refresh Data</button></footer>
     </main>
@@ -72,6 +76,6 @@
   </dialog>
 
   <div id="toast" class="toast"></div>
-  <script src="/app.js?v=2.4.0" defer></script>
+  <script src="/app.js?v=2.4.3" defer></script>
 </body>
 </html>

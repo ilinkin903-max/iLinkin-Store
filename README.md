@@ -1,4 +1,4 @@
-# iLink Auto Order v2.4.2 — Vercel Dashboard
+# iLink Auto Order v2.4.3 — Vercel Dashboard
 
 Deploy ke project Vercel yang sama dengan versi sebelumnya.
 
@@ -37,3 +37,11 @@ api/
 - Produk Induk pada import reseller tidak lagi bergantung pada cache halaman Produk; daftar diambil langsung dari backend ketika modal dibuka.
 - Produk aktif maupun nonaktif dapat dipilih sebagai induk. Jika belum ada produk lokal, mode otomatis diarahkan ke Produk baru.
 - Item supplier yang sebelumnya sudah terhubung ke varian yang sama akan di-update, bukan membuat duplikat.
+
+
+## v2.4.3
+- Kartu produk berwarna hijau saat stok ready, merah saat habis, kuning untuk PRE-ORDER.
+- Chip setiap varian menampilkan Ready/Habis/PO dengan warna masing-masing.
+- Katalog selalu A-Z mengikuti backend.
+- Ikon lonceng sekarang membuka Notification Center, menampilkan badge unread, aksi Tandai dibaca, dan navigasi ke menu terkait.
+- Notification Center tetap tersedia di tampilan HP.

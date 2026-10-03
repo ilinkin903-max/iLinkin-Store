@@ -1,2 +1,3 @@
-iLink Auto Order Vercel v2.2.0
-Responsive dashboard, order detail, flexible reports, organized settings/bot, backup upload/restore
+iLink Auto Order Vercel v2.3.0
+Role: Owner dashboard + secure gateway + VPS media proxy
+Backend database: SQLite on Pterodactyl

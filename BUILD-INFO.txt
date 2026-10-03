@@ -1,2 +1,2 @@
-iLink Auto Order Vercel v2.4.1
-Neo-brutalism owner dashboard + secure Pterodactyl gateway
+iLink Auto Order Vercel v2.4.2
+Legacy JSON migration UI + reseller parent product refresh.

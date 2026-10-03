@@ -1,4 +1,4 @@
-# iLink Auto Order v2.4.0 — Vercel Dashboard
+# iLink Auto Order v2.4.2 — Vercel Dashboard
 
 Deploy ke project Vercel yang sama dengan versi sebelumnya.
 
@@ -30,3 +30,10 @@ api/
 ## v2.4.1
 - Submenu Pengaturan/Bot dibuat vertikal seperti menu utama.
 - Upload gambar/video `/start` menggunakan chunked upload melalui gateway dan menampilkan progress + preview.
+
+
+## v2.4.2
+- Submenu Backup memiliki migrator JSON bot lama dengan upload chunked sampai 50 MB, preview, pilihan data, dan hasil import.
+- Produk Induk pada import reseller tidak lagi bergantung pada cache halaman Produk; daftar diambil langsung dari backend ketika modal dibuka.
+- Produk aktif maupun nonaktif dapat dipilih sebagai induk. Jika belum ada produk lokal, mode otomatis diarahkan ke Produk baru.
+- Item supplier yang sebelumnya sudah terhubung ke varian yang sama akan di-update, bukan membuat duplikat.

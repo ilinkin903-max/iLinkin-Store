@@ -1,2 +1,2 @@
-iLink Auto Order Vercel v2.3.1
-QRIS mode section + configurable sidebar metric + diagnostics
+iLink Auto Order Vercel v2.4.0
+Neo-brutalism owner dashboard + secure Pterodactyl gateway

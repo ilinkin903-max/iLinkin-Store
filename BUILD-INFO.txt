@@ -1,3 +1,2 @@
-iLink Auto Order Vercel v2.3.0
-Role: Owner dashboard + secure gateway + VPS media proxy
-Backend database: SQLite on Pterodactyl
+iLink Auto Order Vercel v2.3.1
+QRIS mode section + configurable sidebar metric + diagnostics

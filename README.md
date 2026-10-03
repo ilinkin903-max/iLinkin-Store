@@ -1,4 +1,4 @@
-# iLink Auto Order v2.3.0 — Vercel Dashboard
+# iLink Auto Order v2.3.1 — Vercel Dashboard
 
 Deploy ke project Vercel yang sama dengan versi sebelumnya.
 
@@ -12,7 +12,7 @@ GATEWAY_TIMEOUT_MS=50000
 Tidak ada BOT_TOKEN, API key supplier, API key AutoGoPay, atau database di Vercel.
 
 ## Update
-Upload/deploy seluruh isi ZIP v2.3.0 ke project Vercel yang sama. Root project harus berisi:
+Root project harus berisi:
 ```text
 index.html
 app.js
@@ -21,10 +21,4 @@ vercel.json
 api/
 ```
 
-Sesudah deploy cek:
-- `/`
-- `/dashboard`
-- `/api/health`
-
-## Media VPS
-Media `vps://...` ditampilkan melalui `/api/media` yang meneruskan file dari Pterodactyl menggunakan shared secret. Pengguna tidak perlu mengetahui URL backend Pterodactyl.
+v2.3.1 menambahkan cache-busting pada `app.js/app.css`, section Pembayaran & QRIS yang jelas, pilihan metrik sidebar, dan diagnostik koneksi Telegram.

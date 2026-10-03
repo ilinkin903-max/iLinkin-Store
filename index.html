@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#6c2cff" />
   <title>iLink Auto Order - Dashboard Owner</title>
-  <link rel="stylesheet" href="/app.css" />
+  <link rel="stylesheet" href="/app.css?v=2.3.1" />
 </head>
 <body>
   <section id="loginView" class="login-screen">
@@ -43,7 +43,7 @@
         <div class="owner-avatar">👨‍💼</div>
         <div><b id="ownerName">Owner</b><small id="ownerUsername">@owneradmin</small><span class="owner-pill">OWNER</span></div>
       </div>
-      <div class="store-balance"><span>Saldo Toko</span><strong id="storeBalance">Rp 0</strong><b>👛</b></div>
+      <div class="store-balance"><span id="storeBalanceLabel">Profit Bulan Ini</span><strong id="storeBalance">Rp 0</strong><b>👛</b></div>
       <button id="logoutBtn" class="logout-btn">↪ Keluar</button>
     </aside>
     <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
@@ -71,6 +71,6 @@
   </dialog>
 
   <div id="toast" class="toast"></div>
-  <script src="/app.js" defer></script>
+  <script src="/app.js?v=2.3.1" defer></script>
 </body>
 </html>

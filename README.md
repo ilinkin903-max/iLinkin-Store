@@ -1,4 +1,4 @@
-# iLink Auto Order v2.4.3 — Vercel Dashboard
+# iLink Auto Order v2.4.4 — Vercel Dashboard
 
 Deploy ke project Vercel yang sama dengan versi sebelumnya.
 
@@ -39,7 +39,7 @@ api/
 - Item supplier yang sebelumnya sudah terhubung ke varian yang sama akan di-update, bukan membuat duplikat.
 
 
-## v2.4.3
+## v2.4.4
 - Kartu produk berwarna hijau saat stok ready, merah saat habis, kuning untuk PRE-ORDER.
 - Chip setiap varian menampilkan Ready/Habis/PO dengan warna masing-masing.
 - Katalog selalu A-Z mengikuti backend.

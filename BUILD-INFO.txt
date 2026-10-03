@@ -1,2 +1,2 @@
-iLink Auto Order Vercel v2.4.0
+iLink Auto Order Vercel v2.4.1
 Neo-brutalism owner dashboard + secure Pterodactyl gateway

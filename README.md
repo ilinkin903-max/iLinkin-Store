@@ -26,3 +26,7 @@ api/
 - Bot & Notifikasi memakai submenu Bot / Menu start / Link & Notifikasi / Diagnostik.
 - Upload gambar produk langsung dipasang ke produk saat Edit; media VPS diproxy lewat `/api/media`.
 - Routing Vercel tidak lagi memakai catch-all yang dapat mengganggu endpoint media/API.
+
+## v2.4.1
+- Submenu Pengaturan/Bot dibuat vertikal seperti menu utama.
+- Upload gambar/video `/start` menggunakan chunked upload melalui gateway dan menampilkan progress + preview.

@@ -1,4 +1,4 @@
-# iLink Auto Order v2.6.7 — Vercel Dashboard
+# iLink Auto Order v2.6.8 — Vercel Dashboard
 
 Deploy ke project Vercel yang sama dengan versi sebelumnya.
 
@@ -19,6 +19,16 @@ app.css
 vercel.json
 api/
 ```
+
+
+## v2.6.8
+- Dashboard Fresh membedakan **Saldo API Jaspay** dari saldo user customer.
+- Editor teks halaman **READY STOK** ditambahkan dan mendukung Telegram HTML.
+- Setiap Produk Fresh mempunyai konfigurasi **Ready Stok Lokal**: aktif/nonaktif, label tombol, dan pemilihan kombinasi harga Fresh yang digunakan.
+- Tombol **Stok Ready** membuka inventory lokal per produk dengan mode tambah atau ganti seluruh stok Available.
+- Inventory admin menampilkan Available, Reserved, dan Terjual; stok Reserved tidak dihapus saat admin mengganti daftar stok.
+- Status **Generate API** dipisahkan dari status **Ready Stok Lokal**, sehingga generate dapat dimatikan sementara tanpa menghilangkan inventory Ready Stok.
+- Ringkasan Fresh menampilkan total Ready Stok lokal, bukan stok endpoint `/v1/ready/stock`.
 
 
 ## v2.6.7

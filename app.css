@@ -275,3 +275,7 @@ body{overflow-x:hidden}.app-shell{min-height:100vh;display:grid;grid-template-co
   .product-thumb{width:72px;height:72px}
   .product-info{grid-template-columns:1fr}.product-title h3{font-size:16px}
 }
+
+/* v2.6.8 Fresh Ready Stock local inventory */
+.fresh-local-stock-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.fresh-local-stock-meta span{border:2px solid var(--ink);border-radius:999px;background:#eefbe6;padding:3px 7px;font-size:8px;font-weight:900}.ready-stock-editor{display:grid;gap:12px}.ready-stock-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.ready-stock-stats span,.ready-stock-config-summary{border:2px solid var(--ink);border-radius:10px;background:#efffe3;padding:9px;font-size:10px;font-weight:850}.ready-stock-stats b{display:block;font-size:16px;margin-top:2px}.ready-stock-editor textarea{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;line-height:1.45}.ready-stock-config{background:#f8fff1}.fresh-admin-product{align-items:start}
+@media(max-width:640px){.ready-stock-stats{grid-template-columns:1fr}.fresh-local-stock-meta{margin-top:5px}.fresh-local-stock-meta span{font-size:7px}.fresh-admin-product .supplier-product-actions{display:grid;grid-template-columns:1fr 1fr}.fresh-admin-product .supplier-product-actions .neo-btn{width:100%}}

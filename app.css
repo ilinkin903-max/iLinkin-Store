@@ -214,3 +214,14 @@ body{overflow-x:hidden}.app-shell{min-height:100vh;display:grid;grid-template-co
 .fresh-price-card>span{display:grid;place-items:center;width:30px;height:30px;border:2px solid var(--ink);border-radius:9px;background:#7be314;font-size:9px;font-weight:1000}
 .fresh-price-card>div{min-width:0}.fresh-price-card b{display:block;font-size:10px;line-height:1.35;overflow-wrap:anywhere}.fresh-price-card small{display:block;margin-top:4px;color:#555;font-size:9px;font-weight:850;line-height:1.35;overflow-wrap:anywhere}
 @media(max-width:720px){.fresh-price-grid{grid-template-columns:1fr}.fresh-price-card{grid-template-columns:30px minmax(0,1fr);padding:8px}.fresh-price-card>span{width:27px;height:27px}.fresh-price-card b{font-size:9px}.fresh-price-card small{font-size:8px}.fresh-api-dot,.fresh-product-dot{width:11px;height:11px;box-shadow:1px 1px 0 var(--ink)}}
+
+
+/* v2.6.4 - submenu landing cards like Settings reference */
+.submenu-home{max-width:760px;margin:0 auto;border:3px solid var(--ink);border-radius:18px;padding:18px;background:#e8ffc5;box-shadow:6px 7px 0 var(--ink)}
+.bot-menu-home{background:#eaf4ff}
+.submenu-home-head{margin-bottom:14px}.submenu-home-head h2{margin:0 0 5px;font-size:22px;line-height:1.1}.submenu-home-head p{margin:0;color:#555;font-size:11px;font-weight:800}
+.submenu-card-list{display:grid;gap:9px}.submenu-card{width:100%;display:grid;grid-template-columns:42px minmax(0,1fr) 22px;align-items:center;gap:11px;text-align:left;padding:11px 12px;border:3px solid var(--ink);border-radius:14px;background:#fff;box-shadow:3px 4px 0 var(--ink);color:var(--ink);cursor:pointer;transition:.12s ease}.submenu-card:hover{transform:translate(-1px,-1px);box-shadow:5px 6px 0 var(--ink)}.submenu-card:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.submenu-card-icon{width:36px;height:36px;display:grid;place-items:center;border:2px solid var(--ink);border-radius:10px;background:#edf5ff;font-size:18px}.settings-menu-home .submenu-card-icon{background:#f5f8ff}
+.submenu-card-copy{display:block;min-width:0}.submenu-card-copy b{display:block;font-size:13px;line-height:1.15;font-weight:1000}.submenu-card-copy small{display:block;margin-top:3px;color:#555;font-size:9px;line-height:1.3;font-weight:800;white-space:normal}.submenu-card-arrow{font-size:23px;font-weight:1000;text-align:center;line-height:1}
+.submenu-detail{display:grid;gap:13px;min-width:0}.submenu-detail-top{display:flex;align-items:center;justify-content:flex-start}.submenu-back{font-weight:950}
+@media(max-width:620px){.submenu-home{padding:12px;border-radius:15px;box-shadow:4px 5px 0 var(--ink)}.submenu-home-head h2{font-size:19px}.submenu-card{grid-template-columns:38px minmax(0,1fr) 18px;padding:9px;gap:9px}.submenu-card-icon{width:32px;height:32px;font-size:16px}.submenu-card-copy b{font-size:11px}.submenu-card-copy small{font-size:8px}.submenu-card-arrow{font-size:20px}.submenu-back{width:100%}}

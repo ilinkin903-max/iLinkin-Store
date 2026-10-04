@@ -1,8 +1,10 @@
-# Dashboard Vercel v2.3.1
+# iLink Auto Order v2.3.1
 
-- Section Pembayaran & QRIS terpisah dengan 3 mode: GoPay, ShopeePay, Auto Rotating.
-- Tombol cek status per mode.
-- Metrik kartu sidebar dapat dipilih: Profit Bulan Ini, Omzet Bulan Ini, Profit Hari Ini, Omzet Hari Ini, Saldo Manual.
-- Default diubah ke Profit Bulan Ini agar istilah saldo tidak membingungkan.
-- Status sistem Bot & Notifikasi menampilkan latency API Telegram, antrean chat, network failure, dan error polling terakhir.
-- Cache busting asset untuk mencegah dashboard lama tetap tampil setelah deploy.
+## Perbaikan utama
+- Telegram API JSON memakai keep-alive connection dan IPv4 khusus Telegram untuk mengurangi ETIMEDOUT pada VPS shared.
+- Timeout interaksi bot dipendekkan; callback tidak lagi menunggu request network sebelum UI lanjut.
+- Update diproses paralel antar chat, tetapi tetap berurutan untuk chat yang sama. Satu user yang lambat tidak membekukan semua user.
+- Polling memiliki backoff bertahap dan diagnostik latency/network failure.
+- Cek wajib-join fail-open saat Telegram API sedang timeout agar bot tidak freeze karena `getChatMember`.
+- QRIS button menampilkan mode aktif: GoPay, ShopeePay, atau Auto Rotating.
+- Default kartu sidebar = Profit Bulan Ini; dapat dipilih Profit/Omzet harian/bulanan atau saldo manual.

@@ -1,4 +1,4 @@
-# iLink Auto Order v2.6.0 — Vercel Dashboard
+# iLink Auto Order v2.6.1 — Vercel Dashboard
 
 Deploy ke project Vercel yang sama dengan versi sebelumnya.
 

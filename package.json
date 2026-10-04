@@ -1,13 +1,9 @@
 {
-  "name": "ilink-autoorder-pterodactyl",
+  "name": "ilink-autoorder-dashboard-vercel",
   "version": "2.6.2",
   "private": true,
-  "description": "iLink Auto Order backend: Pterodactyl + SQLite + Telegram long polling",
-  "scripts": {
-    "start": "node --no-warnings server.js",
-    "check": "node --check server.js && node --check lib/db.js && node --check lib/auth.js && node --check lib/telegram.js && node --check lib/payments.js && node --check lib/suppliers.js && node --check lib/jaspay.js && node --check lib/media.js"
-  },
+  "description": "iLink Auto Order neo-brutalism owner dashboard + secure Pterodactyl gateway",
   "engines": {
-    "node": ">=22.13.0 <23"
+    "node": "22.x"
   }
 }

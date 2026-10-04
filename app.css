@@ -201,3 +201,6 @@ body{overflow-x:hidden}.app-shell{min-height:100vh;display:grid;grid-template-co
 .settings-subcard{border:3px solid #111;border-radius:18px;padding:16px;background:#fff;box-shadow:6px 6px 0 #111;margin-top:4px}
 .settings-subcard h4{margin:0 0 6px;font-size:1rem}.compact-grid{margin-top:12px;padding-top:12px;border-top:2px dashed #222}
 @media(max-width:720px){.settings-subcard{padding:12px;border-radius:14px;box-shadow:4px 4px 0 #111}.compact-grid{grid-template-columns:1fr!important}.settings-subcard textarea{min-height:82px}}
+
+/* v2.6.2 - Jaspay Fresh main menu */
+.fresh-admin-page{display:grid;gap:16px}.fresh-admin-page .settings-section{margin:0}.settings-subcard .info-note{margin-top:10px}

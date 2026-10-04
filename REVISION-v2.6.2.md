@@ -1,18 +1,9 @@
-# Revision v2.6.2
+# Revision v2.6.2 — Dashboard
 
-## Produk Fresh / Zoom
-
-- Setelah user memilih **Akun Baru**, Bot menampilkan ringkasan **Setting Akun** sebelum memilih durasi/order.
-- Default Nama, Domain, Password, dan jumlah digit berasal dari pengaturan owner.
-- User dapat menekan **Setting Akun** untuk mengubah field yang diizinkan owner, atau langsung **Lanjut order**.
-- Mode **Perpanjang** menggunakan alur pemeriksaan akun sebelum memilih durasi.
-- Harga jual Perpanjang 7/14 Hari dapat dioverride per durasi.
-- Refund gagal Perpanjang 7/14 Hari dapat diatur terpisah. Contoh: harga Rp12.000, refund gagal Rp4.000.
-- Perhitungan order menyimpan nilai net setelah refund agar laporan/profit konsisten.
-- Perpanjang tampil sebagai mode normal dan urutannya tetap dapat diatur melalui editor Mode & Urutan.
-
-## Dashboard
-
-- **Jaspay Fresh** dipindahkan dari Pengaturan → Supplier menjadi menu utama dashboard.
-- Pengaturan Supplier sekarang khusus ProdSeller dan AIVerseHub.
-- Editor Produk Fresh menambahkan izin Setting Akun user serta konfigurasi Harga/Refund Perpanjang 7/14 Hari.
+- Jaspay Fresh menjadi menu utama di sidebar.
+- Pengaturan → Supplier hanya berisi ProdSeller dan AIVerseHub.
+- Editor Produk Fresh menambahkan Default Pembuatan Akun yang tampil ke user setelah memilih Akun Baru.
+- Owner dapat menentukan apakah user boleh mengubah Nama, Domain, Password, dan jumlah digit.
+- Owner dapat mengatur harga jual Perpanjang 7/14 Hari dan nominal refund jika gagal secara terpisah.
+- Urutan, warna, label, deskripsi, dan tampil/sembunyi mode tetap dapat diatur dari dashboard.
+- Asset cache dinaikkan ke v2.6.2.

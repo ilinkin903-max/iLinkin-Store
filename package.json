@@ -1,6 +1,6 @@
 {
   "name": "ilink-autoorder-dashboard-vercel",
-  "version": "2.6.2",
+  "version": "2.6.3",
   "private": true,
   "description": "iLink Auto Order neo-brutalism owner dashboard + secure Pterodactyl gateway",
   "engines": {

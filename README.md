@@ -1,4 +1,4 @@
-# iLink Auto Order v2.6.6 — Vercel Dashboard
+# iLink Auto Order v2.6.7 — Vercel Dashboard
 
 Deploy ke project Vercel yang sama dengan versi sebelumnya.
 
@@ -19,6 +19,12 @@ app.css
 vercel.json
 api/
 ```
+
+
+## v2.6.7
+- Dashboard Fresh menampilkan istilah **Saldo** untuk balance Jaspay, bukan Credit.
+- Ringkasan Fresh menampilkan total **Stok Ready** dari endpoint Ready Stock bila tersedia.
+- Gateway produk Fresh meneruskan metadata Ready Stock dari VPS agar status dashboard dan bot memakai sumber data yang sama.
 
 
 ## v2.6.6

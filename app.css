@@ -229,3 +229,49 @@ body{overflow-x:hidden}.app-shell{min-height:100vh;display:grid;grid-template-co
 /* v2.6.5 - supplier-root product actions */
 .product-actions [data-sync-product-supplier-card]{grid-column:span 2}
 @media(max-width:620px){.product-actions [data-sync-product-supplier-card]{grid-column:span 2}}
+
+
+/* v2.6.6 - Fresh per-option pricing + compact, cleaner product miniapp */
+.fresh-price-grid.editable{grid-template-columns:1fr;gap:9px}
+.fresh-price-edit-card{align-items:flex-start;background:#fbf9ff}
+.fresh-price-main{min-width:0;display:grid;gap:4px}
+.fresh-price-input{display:grid;grid-template-columns:minmax(130px,auto) minmax(170px,240px);gap:9px;align-items:center;margin-top:6px}
+.fresh-price-input em{font-size:9px;font-style:normal;font-weight:950;color:#555}
+.fresh-price-input input[type=number]{width:100%;border:2px solid var(--ink);border-radius:9px;background:#fff;padding:8px 10px;font-weight:900}
+.variant-default-hidden-note{background:#fff8cc}
+.supplier-product-actions [data-jaspay-toggle]{min-width:96px}
+
+.product-card{grid-template-columns:108px minmax(0,1fr);gap:13px;padding:12px 13px;border-radius:18px;min-height:0!important}
+.product-thumb{width:108px;height:108px;aspect-ratio:auto;border-radius:13px;font-size:42px}
+.product-index{top:8px;left:7px;padding:2px 6px;font-size:10px}
+.product-head{gap:8px;align-items:flex-start}
+.product-title h3{font-size:20px;line-height:1.08}
+.product-title p{margin:3px 0;font-size:11px;line-height:1.25}
+.product-head-actions{gap:5px;flex-wrap:nowrap}
+.stock-state-pill{padding:4px 7px;font-size:8px;white-space:nowrap}
+.toggle{padding:5px 9px;font-size:11px;white-space:nowrap}
+.product-info{gap:7px;margin:7px 0}
+.info-box{padding:7px 9px;min-height:62px;display:flex;flex-direction:column;justify-content:center}
+.info-box small{font-size:8px}
+.info-box strong{font-size:17px;line-height:1.12;overflow-wrap:anywhere}
+.info-box.price em,.stock-box em{font-size:7px;margin-top:2px}
+.variant-row{gap:5px;margin-top:0}
+.variant-chip,.tag-chip{padding:2px 6px;font-size:8px;border-radius:8px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.product-actions{grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:6px;margin-top:7px}
+.product-actions .neo-btn{padding:7px 6px;font-size:10px;line-height:1.1;min-width:0}
+.product-actions [data-sync-product-supplier-card]{grid-column:auto}
+
+@media(max-width:720px){
+  .fresh-price-input{grid-template-columns:1fr;gap:5px}.supplier-product-actions [data-jaspay-toggle]{min-width:0}
+  .product-card{grid-template-columns:84px minmax(0,1fr);gap:9px;padding:9px}
+  .product-thumb{width:84px;height:84px;font-size:34px}
+  .product-title h3{font-size:17px}.product-title p{font-size:10px}
+  .product-head-actions{display:grid;justify-items:end}.stock-state-pill{font-size:7px}.toggle{font-size:10px;padding:4px 7px}
+  .product-info{grid-template-columns:1fr 1fr;gap:5px;margin:6px 0}.info-box{min-height:54px;padding:6px}.info-box strong{font-size:14px}
+  .product-actions{grid-template-columns:1fr 1fr;gap:5px}.product-actions .neo-btn{font-size:9px;padding:7px 4px}
+}
+@media(max-width:440px){
+  .product-card{grid-template-columns:72px minmax(0,1fr);gap:8px}
+  .product-thumb{width:72px;height:72px}
+  .product-info{grid-template-columns:1fr}.product-title h3{font-size:16px}
+}

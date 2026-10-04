@@ -1,4 +1,4 @@
-# iLink Auto Order v2.6.5 — Vercel Dashboard
+# iLink Auto Order v2.6.6 — Vercel Dashboard
 
 Deploy ke project Vercel yang sama dengan versi sebelumnya.
 
@@ -19,6 +19,13 @@ app.css
 vercel.json
 api/
 ```
+
+
+## v2.6.6
+- Editor harga Jaspay Fresh per kombinasi API dengan Harga Jual Kustom.
+- Pembacaan status Fresh global diperbaiki; quick toggle ON/OFF tersedia per produk Fresh.
+- Kartu produk dibuat lebih ringkas, responsif, dan nyaman dibaca pada desktop maupun HP.
+- Saat produk memiliki varian, pengaturan Default (harga, modal, bulk, mode, stok, dan pilihan manual order) disembunyikan agar tidak membingungkan.
 
 ## v2.4.0
 - Broadcast menjadi menu utama sendiri.

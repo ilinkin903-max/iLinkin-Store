@@ -51,7 +51,7 @@ function showLogin(){$('#loginView').classList.remove('hidden');$('#appView').cl
 $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginError').textContent='';try{const r=await api('/api/admin/auth/login',{method:'POST',body:{username:$('#loginUsername').value,password:$('#loginPassword').value}});state.token=r.token;sessionStorage.setItem('ilink_owner_token',r.token);$('#loginPassword').value='';await initialize()}catch(err){$('#loginError').textContent=err.message}};$('#logoutBtn').onclick=()=>logout();$('#refreshBtn').onclick=()=>navigate(state.view,true);$('#notifBtn').onclick=e=>{e.stopPropagation();toggleNotifications()};$('#notificationPanel').onclick=e=>e.stopPropagation();$('#notifMarkAll').onclick=async()=>{try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{all:true}});renderNotifications(r);toast('Semua notifikasi ditandai dibaca')}catch(e){toast(e.message,true)}};$('#notificationList').onclick=async e=>{const b=e.target.closest('[data-notif-key]');if(!b)return;try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{keys:[b.dataset.notifKey]}});renderNotifications(r)}catch{}closeNotifications();if(b.dataset.notifView)navigate(b.dataset.notifView)};document.addEventListener('click',closeNotifications);function closeSidebar(){$('#sidebar').classList.remove('open');$('#sidebarBackdrop')?.classList.remove('show');$('#menuBtn')?.setAttribute('aria-expanded','false')}$('#menuBtn').onclick=e=>{e.stopPropagation();const open=$('#sidebar').classList.toggle('open');$('#sidebarBackdrop')?.classList.toggle('show',open);$('#menuBtn').setAttribute('aria-expanded',open?'true':'false')};$('#sidebarBackdrop').onclick=closeSidebar;document.addEventListener('click',e=>{const side=$('#sidebar'),menu=$('#menuBtn');if(side?.classList.contains('open')&&!side.contains(e.target)&&!menu?.contains(e.target))closeSidebar()});$('#nav').onclick=e=>{const b=e.target.closest('[data-view]');if(b){closeSidebar();navigate(b.dataset.view)}};
 function setHeader(view){const[t,s]=titles[view]||[view,''];$('#pageTitle').textContent=t;$('#pageSubtitle').textContent=s;$$('#nav [data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))}
 async function initialize(){state.me=(await api('/api/admin/me')).user;showApp();await navigate('dashboard');await refreshNotifications();if(!state.notificationTimer)state.notificationTimer=setInterval(()=>refreshNotifications(true),60000)}
-async function navigate(view){state.view=view;closeNotifications();setHeader(view);$('#content').innerHTML='<div class="empty-product">Memuat data...</div>';try{await({dashboard:loadDashboard,products:loadProducts,fresh:loadFresh,orders:loadOrders,reports:loadReports,coupons:loadCoupons,settings:loadSettings,bot:loadBot,broadcast:loadBroadcast,users:loadUsers}[view]||loadDashboard)();$('#lastUpdated').textContent='Terakhir diperbarui: '+new Date().toLocaleString('id-ID');refreshNotifications(true)}catch(e){$('#content').innerHTML=`<div class="empty-product">${esc(e.message)}</div>`;toast(e.message,true)}}
+async function navigate(view){if(state.broadcastPollTimer){clearInterval(state.broadcastPollTimer);state.broadcastPollTimer=null;}state.view=view;closeNotifications();setHeader(view);$('#content').innerHTML='<div class="empty-product">Memuat data...</div>';try{await({dashboard:loadDashboard,products:loadProducts,fresh:loadFresh,orders:loadOrders,reports:loadReports,coupons:loadCoupons,settings:loadSettings,bot:loadBot,broadcast:loadBroadcast,users:loadUsers}[view]||loadDashboard)();$('#lastUpdated').textContent='Terakhir diperbarui: '+new Date().toLocaleString('id-ID');refreshNotifications(true)}catch(e){$('#content').innerHTML=`<div class="empty-product">${esc(e.message)}</div>`;toast(e.message,true)}}
 function applyShell(r){const s=r.settings||{};const o=r.stats||{};state.overview=r;$('#brandName').innerHTML=esc(String(s.store_name||'AUTO ORDER')).replace(/\s+/g,'<br>');$('#brandTagline').textContent=s.store_tagline||'Digital Store';$('#ownerName').textContent=s.owner_display_name||state.me?.display_name||'Owner';$('#ownerUsername').textContent='@'+String(s.owner_username||state.me?.owner_username||'owneradmin').replace(/^@/,'');const metric=String(s.store_balance_metric||o.store_balance_metric||'month_profit');const metricMap={month_profit:['Profit Bulan Ini',o.month_profit],month_revenue:['Omzet Bulan Ini',o.month_revenue],today_profit:['Profit Hari Ini',o.today_profit],today_revenue:['Omzet Hari Ini',o.today_revenue],manual:['Saldo Manual',s.store_balance??o.store_balance]};const selected=metricMap[metric]||metricMap.month_profit;$('#storeBalanceLabel').textContent=selected[0];$('#storeBalance').textContent=money(selected[1]||0);const badgeEl=$('#orderBadge');const pending=Number(o.pending_orders||0);badgeEl.textContent=pending;badgeEl.classList.toggle('hidden',pending<1);const username=state.overview?.bot?.username;$('#telegramBtn').href=username?`https://t.me/${username}`:'#';$('#telegramBtn').textContent='✈ Telegram Mini App';$('#systemSafe').textContent=state.overview?.bot?.running?'Semua sistem berjalan dengan aman':'Dashboard aktif · Bot Telegram offline'}
 function stat(icon,color,label,value,small){return`<div class="stat-card"><div class="stat-icon ${color}">${icon}</div><div><small>${esc(label)}</small><strong>${esc(value)}</strong><em>${esc(small)}</em></div></div>`}
 function productStockState(p={}){const all=Array.isArray(p.variants)?p.variants:[],vars=all.filter(v=>v.active);if(all.length){if(vars.some(v=>v.delivery_mode!=='preorder'&&Number(v.stock||0)>0))return'ready';if(vars.some(v=>v.delivery_mode==='preorder'))return'preorder';return'empty'}if(p.delivery_mode==='preorder'&&Number(p.stock||0)<1)return'preorder';return Number(p.sale_stock??p.stock??0)>0?'ready':'empty'}
@@ -223,7 +223,231 @@ function openJaspayProduct(key){
 async function loadBot(){const[sys,settings]=await Promise.all([api('/api/admin/system'),api('/api/admin/settings')]);state.cache.system=sys;state.cache.settings=settings.settings||{};state.botTab='';renderBot()}
 function botTabsHtml(){const tabs=[['general','🤖','BOT TELEGRAM','Status bot, maintenance, dan pesan ketika bot dinonaktifkan.'],['start','▶️','MEDIA /START','Atur gambar, GIF, video, dan caption pembuka bot.'],['links','🔗','LINK & CHANNEL','Customer service, grup, Nokos, dan channel wajib.'],['transactions','🔔','NOTIFIKASI TRANSAKSI','Atur tujuan notifikasi order/TopUp dan kirim test.'],['diagnostic','🩺','DIAGNOSTIK BOT','Cek koneksi Telegram, latency, antrean chat, dan command owner.']];return`<section class="submenu-home bot-menu-home"><div class="submenu-home-head"><h2>Bot & Notifikasi</h2><p>Pilih bagian bot yang ingin dikelola.</p></div><nav class="submenu-card-list" aria-label="Submenu Bot & Notifikasi">${tabs.map(([k,icon,title,desc])=>`<button class="submenu-card" data-bot-tab="${k}"><span class="submenu-card-icon">${icon}</span><span class="submenu-card-copy"><b>${title}</b><small>${desc}</small></span><span class="submenu-card-arrow">›</span></button>`).join('')}</nav></section>`}
 function renderBot(){const sys=state.cache.system||{},x=state.cache.settings||{};if(!state.botTab){$('#content').innerHTML=botTabsHtml();$$('[data-bot-tab]').forEach(b=>b.onclick=()=>{state.botTab=b.dataset.botTab;renderBot()});return;}let body='';if(state.botTab==='general')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>🤖 Bot Telegram</h3><p>Status bot dan mode maintenance.</p></div>${badge(sys.integrations?.telegram?.running?'running':'offline')}</div><form id="botGeneralForm" class="form-grid"><label>Status Bot<select name="bot_enabled"><option value="true" ${x.bot_enabled!==false?'selected':''}>Aktif</option><option value="false" ${x.bot_enabled===false?'selected':''}>Maintenance</option></select></label><label class="full">Pesan Maintenance<textarea name="bot_maintenance_message">${esc(x.bot_maintenance_message||'')}</textarea></label><div class="full form-actions"><button class="neo-btn purple" type="submit">Simpan Bot</button></div></form></section>`;else if(state.botTab==='start')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>🏠 Tampilan /start</h3><p>Atur media dan caption menu awal bot. File disimpan di VPS.</p></div></div><form id="startSettingsForm" class="form-grid"><label>Media /start<select name="start_media_type" id="startMediaType"><option value="none" ${!x.start_media_type||x.start_media_type==='none'?'selected':''}>Tidak Ada</option><option value="photo" ${x.start_media_type==='photo'?'selected':''}>Foto</option><option value="animation" ${x.start_media_type==='animation'||x.start_media_type==='gif'?'selected':''}>GIF / Animasi</option><option value="video" ${x.start_media_type==='video'?'selected':''}>Video</option><option value="sticker" ${x.start_media_type==='sticker'?'selected':''}>Sticker</option></select></label><label class="full">Media /start<div class="media-uploader"><input id="startMediaFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm"><button type="button" id="uploadStartMedia" class="neo-btn blue small">Upload ke VPS</button><button type="button" id="clearStartMedia" class="neo-btn white small">Hapus</button></div><div class="media-upload-hint"><span>Gambar/GIF maks. 8 MB · Video MP4/WEBM maks. 40 MB</span><b id="startMediaProgress"></b></div><input name="start_media_value" id="startMediaValue" value="${esc(x.start_media_value||'')}" placeholder="vps://... atau Telegram file_id / URL"><div id="startMediaPreview" class="media-preview">${mediaPreviewHtml(x.start_media_value||'',x.start_media_type||'')}</div></label><label class="full">Caption /start<textarea name="start_media_caption">${esc(x.start_media_caption||'')}</textarea></label><div class="full form-actions"><button class="neo-btn purple" type="submit">Simpan Menu /start</button></div></form></section>`;else if(state.botTab==='links')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>🔗 Link</h3><p>Customer service, grup, Nokos, dan channel wajib.</p></div></div><form id="linkSettingsForm" class="form-grid"><label>Customer Service<input name="customer_service_link" value="${esc(x.customer_service_link||'')}" placeholder="@username atau https://..."></label><label>Grup Telegram<input name="group_link" value="${esc(x.group_link||'')}" placeholder="@username atau https://..."></label><label>Nokos / Link<input name="nokos_link" value="${esc(x.nokos_link||'')}" placeholder="@username atau https://..."></label><label>Channel Wajib ID<input name="required_channel_id" value="${esc(x.required_channel_id||'')}"></label><label>Channel Wajib Link<input name="required_channel_link" value="${esc(x.required_channel_link||'')}" placeholder="@channel atau https://..."></label><div class="full form-actions"><button class="neo-btn purple" type="submit">Simpan Link</button></div></form></section>`;else if(state.botTab==='transactions')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>💸 Notifikasi Transaksi</h3><p>Atur chat, grup, atau channel Telegram tujuan notifikasi transaksi.</p></div></div><form id="transactionNotificationForm" class="form-grid"><label>Status<select name="transaction_notifications_enabled"><option value="true" ${x.transaction_notifications_enabled!==false?'selected':''}>Aktif</option><option value="false" ${x.transaction_notifications_enabled===false?'selected':''}>Nonaktif</option></select></label><label>Tujuan Notifikasi<input name="transaction_channel_id" value="${esc(x.transaction_channel_id||'')}" placeholder="-1001234567890 atau @channel"><small>Bot harus berada di grup/channel dan memiliki izin mengirim pesan.</small></label><label>Order Berhasil<select name="transaction_notify_orders"><option value="true" ${x.transaction_notify_orders!==false?'selected':''}>Kirim</option><option value="false" ${x.transaction_notify_orders===false?'selected':''}>Jangan kirim</option></select></label><label>TopUp Berhasil<select name="transaction_notify_topups"><option value="true" ${x.transaction_notify_topups!==false?'selected':''}>Kirim</option><option value="false" ${x.transaction_notify_topups===false?'selected':''}>Jangan kirim</option></select></label><div class="full form-actions"><button class="neo-btn purple" type="submit">Simpan Notifikasi</button><button id="testTransactionNotification" class="neo-btn blue" type="button">Kirim Test</button></div></form></section>`;else body=`<div class="grid-2"><section class="settings-section"><div class="section-head"><div><h3>🩺 Status Telegram</h3><p>Diagnostik proses bot.</p></div></div><div class="system-mini-grid"><div><span>Bot</span><b>${esc(sys.integrations?.telegram?.username?'@'+sys.integrations.telegram.username:'Tidak terkonfigurasi')}</b></div><div><span>API Telegram</span><b>${Number(sys.integrations?.telegram?.last_api_latency_ms||0)} ms</b></div><div><span>Antrean Chat</span><b>${Number(sys.integrations?.telegram?.in_flight_chats||0)}</b></div><div><span>Network Failure</span><b>${Number(sys.integrations?.telegram?.network_failures||0)}</b></div><div><span>Node</span><b>${esc(sys.node)}</b></div><div><span>Uptime</span><b>${Math.floor((sys.uptime_seconds||0)/60)} menit</b></div></div>${sys.integrations?.telegram?.last_poll_error?`<div class="warning-note"><b>Telegram terakhir:</b> ${esc(sys.integrations.telegram.last_poll_error)}</div>`:''}</section><section class="settings-section"><div class="section-head"><div><h3>⌨️ Command Owner</h3><p>Perintah cepat owner.</p></div></div><div class="code-list">${['/ownermenu','/panel','/stats','/addproduk','/addstok','/editstok','/editdeskripsi','/editsnk','/bc','/bcphoto','/bcsticker','/bcpoll','/addvoucher','/rekap','/maintenance'].map(c=>`<span class="code-pill">${c}</span>`).join('')}</div></section></div>`;$('#content').innerHTML=`<div class="submenu-detail"><div class="submenu-detail-top"><button type="button" class="neo-btn white submenu-back" id="botMenuBack">← Kembali ke Bot & Notifikasi</button></div><div class="settings-tab-body">${body}</div></div>`;$('#botMenuBack').onclick=()=>{state.botTab='';renderBot()};if($('#botGeneralForm'))$('#botGeneralForm').onsubmit=e=>saveBotSettings(e,['bot_enabled']);if($('#startSettingsForm')){$('#startSettingsForm').onsubmit=e=>saveBotSettings(e,[]);$('#uploadStartMedia').onclick=async()=>{const btn=$('#uploadStartMedia'),progress=$('#startMediaProgress');try{const file=$('#startMediaFile').files?.[0];if(!file)throw new Error('Pilih gambar atau video terlebih dahulu.');const isGif=String(file.type||'').toLowerCase()==='image/gif'||/\.gif$/i.test(String(file.name||'')),isVideo=String(file.type||'').startsWith('video/')||/\.(mp4|webm)$/i.test(String(file.name||'')),isImage=!isGif&&(String(file.type||'').startsWith('image/')||/\.(jpe?g|png|webp)$/i.test(String(file.name||'')));if(!isVideo&&!isImage&&!isGif)throw new Error('Format harus JPG, PNG, WEBP, GIF, MP4, atau WEBM.');btn.disabled=true;btn.textContent='Mengupload...';progress.textContent='0%';const type=isVideo?'video':isGif?'animation':'photo',kind=isVideo?'start-video':isGif?'start-animation':'start-photo',r=await uploadMedia(file,kind,p=>{progress.textContent=p+'%'});await api('/api/admin/settings',{method:'PATCH',body:{start_media_type:type,start_media_value:r.item.key}});state.cache.settings={...(state.cache.settings||{}),start_media_type:type,start_media_value:r.item.key};$('#startMediaValue').value=r.item.key;$('#startMediaType').value=type;$('#startMediaPreview').innerHTML=mediaPreviewHtml(r.item.key,type);progress.textContent='100% · tersimpan';toast(`${isVideo?'Video':isGif?'GIF':'Gambar'} /start berhasil diupload dan langsung disimpan`)}catch(e){progress.textContent='Gagal';toast(e.message,true)}finally{btn.disabled=false;btn.textContent='Upload ke VPS'}};$('#clearStartMedia').onclick=async()=>{const old=$('#startMediaValue').value;try{if(String(old).startsWith('vps://'))await api('/api/admin/media?key='+encodeURIComponent(old),{method:'DELETE'}).catch(()=>null);await api('/api/admin/settings',{method:'PATCH',body:{start_media_type:'none',start_media_value:''}});state.cache.settings={...(state.cache.settings||{}),start_media_type:'none',start_media_value:''};$('#startMediaValue').value='';$('#startMediaType').value='none';$('#startMediaPreview').innerHTML='<span>Belum ada media.</span>';$('#startMediaProgress').textContent='';toast('Media /start dihapus')}catch(e){toast(e.message,true)}}}if($('#linkSettingsForm'))$('#linkSettingsForm').onsubmit=e=>saveBotSettings(e,[]);if($('#transactionNotificationForm')){$('#transactionNotificationForm').onsubmit=e=>saveBotSettings(e,['transaction_notifications_enabled','transaction_notify_orders','transaction_notify_topups']);$('#testTransactionNotification').onclick=async()=>{try{await api('/api/admin/bot/test-transaction-notification',{method:'POST',body:{}});toast('Test notifikasi transaksi berhasil dikirim')}catch(err){toast(err.message,true)}}}}
-async function loadBroadcast(){const logs=await api('/api/admin/broadcasts?limit=50');$('#content').innerHTML=`<div class="broadcast-page"><section class="settings-section"><div class="section-head"><div><h3>📢 Buat Broadcast</h3><p>Kirim teks, foto, sticker, atau polling ke pengguna aktif.</p></div></div><div class="broadcast-compose"><form id="broadcastForm" class="form-grid"><label>Tipe<select name="type" id="broadcastType"><option value="text">Teks</option><option value="photo">Foto</option><option value="sticker">Sticker File ID</option><option value="poll">Polling</option></select></label><label>Media / Opsi Poll<input name="media" id="broadcastMedia" placeholder="vps://, URL/file_id, atau Opsi 1|Opsi 2"></label><label class="full">Upload Foto ke VPS<div class="media-uploader"><input id="broadcastFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><button type="button" id="uploadBroadcastMedia" class="neo-btn blue small">Upload Foto</button></div></label><label class="full">Pesan / Caption<textarea name="message" id="broadcastMessage" rows="7" placeholder="Tulis pesan broadcast..."></textarea></label><div class="full form-actions"><button class="neo-btn purple" type="submit">📢 Kirim Broadcast</button></div></form><div><h4>Preview</h4><div id="broadcastPreview" class="broadcast-preview">Pesan broadcast akan tampil di sini.</div></div></div></section><section class="settings-section"><div class="section-head"><div><h3>🧾 Riwayat Broadcast</h3><p>50 broadcast terbaru.</p></div></div><div class="broadcast-log-list">${(logs.items||[]).length?(logs.items||[]).map(x=>`<article class="broadcast-log-card"><div><b>${esc(x.type)}</b><small>${date(x.created_at)}</small></div><p>${esc(x.message||'-').slice(0,180)}</p><div><span>Total <b>${x.total}</b></span><span>Terkirim <b>${x.sent}</b></span><span>Gagal <b>${x.failed}</b></span></div></article>`).join(''):'<div class="empty compact">Belum ada broadcast.</div>'}</div></section></div>`;const update=()=>$('#broadcastPreview').textContent=$('#broadcastMessage').value||'Pesan broadcast akan tampil di sini.';$('#broadcastMessage').oninput=update;$('#uploadBroadcastMedia').onclick=async()=>{try{const file=$('#broadcastFile').files?.[0];const r=await uploadMedia(file,'broadcast');$('#broadcastMedia').value=r.item.key;$('#broadcastType').value='photo';toast('Foto broadcast tersimpan di VPS')}catch(e){toast(e.message,true)}};$('#broadcastForm').onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target).entries());if(!confirm('Kirim broadcast ke seluruh pengguna aktif?'))return;try{const r=await api('/api/admin/broadcast',{method:'POST',body:{...b,options:b.type==='poll'?String(b.media||'').split('|').map(x=>x.trim()).filter(Boolean):[]}});toast('Broadcast dimulai: '+r.job.id);setTimeout(loadBroadcast,1200)}catch(err){toast(err.message,true)}}}
+async function loadBroadcast(){
+  if(state.broadcastPollTimer){clearInterval(state.broadcastPollTimer);state.broadcastPollTimer=null;}
+  const logs=await api('/api/admin/broadcasts?limit=50').catch(()=>({items:[]}));
+  const activeJob=logs.active_job;
+
+  const renderActiveCard=(j)=>{
+    if(!j||j.status==='completed')return '';
+    const pct=j.total?Math.min(100,Math.round(((j.sent+j.failed)/j.total)*100)):0;
+    return `<div class="broadcast-monitor-card" id="broadcastMonitor">
+      <div class="broadcast-monitor-head">
+        <div><b>📡 Broadcast Sedang Berjalan</b><small>Job: <code>${esc(j.id)}</code></small></div>
+        ${badge(j.status||'running')}
+      </div>
+      <div class="broadcast-monitor-stats">
+        <div class="broadcast-monitor-stat"><small>Target</small><b>${j.total||0}</b></div>
+        <div class="broadcast-monitor-stat ok"><small>Terkirim</small><b>${j.sent||0}</b></div>
+        <div class="broadcast-monitor-stat bad"><small>Gagal</small><b>${j.failed||0}</b></div>
+      </div>
+      <div class="broadcast-progress-bar"><div class="broadcast-progress-fill" style="width:${pct}%"></div></div>
+    </div>`;
+  };
+
+  const renderLogCard=(x)=>{
+    const btnInfo=x.button_text?`<div class="log-button-info">🔘 <b>${esc(x.button_text)}</b> ${x.button_action==='url'?`(${esc(x.button_url||'-')})`:'(Aksi: /start)'}</div>`:'';
+    return `<article class="broadcast-log-card">
+      <div><b>${esc(x.type)}</b><small>${date(x.created_at)}</small></div>
+      <p>${esc(x.message||'-').slice(0,180)}</p>
+      ${btnInfo}
+      <div>
+        <span>Target <b>${x.total}</b></span>
+        <span style="color:#15803d;background:#ecfdf5">Terkirim <b>${x.sent}</b></span>
+        <span style="color:#b91c1c;background:#fef2f2">Gagal <b>${x.failed}</b></span>
+      </div>
+    </article>`;
+  };
+
+  $('#content').innerHTML=`<div class="broadcast-page">
+    <div id="broadcastMonitorWrap">${renderActiveCard(activeJob)}</div>
+    <section class="settings-section">
+      <div class="section-head">
+        <div><h3>📢 Buat Broadcast</h3><p>Kirim teks, foto, sticker, atau polling ke pengguna bot.</p></div>
+      </div>
+      <div class="broadcast-compose">
+        <form id="broadcastForm" class="form-grid">
+          <label>Tipe
+            <select name="type" id="broadcastType">
+              <option value="text">Teks</option>
+              <option value="photo">Foto</option>
+              <option value="sticker">Sticker File ID</option>
+              <option value="poll">Polling</option>
+            </select>
+          </label>
+          <label>Media / Opsi Poll
+            <input name="media" id="broadcastMedia" placeholder="vps://, URL/file_id, atau Opsi 1|Opsi 2">
+          </label>
+          <label class="full">Upload Foto ke VPS
+            <div class="media-uploader">
+              <input id="broadcastFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+              <button type="button" id="uploadBroadcastMedia" class="neo-btn blue small">Upload Foto</button>
+            </div>
+          </label>
+          <label class="full">Pesan / Caption
+            <textarea name="message" id="broadcastMessage" rows="6" placeholder="Tulis pesan broadcast..."></textarea>
+          </label>
+          
+          <div class="full broadcast-button-card">
+            <div class="broadcast-button-head">
+              <label class="inline-checkbox">
+                <input type="checkbox" id="broadcastBtnToggle" name="button_enabled">
+                <b>🔘 Tambahkan Tombol di Bawah Pesan</b>
+              </label>
+            </div>
+            <div id="broadcastBtnFields" class="form-grid hidden" style="margin-top:10px">
+              <label>Tipe Aksi Tombol
+                <select id="broadcastBtnAction" name="button_type">
+                  <option value="start">🚀 Mulai Bot (/start)</option>
+                  <option value="url">🔗 Buka Link URL</option>
+                </select>
+              </label>
+              <label>Nama / Label Tombol
+                <input type="text" id="broadcastBtnText" name="button_text" value="🚀 Mulai Belanja" placeholder="Contoh: Mulai Belanja, Buka Menu...">
+              </label>
+              <label id="broadcastBtnUrlWrap" class="full hidden">Tautan URL (Website / Channel)
+                <input type="url" id="broadcastBtnUrl" name="button_url" placeholder="https://t.me/channel atau https://...">
+              </label>
+            </div>
+          </div>
+
+          <div class="full form-actions">
+            <button class="neo-btn purple" id="broadcastSubmitBtn" type="submit">📢 Kirim Broadcast</button>
+          </div>
+        </form>
+        <div>
+          <h4>Preview Pesan</h4>
+          <div id="broadcastPreview" class="broadcast-preview">
+            <div class="broadcast-preview-text" id="broadcastPreviewText">Pesan broadcast akan tampil di sini.</div>
+            <div class="broadcast-preview-btn-wrap hidden" id="broadcastPreviewBtnWrap">
+              <button type="button" class="telegram-preview-button" id="broadcastPreviewBtn">🚀 Mulai Belanja</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="settings-section">
+      <div class="section-head">
+        <div><h3>🧾 Riwayat Broadcast</h3><p>50 broadcast terbaru dengan rincian jumlah terkirim dan gagal.</p></div>
+        <button type="button" class="neo-btn white small" id="refreshBroadcastLogs">↻ Refresh</button>
+      </div>
+      <div class="broadcast-log-list" id="broadcastLogList">${(logs.items||[]).length?(logs.items||[]).map(renderLogCard).join(''):'<div class="empty compact">Belum ada broadcast.</div>'}</div>
+    </section>
+  </div>`;
+
+  const syncPreview=()=>{
+    const msg=$('#broadcastMessage').value||'';
+    $('#broadcastPreviewText').textContent=msg||'Pesan broadcast akan tampil di sini.';
+    const btnOn=$('#broadcastBtnToggle').checked;
+    $('#broadcastPreviewBtnWrap').classList.toggle('hidden',!btnOn);
+    if(btnOn){
+      $('#broadcastPreviewBtn').textContent=$('#broadcastBtnText').value||'🚀 Tombol';
+    }
+  };
+
+  $('#broadcastMessage').oninput=syncPreview;
+  $('#broadcastBtnText').oninput=syncPreview;
+
+  $('#broadcastBtnToggle').onchange=()=>{
+    const on=$('#broadcastBtnToggle').checked;
+    $('#broadcastBtnFields').classList.toggle('hidden',!on);
+    syncPreview();
+  };
+
+  $('#broadcastBtnAction').onchange=()=>{
+    const isUrl=$('#broadcastBtnAction').value==='url';
+    $('#broadcastBtnUrlWrap').classList.toggle('hidden',!isUrl);
+    if(isUrl&&!$('#broadcastBtnText').value.trim())$('#broadcastBtnText').value='🔗 Buka Link';
+    else if(!isUrl&&!$('#broadcastBtnText').value.trim())$('#broadcastBtnText').value='🚀 Mulai Belanja';
+    syncPreview();
+  };
+
+  $('#uploadBroadcastMedia').onclick=async()=>{
+    try{
+      const file=$('#broadcastFile').files?.[0];
+      const r=await uploadMedia(file,'broadcast');
+      $('#broadcastMedia').value=r.item.key;
+      $('#broadcastType').value='photo';
+      toast('Foto broadcast tersimpan di VPS');
+    }catch(e){toast(e.message,true);}
+  };
+
+  if($('#refreshBroadcastLogs'))$('#refreshBroadcastLogs').onclick=loadBroadcast;
+
+  const startPollingJob=(jobId)=>{
+    if(state.broadcastPollTimer)clearInterval(state.broadcastPollTimer);
+    state.broadcastPollTimer=setInterval(async()=>{
+      try{
+        const st=await api(`/api/admin/broadcast/status?id=${encodeURIComponent(jobId)}`);
+        const j=st.job;
+        if(!j)return;
+        const wrap=$('#broadcastMonitorWrap');
+        if(wrap)wrap.innerHTML=renderActiveCard(j);
+        if(j.status==='completed'||j.status==='failed'){
+          clearInterval(state.broadcastPollTimer);
+          state.broadcastPollTimer=null;
+          toast(j.status==='completed'?`Broadcast selesai: ${j.sent||0} terkirim, ${j.failed||0} gagal`:`Broadcast gagal: ${j.error||'Error'}`);
+          const refreshed=await api('/api/admin/broadcasts?limit=50').catch(()=>null);
+          if(refreshed&&$('#broadcastLogList'))$('#broadcastLogList').innerHTML=(refreshed.items||[]).length?(refreshed.items||[]).map(renderLogCard).join(''):'<div class="empty compact">Belum ada broadcast.</div>';
+        }
+      }catch(e){
+        clearInterval(state.broadcastPollTimer);
+        state.broadcastPollTimer=null;
+      }
+    },1500);
+  };
+
+  if(activeJob&&activeJob.status==='running'){
+    startPollingJob(activeJob.id);
+  }
+
+  $('#broadcastForm').onsubmit=async e=>{
+    e.preventDefault();
+    const fd=new FormData(e.target);
+    const b=Object.fromEntries(fd.entries());
+    const btnEnabled=$('#broadcastBtnToggle').checked;
+    const btnType=$('#broadcastBtnAction').value;
+    const btnText=($('#broadcastBtnText').value||'').trim();
+    const btnUrl=($('#broadcastBtnUrl').value||'').trim();
+    if(btnEnabled&&!btnText){toast('Nama tombol harus diisi',true);return;}
+    if(btnEnabled&&btnType==='url'&&!btnUrl){toast('URL tombol harus diisi (contoh: https://...)',true);return;}
+
+    if(!confirm('Kirim broadcast ke seluruh pengguna bot?'))return;
+
+    const submitBtn=$('#broadcastSubmitBtn');
+    submitBtn.disabled=true;submitBtn.textContent='Mengirim...';
+
+    try{
+      const r=await api('/api/admin/broadcast',{
+        method:'POST',
+        body:{
+          ...b,
+          button:{
+            enabled:btnEnabled,
+            type:btnType,
+            text:btnText,
+            url:btnUrl
+          },
+          button_enabled:btnEnabled,
+          button_type:btnType,
+          button_text:btnText,
+          button_url:btnUrl,
+          options:b.type==='poll'?String(b.media||'').split('|').map(x=>x.trim()).filter(Boolean):[]
+        }
+      });
+      toast('Broadcast dimulai: '+r.job.id);
+      startPollingJob(r.job.id);
+      setTimeout(async()=>{
+        const refreshed=await api('/api/admin/broadcasts?limit=50').catch(()=>null);
+        if(refreshed&&$('#broadcastLogList'))$('#broadcastLogList').innerHTML=(refreshed.items||[]).length?(refreshed.items||[]).map(renderLogCard).join(''):'<div class="empty compact">Belum ada broadcast.</div>';
+      },600);
+    }catch(err){
+      toast(err.message,true);
+    }finally{
+      submitBtn.disabled=false;submitBtn.textContent='📢 Kirim Broadcast';
+    }
+  };
+}
 async function saveBotSettings(e,boolKeys=[]){e.preventDefault();const x=Object.fromEntries(new FormData(e.target).entries());for(const k of boolKeys)x[k]=x[k]==='true';try{await api('/api/admin/settings',{method:'PATCH',body:x});toast('Pengaturan bot disimpan')}catch(err){toast(err.message,true)}}
 async function loadUsers(){
   const r=await api('/api/admin/users?limit=500');state.cache.users=Array.isArray(r.items)?r.items:[];

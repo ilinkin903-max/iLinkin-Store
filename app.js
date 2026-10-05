@@ -227,13 +227,42 @@ async function loadBroadcast(){const logs=await api('/api/admin/broadcasts?limit
 async function saveBotSettings(e,boolKeys=[]){e.preventDefault();const x=Object.fromEntries(new FormData(e.target).entries());for(const k of boolKeys)x[k]=x[k]==='true';try{await api('/api/admin/settings',{method:'PATCH',body:x});toast('Pengaturan bot disimpan')}catch(err){toast(err.message,true)}}
 async function loadUsers(){
   const r=await api('/api/admin/users?limit=500');state.cache.users=Array.isArray(r.items)?r.items:[];
-  $('#content').innerHTML=`<div class="toolbar user-toolbar"><div class="searchbox"><input id="userSearch" placeholder="Cari ID, username, nama..."></div><select id="userStatus"><option value="">Semua Status</option><option value="active">Aktif</option><option value="blocked">Blocked</option><option value="inactive">Inactive</option></select><button type="button" id="unblockAllUsers" class="neo-btn green small">⚡ Aktifkan Semua Blocked</button><div class="toolbar-count">${state.cache.users.length} user</div></div><div id="userCards" class="user-list">${userCards(state.cache.users)}</div>`;
+  const actCount=state.cache.users.filter(u=>u.status==='active').length;
+  const blkCount=state.cache.users.filter(u=>u.status==='blocked').length;
+  $('#content').innerHTML=`<div class="toolbar user-toolbar"><div class="searchbox"><input id="userSearch" placeholder="Cari ID, username, nama..."></div><select id="userStatus"><option value="">Semua Status</option><option value="active">Aktif</option><option value="blocked">Blocked</option><option value="inactive">Inactive</option></select><button type="button" id="unblockAllUsers" class="neo-btn green small">⚡ Aktifkan Semua Blocked</button><div class="toolbar-count" id="userCount">${state.cache.users.length} user (${actCount} aktif, ${blkCount} blocked)</div></div><div id="userCards" class="user-list">${userCards(state.cache.users)}</div>`;
   $('#userSearch').oninput=filterUsers;$('#userStatus').onchange=filterUsers;
-  if($('#unblockAllUsers'))$('#unblockAllUsers').onclick=async()=>{if(!confirm('Aktifkan kembali semua user yang berstatus blocked menjadi active?'))return;try{const res=await api('/api/admin/users/activate-all',{method:'POST'});toast(`${res.changes||0} user berhasil diaktifkan`);await loadUsers()}catch(e){toast(e.message,true)}};
+  if($('#unblockAllUsers'))$('#unblockAllUsers').onclick=async()=>{
+    if(!confirm('Aktifkan kembali semua user yang berstatus blocked menjadi active?'))return;
+    const btn=$('#unblockAllUsers');btn.disabled=true;btn.textContent='Memproses...';
+    try{
+      let changes=0;
+      try{
+        const res=await api('/api/admin/users/activate-all',{method:'POST',body:{}});
+        changes=Number(res.changes||0);
+      }catch(err1){
+        try{
+          const res2=await api('/api/admin/users',{method:'PATCH',body:{action:'activate_all'}});
+          changes=Number(res2.changes||0);
+        }catch(err2){
+          const blocked=(state.cache.users||[]).filter(u=>u.status==='blocked');
+          if(!blocked.length)throw new Error('Tidak ada user berstatus blocked di daftar.');
+          for(const u of blocked){
+            try{
+              await api(`/api/admin/users/${encodeURIComponent(u.telegram_id)}`,{method:'PATCH',body:{status:'active'}});
+              changes++;
+            }catch{}
+          }
+        }
+      }
+      toast(`${changes} user berhasil diaktifkan`);
+      await loadUsers();
+    }catch(e){toast(e.message,true)}
+    finally{if(btn){btn.disabled=false;btn.textContent='⚡ Aktifkan Semua Blocked';}}
+  };
   bindUserActions();
 }
 function userCards(rows){return rows.length?rows.map(u=>`<article class="user-card"><div class="user-avatar">${firstLetter(u.first_name||u.username||u.telegram_id)}</div><div class="user-main"><h3>${esc([u.first_name,u.last_name].filter(Boolean).join(' ')||u.username||u.telegram_id)}</h3><p>${u.username?'@'+esc(u.username)+' · ':''}<span class="mono">${esc(u.telegram_id)}</span></p><div class="user-meta"><span>Referral <b>${esc(u.referral_code||'-')}</b></span><span>Saldo Utama <b>${money(u.balance_main)}</b></span><span>Saldo Referral <b>${money(u.balance_referral)}</b></span><span>Total <b>${money(u.balance_total)}</b></span><span>Status ${badge(u.status)}</span><span>Aktif <b>${esc(date(u.last_seen_at))}</b></span></div></div><div class="user-actions">${u.status==='blocked'?`<button class="neo-btn green small" data-unblock-user="${esc(u.telegram_id)}">Aktifkan</button>`:''}<button class="neo-btn yellow small" data-wallet-user="${esc(u.telegram_id)}">Saldo</button><button class="neo-btn blue small" data-chat-user="${esc(u.telegram_id)}">Chat</button><button class="neo-btn red small" data-delete-user="${esc(u.telegram_id)}">Hapus</button></div></article>`).join(''):'<div class="empty-product">Belum ada user Telegram. User akan muncul setelah berinteraksi dengan bot.</div>'}
-function filterUsers(){const q=$('#userSearch').value.toLowerCase(),st=$('#userStatus').value;const rows=state.cache.users.filter(u=>(!q||[u.telegram_id,u.username,u.first_name,u.last_name,u.referral_code].some(x=>String(x||'').toLowerCase().includes(q)))&&(!st||u.status===st));$('#userCards').innerHTML=userCards(rows);bindUserActions()}
+function filterUsers(){const q=$('#userSearch').value.toLowerCase(),st=$('#userStatus').value;const rows=state.cache.users.filter(u=>(!q||[u.telegram_id,u.username,u.first_name,u.last_name,u.referral_code].some(x=>String(x||'').toLowerCase().includes(q)))&&(!st||u.status===st));$('#userCards').innerHTML=userCards(rows);const total=state.cache.users.length;if($('#userCount')){const act=state.cache.users.filter(u=>u.status==='active').length;const blk=state.cache.users.filter(u=>u.status==='blocked').length;$('#userCount').textContent=rows.length===total?`${total} user (${act} aktif, ${blk} blocked)`:`${rows.length} / ${total} user`;}bindUserActions()}
 function bindUserActions(){$$('[data-unblock-user]').forEach(b=>b.onclick=async()=>{try{await api(`/api/admin/users/${encodeURIComponent(b.dataset.unblockUser)}`,{method:'PATCH',body:{status:'active'}});toast('User diaktifkan');loadUsers()}catch(e){toast(e.message,true)}});$$('[data-wallet-user]').forEach(b=>b.onclick=()=>openWallet(state.cache.users.find(x=>String(x.telegram_id)===b.dataset.walletUser)));$$('[data-chat-user]').forEach(b=>b.onclick=()=>openSendMessage(b.dataset.chatUser));$$('[data-delete-user]').forEach(b=>b.onclick=()=>remove(`/api/admin/users/${encodeURIComponent(b.dataset.deleteUser)}`,'Hapus pengguna?',loadUsers))}
 function modal(title,html,onSubmit,{submit='Simpan',hideSubmit=false}={}){$('#modalTitle').textContent=title;$('#modalBody').innerHTML=html;$('#modalSubmit').textContent=submit;$('#modalSubmit').classList.toggle('hidden',hideSubmit);$('#modalForm').onsubmit=async e=>{e.preventDefault();if(hideSubmit)return;try{const fd=new FormData(e.target);await onSubmit(Object.fromEntries(fd.entries()));$('#modal').close()}catch(err){toast(err.message,true)}};if(!$('#modal').open)$('#modal').showModal()}$('#modalClose').onclick=$('#modalCancel').onclick=()=>$('#modal').close();
 function variantEditorHtml(item){

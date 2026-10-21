@@ -1,430 +1,111 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Dashboard Reseller - iLink Store</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900;1000&family=JetBrains+Mono:wght@700;800&display=swap" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#6c2cff" />
+  <title>iLink Store - Dashboard Reseller</title>
+  <link rel="stylesheet" href="/app.css?v=2.6.10" />
+  <link rel="stylesheet" href="/reseller.css?v=2.6.10" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="/reseller.css">
 </head>
 <body>
   <!-- App Shell -->
-  <div id="app" class="reseller-app">
-    <!-- Top Header -->
-    <header class="app-header">
-      <div class="header-left">
-        <div class="store-avatar" id="headerAvatar">🛍️</div>
-        <div class="store-meta">
-          <div class="store-title-row">
-            <h1 id="headerStoreName">Toko Reseller</h1>
-            <span class="bot-badge" id="botStatusBadge">⚪ Offline</span>
-          </div>
-          <p id="headerResellerInfo">ID: <code id="headerTgId">-</code> · <span id="headerUsername">@reseller</span></p>
-        </div>
-      </div>
-      <div class="header-right">
-        <button class="icon-btn" id="btnRefresh" title="Segarkan Data">🔄</button>
-      </div>
-    </header>
-
-    <!-- Main Content Area -->
-    <main class="app-main" id="mainContainer">
-      <!-- Loading State -->
-      <div id="loadingView" class="view-state">
-        <div class="loader-card">
-          <div class="loader-spinner"></div>
-          <h3>Menghubungkan ke Bot...</h3>
-          <p>Memverifikasi sesi Telegram Anda secara otomatis.</p>
+  <section id="appView" class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand-block">
+        <div class="brand-icon" id="brandAvatar">🛍️</div>
+        <div>
+          <b id="brandName">TOKO<br>RESELLER</b>
+          <span id="brandTagline">Kemitraan Resmi</span>
         </div>
       </div>
 
-      <!-- Error State -->
-      <div id="errorView" class="view-state hidden">
-        <div class="neo-card error-card">
-          <div class="error-icon">⚠️</div>
-          <h3 id="errorMessage">Gagal memuat data</h3>
-          <p id="errorDetail">Pastikan Anda membuka halaman ini melalui aplikasi Telegram atau bot toko Anda.</p>
-          <button class="neo-btn purple" id="btnRetry">Coba Lagi</button>
+      <nav id="nav" class="nav-list">
+        <button data-view="dashboard" class="active"><span>🏠</span>Dashboard</button>
+        <button data-view="bot"><span>🤖</span>Bot Toko</button>
+        <button data-view="pricing"><span>🏷️</span>Atur Margin & Varian</button>
+        <button data-view="withdraw"><span>💸</span>Tarik Saldo</button>
+        <button data-view="orders"><span>🛒</span>Pesanan Pembeli</button>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+
+      <div class="owner-card">
+        <div class="owner-avatar" id="resellerAvatar">👤</div>
+        <div>
+          <b id="resellerName">Reseller</b>
+          <small id="resellerUsername">@reseller</small>
+          <span class="owner-pill" style="background:#7be314;color:#0c0c0f">RESELLER</span>
         </div>
       </div>
 
-      <!-- Tab 1: Beranda / Dashboard Overview -->
-      <section id="tabOverview" class="tab-view hidden">
-        <!-- Hero Profit Card -->
-        <div class="neo-card profit-hero">
-          <div class="profit-hero-head">
-            <div>
-              <span class="sub-label">SALDO PROFIT SAYA</span>
-              <h2 class="profit-amount" id="overviewProfitBalance">Rp 0</h2>
-            </div>
-            <button class="neo-btn green" id="btnQuickWithdraw">💸 Tarik Saldo</button>
-          </div>
-          <div class="profit-hero-foot">
-            <div class="foot-col">
-              <small>TOTAL SUDAH DITARIK</small>
-              <strong id="overviewWithdrawn">Rp 0</strong>
-            </div>
-            <div class="foot-col text-right">
-              <small>MODE MARKUP GLOBAL</small>
-              <strong id="overviewMarkupMode">Fixed (+Rp 2.000)</strong>
-            </div>
-          </div>
-        </div>
+      <div class="store-balance">
+        <span id="storeBalanceLabel">Saldo Komisi Profit</span>
+        <strong id="profitBalance">Rp 0</strong>
+        <b>👛</b>
+      </div>
+    </aside>
 
-        <!-- Quick Status & Bot Card -->
-        <div class="neo-card bot-status-banner">
-          <div class="banner-icon" id="botStatusBannerIcon">🤖</div>
-          <div class="banner-body">
-            <div class="banner-title-row">
-              <strong id="botBannerTitle">Bot Toko: Belum Diatur</strong>
-              <span class="badge" id="botBannerStatus">Offline</span>
-            </div>
-            <p id="botBannerDesc">Hubungkan token BotFather agar pelanggan bisa langsung belanja di bot Anda.</p>
-          </div>
-          <button class="neo-btn small purple" id="btnGoToBotTab">Atur Bot</button>
-        </div>
+    <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
 
-        <!-- KPI Metrics Grid -->
-        <div class="kpi-grid">
-          <div class="kpi-card">
-            <div class="kpi-icon yellow">💰</div>
-            <div class="kpi-data">
-              <small>TOTAL OMZET TOKO</small>
-              <strong id="overviewTotalRevenue">Rp 0</strong>
-            </div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-icon green">📈</div>
-            <div class="kpi-data">
-              <small>KOMISI MASUK</small>
-              <strong id="overviewTotalProfit">Rp 0</strong>
-            </div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-icon blue">📦</div>
-            <div class="kpi-data">
-              <small>PESANAN SELESAI</small>
-              <strong id="overviewTotalOrders">0 Transaksi</strong>
-            </div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-icon pink">👥</div>
-            <div class="kpi-data">
-              <small>PELANGGAN BOT</small>
-              <strong id="overviewTotalUsers">0 User</strong>
-            </div>
-          </div>
+    <main class="main-panel">
+      <header class="topbar">
+        <button id="menuBtn" class="square-btn" type="button" aria-label="Menu utama" aria-expanded="false">☰</button>
+        <div class="page-title">
+          <h1 id="pageTitle">Dashboard</h1>
+          <p id="pageSubtitle">Ringkasan performa toko dan komisi profit Anda</p>
         </div>
+        <div class="top-actions">
+          <a id="botLinkBtn" class="telegram-btn" href="#" target="_blank" rel="noreferrer">✈ Buka Bot Toko</a>
+          <button id="refreshBtn" class="square-btn notify" type="button" title="Refresh Data">⟳</button>
+        </div>
+      </header>
 
-        <!-- Quick Nav Shortcuts -->
-        <div class="quick-nav-row">
-          <button class="quick-nav-btn" data-target="bot">
-            <span class="nav-btn-icon">🤖</span>
-            <b>Atur Bot Toko</b>
-            <small>Token, Nama, CS, Banner</small>
-          </button>
-          <button class="quick-nav-btn" data-target="pricing">
-            <span class="nav-btn-icon">🏷️</span>
-            <b>Atur Margin & Harga</b>
-            <small>Ubah margin tiap produk</small>
-          </button>
-          <button class="quick-nav-btn" data-target="orders">
-            <span class="nav-btn-icon">🛒</span>
-            <b>Riwayat Penjualan</b>
-            <small>Pantau komisi & pesanan</small>
-          </button>
-          <button class="quick-nav-btn" id="btnOpenBotTelegram">
-            <span class="nav-btn-icon">🚀</span>
-            <b>Buka Bot di Telegram</b>
-            <small>Coba belanja di bot toko</small>
-          </button>
-        </div>
-
-        <!-- Recent Orders Preview -->
-        <div class="neo-card section-card">
-          <div class="section-card-head">
-            <h3>🛒 Pesanan Terbaru</h3>
-            <button class="neo-link" data-target="orders">Lihat Semua →</button>
-          </div>
-          <div id="recentOrdersList" class="compact-order-list">
-            <div class="empty-state-mini">Belum ada transaksi di bot Anda.</div>
-          </div>
-        </div>
+      <section id="content" class="content">
+        <div class="loader-card"><div class="loader-spinner"></div><p>Menghubungkan ke Bot...</p></div>
       </section>
 
-      <!-- Tab 2: Pengaturan Bot Toko -->
-      <section id="tabBot" class="tab-view hidden">
-        <div class="neo-card form-card">
-          <div class="card-header">
-            <div>
-              <h2>🤖 Pengaturan Bot Toko</h2>
-              <p>Masukkan token dari <b>@BotFather</b> untuk mengaktifkan bot toko online Anda sendiri.</p>
-            </div>
-            <span class="badge" id="botConfigStateBadge">Belum Aktif</span>
-          </div>
-
-          <form id="formBotConfig">
-            <!-- Token Section -->
-            <div class="form-group">
-              <label for="inputBotToken">
-                <span>Token Bot Telegram (dari @BotFather)</span>
-                <span class="required">*</span>
-              </label>
-              <div class="input-with-action">
-                <input type="password" id="inputBotToken" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ" required autocomplete="off">
-                <button type="button" class="neo-btn small blue" id="btnVerifyToken">🔍 Cek Token</button>
-              </div>
-              <small class="helper-text">Ketik <code>/newbot</code> di <a href="https://t.me/BotFather" target="_blank">@BotFather</a> untuk membuat bot baru secara gratis.</small>
-              <div id="tokenVerifyResult" class="verify-feedback hidden"></div>
-            </div>
-
-            <!-- Bot Username & Name -->
-            <div class="form-row-2">
-              <div class="form-group">
-                <label for="inputBotUsername">Username Bot</label>
-                <div class="input-prefix">
-                  <span>@</span>
-                  <input type="text" id="inputBotUsername" placeholder="namabot_bot" required>
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="inputStoreName">Nama Toko Online</label>
-                <input type="text" id="inputStoreName" placeholder="Contoh: Digital Store ID" required>
-              </div>
-            </div>
-
-            <!-- Customer Service -->
-            <div class="form-group highlight-box">
-              <label for="inputBotCs">
-                <span>📞 Customer Service (Otomatis ke Akun Anda)</span>
-                <span class="auto-badge">OTOMATIS</span>
-              </label>
-              <input type="text" id="inputBotCs" placeholder="https://t.me/username_anda">
-              <small class="helper-text">Tombol ‹📞› Customer Service di bot toko Anda akan otomatis mengarahkan customer ke akun Telegram Anda.</small>
-            </div>
-
-            <!-- Banner & Media -->
-            <div class="form-group">
-              <label for="inputStartMedia">Foto Banner Sambutan (/start)</label>
-              <input type="url" id="inputStartMedia" placeholder="https://example.com/banner.jpg (opsional)">
-              <small class="helper-text">URL foto banner yang tampil saat pembeli menekan /start.</small>
-            </div>
-
-            <!-- Welcome Message -->
-            <div class="form-group">
-              <label for="inputStartMessage">Pesan Pembuka Tambahan (/start)</label>
-              <textarea id="inputStartMessage" rows="3" placeholder="Pesan sambutan atau pengumuman khusus toko Anda (opsional)..."></textarea>
-            </div>
-
-            <!-- Channel / Group -->
-            <div class="form-row-2">
-              <div class="form-group">
-                <label for="inputChannelUrl">Link Channel Telegram</label>
-                <input type="url" id="inputChannelUrl" placeholder="https://t.me/channel_anda">
-              </div>
-              <div class="form-group">
-                <label for="inputNokosLink">Link Nokos (Opsional)</label>
-                <input type="url" id="inputNokosLink" placeholder="https://... (opsional)">
-              </div>
-            </div>
-
-            <!-- Action Controls -->
-            <div class="bot-control-actions">
-              <button type="submit" class="neo-btn green wide" id="btnSaveBot">💾 Simpan & Jalankan Bot</button>
-              <div class="button-group-row">
-                <button type="button" class="neo-btn yellow" id="btnRestartBot">🔄 Restart Bot</button>
-                <button type="button" class="neo-btn red" id="btnStopBot">⏹️ Stop Bot</button>
-              </div>
-            </div>
-          </form>
-        </div>
-      </section>
-
-      <!-- Tab 3: Atur Margin & Harga Produk -->
-      <section id="tabPricing" class="tab-view hidden">
-        <!-- Global Markup Card -->
-        <div class="neo-card pricing-header-card">
-          <div class="pricing-header-info">
-            <div>
-              <h2>🏷️ Atur Keuntungan (Margin) Produk</h2>
-              <p>Tentukan margin keuntungan per produk yang dijual di bot toko Anda. Customer membayar harga jual Anda, dan komisi keuntungan otomatis masuk ke Saldo Profit Anda.</p>
-            </div>
-          </div>
-
-          <div class="global-markup-box">
-            <div class="global-markup-head">
-              <strong>⚙️ Atur Margin Cepat (Global)</strong>
-              <small>Terapkan margin default ke semua produk sekaligus:</small>
-            </div>
-            <div class="global-markup-inputs">
-              <select id="selectGlobalMarkupMode">
-                <option value="fixed">Tambah Nominal Tetap (Rp)</option>
-                <option value="percent">Persentase (%)</option>
-              </select>
-              <input type="number" id="inputGlobalMarkupValue" placeholder="2000" min="0" step="500">
-              <button type="button" class="neo-btn blue" id="btnApplyGlobalMarkup">Terapkan ke Semua</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Toolbar & Filter -->
-        <div class="neo-card pricing-toolbar">
-          <div class="search-wrap">
-            <span class="search-icon">🔍</span>
-            <input type="text" id="inputSearchProduct" placeholder="Cari nama atau kode produk...">
-          </div>
-          <div class="filter-actions">
-            <button type="button" class="neo-btn small" id="btnFilterAll">Semua</button>
-            <button type="button" class="neo-btn small green" id="btnFilterEnabled">Aktif di Bot</button>
-            <button type="button" class="neo-btn small red" id="btnFilterDisabled">Nonaktif</button>
-          </div>
-        </div>
-
-        <!-- Product Pricing List -->
-        <div id="productPricingList" class="product-pricing-grid">
-          <!-- Loaded dynamically -->
-        </div>
-
-        <!-- Floating Save Bar -->
-        <div class="floating-save-bar" id="floatingSaveBar">
-          <div class="save-bar-info">
-            <span id="pendingChangesCount">0 perubahan belum disimpan</span>
-          </div>
-          <button class="neo-btn green" id="btnSavePricingChanges">💾 Simpan Perubahan Harga</button>
-        </div>
-      </section>
-
-      <!-- Tab 4: Tarik Saldo (Withdrawal) -->
-      <section id="tabWithdraw" class="tab-view hidden">
-        <!-- Balance Summary Card -->
-        <div class="neo-card withdraw-hero">
-          <span class="sub-label">SALDO PROFIT DAPAT DITARIK</span>
-          <h1 class="withdraw-balance" id="withdrawAvailableBalance">Rp 0</h1>
-          <p>Penarikan akan ditransfer oleh Owner ke rekening bank atau e-wallet pilihan Anda.</p>
-        </div>
-
-        <!-- Withdrawal Form Card -->
-        <div class="neo-card form-card">
-          <h3>💸 Form Permintaan Penarikan</h3>
-          <form id="formWithdrawal">
-            <div class="form-group">
-              <label for="inputWdAmount">Nominal Penarikan (Rp) <span class="required">*</span></label>
-              <input type="number" id="inputWdAmount" placeholder="Minimal 10000" min="10000" step="1000" required>
-              <div class="quick-amount-chips">
-                <button type="button" class="amount-chip" data-amount="25000">Rp 25.000</button>
-                <button type="button" class="amount-chip" data-amount="50000">Rp 50.000</button>
-                <button type="button" class="amount-chip" data-amount="100000">Rp 100.000</button>
-                <button type="button" class="amount-chip" id="btnWdAll">Tarik Semua</button>
-              </div>
-            </div>
-
-            <div class="form-row-2">
-              <div class="form-group">
-                <label for="selectWdBank">Bank / E-Wallet <span class="required">*</span></label>
-                <select id="selectWdBank" required>
-                  <option value="">-- Pilih Tujuan Transfer --</option>
-                  <option value="BCA">BCA (Bank Central Asia)</option>
-                  <option value="BRI">BRI (Bank Rakyat Indonesia)</option>
-                  <option value="BNI">BNI (Bank Negara Indonesia)</option>
-                  <option value="Mandiri">Bank Mandiri</option>
-                  <option value="BSI">BSI (Bank Syariah Indonesia)</option>
-                  <option value="SeaBank">SeaBank</option>
-                  <option value="Jago">Bank Jago</option>
-                  <option value="DANA">DANA</option>
-                  <option value="GoPay">GoPay</option>
-                  <option value="OVO">OVO</option>
-                  <option value="ShopeePay">ShopeePay</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="inputWdAccNo">Nomor Rekening / HP E-Wallet <span class="required">*</span></label>
-                <input type="text" id="inputWdAccNo" placeholder="Contoh: 081234567890" required>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="inputWdAccName">Nama Pemilik Rekening <span class="required">*</span></label>
-              <input type="text" id="inputWdAccName" placeholder="Contoh: Budi Santoso" required>
-            </div>
-
-            <button type="submit" class="neo-btn green wide" id="btnSubmitWithdrawal">Kirim Permintaan Penarikan</button>
-          </form>
-        </div>
-
-        <!-- Withdrawal History Card -->
-        <div class="neo-card section-card">
-          <div class="section-card-head">
-            <h3>📋 Riwayat Penarikan Saldo</h3>
-            <span class="badge" id="wdTotalCount">0 Transaksi</span>
-          </div>
-          <div id="withdrawalHistoryList" class="withdraw-list">
-            <!-- Loaded dynamically -->
-          </div>
-        </div>
-      </section>
-
-      <!-- Tab 5: Riwayat Penjualan Toko -->
-      <section id="tabOrders" class="tab-view hidden">
-        <div class="neo-card section-card">
-          <div class="section-card-head">
-            <div>
-              <h2>🛒 Riwayat Penjualan Bot Toko</h2>
-              <p>Daftar pesanan pembeli di bot Anda beserta komisi profit yang telah Anda dapatkan.</p>
-            </div>
-            <span class="badge purple" id="ordersCountBadge">0 Pesanan</span>
-          </div>
-
-          <div id="ordersFullList" class="order-full-list">
-            <!-- Loaded dynamically -->
-          </div>
-        </div>
-      </section>
+      <footer class="statusbar">
+        <span>🛡️ <b id="systemSafe">Sistem Reseller Aktif</b></span>
+        <span class="status-sep"></span>
+        <span id="lastUpdated">Terakhir diperbarui: -</span>
+        <button id="statusBarRefresh" class="neo-btn purple">⟳ Refresh Data</button>
+      </footer>
     </main>
+  </section>
 
-    <!-- Bottom Navigation Bar -->
-    <nav class="bottom-nav">
-      <button class="nav-item active" data-tab="tabOverview">
-        <span class="nav-icon">📊</span>
-        <span class="nav-text">Beranda</span>
-      </button>
-      <button class="nav-item" data-tab="tabBot">
-        <span class="nav-icon">🤖</span>
-        <span class="nav-text">Bot Toko</span>
-      </button>
-      <button class="nav-item" data-tab="tabPricing">
-        <span class="nav-icon">🏷️</span>
-        <span class="nav-text">Margin</span>
-      </button>
-      <button class="nav-item" data-tab="tabWithdraw">
-        <span class="nav-icon">💸</span>
-        <span class="nav-text">Tarik</span>
-      </button>
-      <button class="nav-item" data-tab="tabOrders">
-        <span class="nav-icon">🛒</span>
-        <span class="nav-text">Pesanan</span>
-      </button>
-    </nav>
-  </div>
-
-  <!-- Image Proof Modal -->
-  <div id="proofModal" class="modal-backdrop hidden">
-    <div class="modal-dialog neo-card">
-      <div class="modal-head">
-        <h3>Bukti Transfer</h3>
-        <button class="close-btn" id="btnCloseProofModal">✕</button>
-      </div>
-      <div class="modal-body">
-        <img id="proofModalImg" src="" alt="Bukti Transfer">
-      </div>
-    </div>
-  </div>
+  <!-- Modal Dialog -->
+  <dialog id="modal" class="neo-modal">
+    <form method="dialog" id="modalForm">
+      <header>
+        <h2 id="modalTitle">Modal</h2>
+        <button id="modalClose" type="button">✕</button>
+      </header>
+      <div id="modalAlert" class="modal-alert hidden"></div>
+      <div id="modalBody" class="modal-body"></div>
+      <footer>
+        <button id="modalCancel" type="button" class="neo-btn white">Batal</button>
+        <button id="modalSubmit" type="submit" class="neo-btn purple">Simpan</button>
+      </footer>
+    </form>
+  </dialog>
 
   <!-- Toast Notification -->
   <div id="toast" class="toast"></div>
 
-  <script src="/reseller.js"></script>
+  <!-- Floating Save Bar for Pricing & Margins -->
+  <div id="floatingSaveBar" class="floating-save-bar hidden">
+    <div class="save-bar-info">
+      <span class="save-bar-icon">⚠️</span>
+      <span id="pendingChangesCount">0 perubahan margin belum disimpan</span>
+    </div>
+    <div class="save-bar-actions">
+      <button type="button" id="btnDiscardPricing" class="neo-btn white small">Batalkan</button>
+      <button type="button" id="btnSavePricingFloating" class="neo-btn green small">💾 Simpan Perubahan</button>
+    </div>
+  </div>
+
+  <script src="/reseller.js?v=2.6.10" defer></script>
 </body>
 </html>

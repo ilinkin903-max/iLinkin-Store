@@ -1,332 +1,440 @@
-// Reseller Mini App Controller
-(function() {
-  const tg = window.Telegram?.WebApp;
-  if (tg) {
-    try {
-      tg.ready();
-      tg.expand();
-      if (tg.setHeaderColor) tg.setHeaderColor('#ffffff');
-      if (tg.setBackgroundColor) tg.setBackgroundColor('#f6f6f2');
-    } catch (e) {
-      console.warn('[telegram:init]', e);
-    }
-  }
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
 
-  const state = {
-    token: localStorage.getItem('ilink_reseller_token') || '',
-    reseller: null,
-    bot: null,
-    runtime: null,
-    products: [],
-    pricingOverrides: {},
-    pendingPricing: {},
-    orders: [],
-    withdrawals: [],
-    activeTab: 'tabOverview',
-    isLoading: false
-  };
+const state = {
+  token: sessionStorage.getItem('ilink_reseller_token') || localStorage.getItem('ilink_reseller_token') || '',
+  view: 'dashboard',
+  me: null,
+  reseller: null,
+  bot: null,
+  runtime: null,
+  products: [],
+  pendingPricing: {},
+  orders: [],
+  withdrawals: []
+};
 
-  // Helper functions
-  function money(v) {
-    return 'Rp ' + Number(v || 0).toLocaleString('id-ID');
-  }
+const titles = {
+  dashboard: ['Dashboard Reseller', 'Ringkasan performa toko dan komisi profit Anda'],
+  bot: ['Bot Toko', 'Kelola token bot, nama toko, banner, dan pengaturan layanan'],
+  pricing: ['Atur Margin & Varian', 'Sesuaikan keuntungan harga jual per produk dan per varian'],
+  withdraw: ['Tarik Saldo', 'Pencairan saldo komisi profit ke rekening bank atau e-wallet'],
+  orders: ['Pesanan Pembeli', 'Daftar riwayat transaksi pembeli yang masuk melalui bot Anda']
+};
 
-  function formatWIB(val) {
-    if (!val) return '-';
-    try {
-      return new Date(val).toLocaleString('id-ID', {
-        timeZone: 'Asia/Jakarta',
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      });
-    } catch {
-      return String(val);
-    }
-  }
+function esc(v = '') {
+  return String(v ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
 
-  function showToast(message, type = 'good', duration = 3000) {
-    const el = document.getElementById('toast');
-    if (!el) return;
-    el.textContent = message;
-    el.className = 'toast show ' + (type === 'bad' ? 'bad' : 'good');
-    clearTimeout(el._timer);
-    el._timer = setTimeout(() => {
-      el.className = 'toast';
-    }, duration);
-  }
+function money(v) {
+  return 'Rp ' + Number(v || 0).toLocaleString('id-ID');
+}
 
-  async function api(path, options = {}) {
-    const url = '/api/gateway?path=' + encodeURIComponent(path);
-    const headers = { ...(options.headers || {}) };
-    if (state.token) {
-      headers['authorization'] = 'Bearer ' + state.token;
-    }
-    if (options.body && typeof options.body !== 'string' && !(options.body instanceof Blob)) {
-      headers['content-type'] = 'application/json';
-      options.body = JSON.stringify(options.body);
-    }
-
-    const res = await fetch(url, { ...options, headers });
-    const ct = res.headers.get('content-type') || '';
-    const data = ct.includes('json') ? await res.json() : { ok: res.ok, message: await res.text() };
-
-    if (res.status === 401) {
-      localStorage.removeItem('ilink_reseller_token');
-      state.token = '';
-      throw new Error(data.message || 'Sesi berakhir. Silakan buka kembali dari bot Telegram.');
-    }
-    if (!res.ok || data.ok === false) {
-      throw new Error(data.message || data.error || 'Terjadi kesalahan sistem.');
-    }
-    return data;
-  }
-
-  // Authentication & Initialization
-  async function initAuth() {
-    const loadingView = document.getElementById('loadingView');
-    const errorView = document.getElementById('errorView');
-    const mainContainer = document.getElementById('mainContainer');
-
-    loadingView.classList.remove('hidden');
-    errorView.classList.add('hidden');
-
-    try {
-      let initData = tg?.initData || '';
-      let tgUser = tg?.initDataUnsafe?.user || null;
-
-      // Browser test fallback if opened outside Telegram directly
-      if (!initData && !tgUser) {
-        const urlParams = new URLSearchParams(window.location.search);
-        const testId = urlParams.get('id') || urlParams.get('tg_id');
-        if (testId) {
-          tgUser = {
-            id: testId,
-            first_name: urlParams.get('name') || 'Reseller Demo',
-            username: urlParams.get('username') || 'reseller_demo'
-          };
-        } else {
-          // If already has token, test verify
-          if (state.token) {
-            try {
-              const me = await api('/api/reseller/me');
-              state.reseller = me.reseller;
-              state.bot = me.bot;
-              state.runtime = me.runtime;
-              onAuthSuccess();
-              return;
-            } catch {}
-          }
-          // Default test mock user for demonstration / testing in browser
-          tgUser = {
-            id: '99887766',
-            first_name: 'Reseller Demo',
-            username: 'reseller_demo'
-          };
-        }
-      }
-
-      // Authenticate / auto-register reseller
-      const payload = {};
-      if (initData) payload.initData = initData;
-      if (tgUser) payload.telegram_user = tgUser;
-
-      const authRes = await api('/api/reseller/auth', {
-        method: 'POST',
-        body: payload
-      });
-
-      state.token = authRes.token;
-      localStorage.setItem('ilink_reseller_token', state.token);
-      state.reseller = authRes.reseller;
-      state.bot = authRes.bot;
-      state.runtime = authRes.runtime;
-
-      onAuthSuccess();
-    } catch (e) {
-      console.error('[auth:failed]', e);
-      loadingView.classList.add('hidden');
-      errorView.classList.remove('hidden');
-      document.getElementById('errorMessage').textContent = 'Otentikasi Gagal';
-      document.getElementById('errorDetail').textContent = e.message || 'Gagal memverifikasi sesi Telegram Anda.';
-    }
-  }
-
-  function onAuthSuccess() {
-    document.getElementById('loadingView').classList.add('hidden');
-    document.getElementById('errorView').classList.add('hidden');
-
-    updateHeaderUI();
-    switchTab('tabOverview');
-    loadOverviewData();
-  }
-
-  function updateHeaderUI() {
-    const r = state.reseller || {};
-    const b = state.bot || {};
-    const rt = state.runtime || {};
-
-    const storeName = b.branding?.store_name || b.bot_name || r.name || 'Toko Reseller';
-    document.getElementById('headerStoreName').textContent = storeName;
-    document.getElementById('headerTgId').textContent = r.telegram_id || '-';
-    document.getElementById('headerUsername').textContent = r.username ? `@${r.username}` : (r.name || 'Reseller');
-
-    const badge = document.getElementById('botStatusBadge');
-    if (!b || !b.bot_token) {
-      badge.textContent = '⚪ Belum Aktif';
-      badge.className = 'bot-badge';
-    } else if (rt.running) {
-      badge.textContent = '🟢 Online';
-      badge.className = 'bot-badge online';
-    } else if (b.status === 'error') {
-      badge.textContent = '🔴 Error';
-      badge.className = 'bot-badge error';
-    } else {
-      badge.textContent = '🟡 Stopped';
-      badge.className = 'bot-badge stopped';
-    }
-  }
-
-  // Tab Navigation
-  function switchTab(tabId) {
-    state.activeTab = tabId;
-    document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
-    const target = document.getElementById(tabId);
-    if (target) target.classList.remove('hidden');
-
-    document.querySelectorAll('.bottom-nav .nav-item').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.tab === tabId);
+function date(v) {
+  if (!v) return '-';
+  try {
+    return new Date(v).toLocaleString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
     });
+  } catch {
+    return String(v);
+  }
+}
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+function toast(msg, bad = false) {
+  const t = $('#toast');
+  if (!t) return;
+  const m = $('#modal');
+  if (m && m.open) {
+    if (t.parentElement !== m) m.appendChild(t);
+  } else {
+    if (t.parentElement !== document.body) document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.className = 'toast show' + (bad ? ' bad' : '');
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => {
+    t.className = 'toast';
+    if (!m || !m.open) {
+      if (t.parentElement !== document.body) document.body.appendChild(t);
+    }
+  }, 2800);
+}
 
-    if (tabId === 'tabOverview') loadOverviewData();
-    else if (tabId === 'tabBot') renderBotForm();
-    else if (tabId === 'tabPricing') loadPricingData();
-    else if (tabId === 'tabWithdraw') loadWithdrawalData();
-    else if (tabId === 'tabOrders') loadOrdersData();
+function badge(status) {
+  const s = String(status || '').toLowerCase();
+  const cls = ['completed', 'paid', 'success', 'active', 'running', 'approved'].includes(s) ? 'ok' :
+              ['pending', 'waiting'].includes(s) ? 'warn' :
+              ['failed', 'rejected', 'canceled', 'cancelled', 'stopped'].includes(s) ? 'bad' : 'purple';
+  return `<span class="badge ${cls}">${esc(status || '-')}</span>`;
+}
+
+function modal(title, html, onSubmit, options = {}) {
+  const m = $('#modal'), form = $('#modalForm'), alertBox = $('#modalAlert'), submitBtn = $('#modalSubmit');
+  if (!m || !form) return;
+  $('#modalTitle').textContent = title;
+  $('#modalBody').innerHTML = html;
+  if (alertBox) { alertBox.className = 'modal-alert hidden'; alertBox.textContent = ''; }
+  submitBtn.textContent = options.submit || 'Simpan';
+  submitBtn.disabled = false;
+  submitBtn.classList.toggle('hidden', options.noSubmit === true);
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    if (!onSubmit) return m.close();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Menyimpan...';
+    try {
+      const fd = new FormData(form);
+      const data = Object.fromEntries(fd.entries());
+      await onSubmit(data);
+      m.close();
+    } catch (err) {
+      if (alertBox) {
+        alertBox.textContent = err.message || 'Terjadi kesalahan.';
+        alertBox.className = 'modal-alert';
+        alertBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        toast(err.message, true);
+      }
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = options.submit || 'Simpan';
+    }
+  };
+  $('#modalClose').onclick = () => m.close();
+  $('#modalCancel').onclick = () => m.close();
+  m.showModal();
+}
+
+async function api(path, options = {}) {
+  const url = '/api/gateway?path=' + encodeURIComponent(path);
+  const headers = { ...(options.headers || {}) };
+  if (state.token) headers.authorization = 'Bearer ' + state.token;
+  if (options.body && typeof options.body !== 'string' && !(options.body instanceof Blob)) {
+    headers['content-type'] = 'application/json';
+    options.body = JSON.stringify(options.body);
+  }
+  const res = await fetch(url, { ...options, headers });
+  if (options.raw) {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res;
+  }
+  const ct = res.headers.get('content-type') || '';
+  const data = ct.includes('json') ? await res.json() : { ok: res.ok, message: await res.text() };
+  if (res.status === 401) {
+    sessionStorage.removeItem('ilink_reseller_token');
+    localStorage.removeItem('ilink_reseller_token');
+    state.token = '';
+    throw new Error('Sesi kedaluwarsa. Silakan buka kembali dari bot Telegram.');
+  }
+  if (!res.ok || data.ok === false) {
+    throw new Error(data.message || data.error || `HTTP ${res.status}`);
+  }
+  return data;
+}
+
+// Sidebar Drawer Control
+function closeSidebar() {
+  $('#sidebar')?.classList.remove('open');
+  $('#sidebarBackdrop')?.classList.remove('show');
+  $('#menuBtn')?.setAttribute('aria-expanded', 'false');
+}
+
+$('#menuBtn').onclick = (e) => {
+  e.stopPropagation();
+  const open = $('#sidebar').classList.toggle('open');
+  $('#sidebarBackdrop')?.classList.toggle('show', open);
+  $('#menuBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
+};
+
+$('#sidebarBackdrop').onclick = closeSidebar;
+document.addEventListener('click', (e) => {
+  const side = $('#sidebar'), menu = $('#menuBtn');
+  if (side?.classList.contains('open') && !side.contains(e.target) && !menu?.contains(e.target)) {
+    closeSidebar();
+  }
+});
+
+$('#nav').onclick = (e) => {
+  const b = e.target.closest('[data-view]');
+  if (b) {
+    closeSidebar();
+    navigate(b.dataset.view);
+  }
+};
+
+$('#refreshBtn').onclick = () => navigate(state.view, true);
+$('#statusBarRefresh').onclick = () => navigate(state.view, true);
+
+function setHeader(view) {
+  const [t, s] = titles[view] || [view, ''];
+  $('#pageTitle').textContent = t;
+  $('#pageSubtitle').textContent = s;
+  $$('#nav [data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+}
+
+function updateShellUI() {
+  const r = state.reseller || {};
+  const b = state.bot || {};
+  const rt = state.runtime || {};
+
+  const storeName = b.branding?.store_name || b.bot_name || r.name || 'Toko Reseller';
+  $('#brandName').innerHTML = esc(storeName).replace(/\s+/g, '<br>');
+  $('#resellerName').textContent = r.name || 'Reseller';
+  $('#resellerUsername').textContent = r.username ? `@${r.username}` : `ID: ${r.telegram_id || '-'}`;
+  $('#profitBalance').textContent = money(r.profit_balance || 0);
+
+  const botBtn = $('#botLinkBtn');
+  if (b.bot_username) {
+    botBtn.href = `https://t.me/${b.bot_username.replace(/^@+/, '')}`;
+    botBtn.classList.remove('hidden');
+  } else {
+    botBtn.classList.add('hidden');
   }
 
-  // Tab 1: Overview
-  async function loadOverviewData() {
-    try {
-      const data = await api('/api/reseller/overview');
-      state.reseller = data.reseller;
-      state.bot = data.bot;
-      state.runtime = data.runtime;
+  const safeEl = $('#systemSafe');
+  if (!b || !b.bot_token) {
+    safeEl.textContent = 'Bot Toko: Belum Dikonfigurasi';
+  } else if (rt.running) {
+    safeEl.textContent = `🟢 Bot @${b.bot_username || 'bot'} Online & Siap Menerima Pesanan`;
+  } else {
+    safeEl.textContent = '🟡 Bot Toko Sedang Dihentikan (Stopped)';
+  }
+}
 
-      updateHeaderUI();
+async function navigate(view, silent = false) {
+  state.view = view;
+  setHeader(view);
+  if (!silent) {
+    $('#content').innerHTML = '<div class="loader-card"><div class="loader-spinner"></div><p>Memuat data...</p></div>';
+  }
+  try {
+    await ({
+      dashboard: loadDashboard,
+      bot: loadBot,
+      pricing: loadPricing,
+      withdraw: loadWithdraw,
+      orders: loadOrders
+    }[view] || loadDashboard)();
+    $('#lastUpdated').textContent = 'Terakhir diperbarui: ' + new Date().toLocaleTimeString('id-ID');
+  } catch (e) {
+    $('#content').innerHTML = `<div class="empty-product">${esc(e.message)}</div>`;
+    toast(e.message, true);
+  }
+}
 
-      // Update Hero
-      document.getElementById('overviewProfitBalance').textContent = money(data.stats.profit_balance);
-      document.getElementById('overviewWithdrawn').textContent = money(data.stats.withdrawn_total);
-      const modeStr = data.reseller.markup_mode === 'percent'
-        ? `+${data.reseller.markup_value}%`
-        : `+${money(data.reseller.markup_value)}`;
-      document.getElementById('overviewMarkupMode').textContent = modeStr;
+// ---------------------------------------------------------------------
+// VIEW 1: DASHBOARD
+// ---------------------------------------------------------------------
+async function loadDashboard() {
+  const data = await api('/api/reseller/overview');
+  state.reseller = data.reseller;
+  state.bot = data.bot;
+  state.runtime = data.runtime;
+  state.orders = data.recent_orders || [];
+  updateShellUI();
 
-      // Update Bot Banner
-      const b = data.bot;
-      const rt = data.runtime || {};
-      const bannerTitle = document.getElementById('botBannerTitle');
-      const bannerStatus = document.getElementById('botBannerStatus');
-      const bannerDesc = document.getElementById('botBannerDesc');
-      const bannerIcon = document.getElementById('botStatusBannerIcon');
+  const r = state.reseller || {};
+  const b = state.bot || {};
+  const rt = state.runtime || {};
+  const stats = data.stats || {};
 
-      if (!b || !b.bot_token) {
-        bannerTitle.textContent = 'Bot Toko: Belum Diatur';
-        bannerStatus.textContent = 'Setup';
-        bannerStatus.className = 'badge';
-        bannerDesc.textContent = 'Hubungkan token BotFather agar pelanggan bisa langsung belanja di bot Anda.';
-        bannerIcon.textContent = '🤖';
-      } else if (rt.running) {
-        bannerTitle.textContent = `@${b.bot_username || 'bot'} (Aktif)`;
-        bannerStatus.textContent = 'Online';
-        bannerStatus.className = 'badge green';
-        bannerDesc.textContent = `Bot toko aktif melayani pesanan 24 jam dengan CS otomatis ke akun Anda.`;
-        bannerIcon.textContent = '🟢';
-      } else {
-        bannerTitle.textContent = `@${b.bot_username || 'bot'} (Berhenti)`;
-        bannerStatus.textContent = 'Stopped';
-        bannerStatus.className = 'badge yellow';
-        bannerDesc.textContent = b.last_error ? `Kendala: ${b.last_error}` : 'Bot sedang dihentikan sementara.';
-        bannerIcon.textContent = '⏸️';
-      }
+  const botStatusBadge = !b.bot_token
+    ? '<span class="badge">Belum Setup</span>'
+    : rt.running
+    ? '<span class="badge ok">🟢 Online</span>'
+    : '<span class="badge warn">🟡 Stopped</span>';
 
-      // Update KPIs
-      document.getElementById('overviewTotalRevenue').textContent = money(data.stats.total_revenue);
-      document.getElementById('overviewTotalProfit').textContent = money(data.stats.total_profit_earned);
-      document.getElementById('overviewTotalOrders').textContent = `${data.stats.total_orders} Pesanan`;
-      document.getElementById('overviewTotalUsers').textContent = `${data.stats.total_users} Pelanggan`;
+  const recentRows = (state.orders.slice(0, 5) || []).map(o => `
+    <tr>
+      <td><b>#${esc(o.order_ref || String(o.id))}</b><br><small>${date(o.created_at)}</small></td>
+      <td><b>${esc(o.product_name)}</b><br><small>${esc(o.variant_name || '-')}</small></td>
+      <td><strong>${money(o.total_price)}</strong></td>
+      <td><span class="badge ok">+${money(o.reseller_profit)}</span></td>
+      <td>${badge(o.status)}</td>
+    </tr>
+  `).join('');
 
-      // Update Recent Orders
-      const recentList = document.getElementById('recentOrdersList');
-      if (!data.recent_orders || !data.recent_orders.length) {
-        recentList.innerHTML = '<div class="empty-state-mini">Belum ada transaksi di bot Anda.</div>';
-      } else {
-        recentList.innerHTML = data.recent_orders.map(o => `
-          <div class="compact-order-item">
-            <div class="order-item-left">
-              <b>${escapeHtml(o.product_name)}</b>
-              <small>${escapeHtml(o.order_ref)} · ${formatWIB(o.created_at)}</small>
-            </div>
-            <div class="order-item-right">
-              <span class="order-profit-badge">+${money(o.reseller_profit)}</span>
+  $('#content').innerHTML = `
+    <div class="dashboard-kpis">
+      <div class="stat-card">
+        <div class="stat-icon purple">👛</div>
+        <div>
+          <small>Saldo Komisi Profit</small>
+          <strong>${money(stats.profit_balance)}</strong>
+          <em>Sudah ditarik: ${money(stats.withdrawn_total)}</em>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon yellow">💰</div>
+        <div>
+          <small>Total Penjualan</small>
+          <strong>${money(stats.revenue_total)}</strong>
+          <em>Omzet toko Anda</em>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">📦</div>
+        <div>
+          <small>Total Pesanan</small>
+          <strong>${Number(stats.orders_count || 0)}</strong>
+          <em>Pesanan berhasil</em>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon blue">👥</div>
+        <div>
+          <small>Pelanggan Bot</small>
+          <strong>${Number(stats.customers_count || 0)} User</strong>
+          <em>Total pembeli terdaftar</em>
+        </div>
+      </div>
+    </div>
+
+    <div class="neo-card" style="margin-top:16px;padding:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:24px">🤖</span>
+            <div>
+              <h3 style="margin:0;font-size:18px">${esc(b.branding?.store_name || b.bot_name || 'Bot Toko Belum Diatur')}</h3>
+              <p style="margin:2px 0 0;font-size:13px;color:var(--muted)">Username: <b>${b.bot_username ? '@' + b.bot_username : '-'}</b></p>
             </div>
           </div>
-        `).join('');
-      }
-    } catch (e) {
-      console.warn('[overview:load]', e);
-    }
-  }
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          ${botStatusBadge}
+          <button type="button" class="neo-btn purple small" id="dashGoBotBtn">⚙️ Atur Bot</button>
+        </div>
+      </div>
+    </div>
 
-  // Tab 2: Bot Configuration
-  function renderBotForm() {
-    const b = state.bot || {};
-    const r = state.reseller || {};
-    const br = b.branding || {};
+    <div class="neo-card" style="margin-top:16px;padding:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <h3 style="margin:0;font-size:18px">🛒 5 Transaksi Pembeli Terakhir</h3>
+          <p style="margin:3px 0 0;font-size:12px;color:var(--muted)">Pesanan yang masuk melalui bot toko Anda</p>
+        </div>
+        <button type="button" class="neo-btn white small" id="dashGoOrdersBtn">Lihat Semua →</button>
+      </div>
+      ${state.orders.length ? `
+        <div style="overflow-x:auto">
+          <table class="neo-table" style="width:100%">
+            <thead>
+              <tr>
+                <th>Invoice</th>
+                <th>Produk</th>
+                <th>Harga Jual</th>
+                <th>Profitmu</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>${recentRows}</tbody>
+          </table>
+        </div>
+      ` : '<div class="empty-product">Belum ada transaksi pembeli di bot toko Anda.</div>'}
+    </div>
+  `;
 
-    document.getElementById('inputBotToken').value = b.bot_token || '';
-    document.getElementById('inputBotUsername').value = (b.bot_username || '').replace(/^@+/, '');
-    document.getElementById('inputStoreName').value = br.store_name || b.bot_name || r.name || '';
+  $('#dashGoBotBtn').onclick = () => navigate('bot');
+  $('#dashGoOrdersBtn').onclick = () => navigate('orders');
+}
 
-    // CS is automatically pre-filled to reseller's telegram account if empty!
-    const defaultCs = r.username ? `https://t.me/${r.username}` : (r.telegram_id ? `tg://user?id=${r.telegram_id}` : '');
-    document.getElementById('inputBotCs').value = br.cs_contact || defaultCs;
+// ---------------------------------------------------------------------
+// VIEW 2: BOT TOKO
+// ---------------------------------------------------------------------
+async function loadBot() {
+  const data = await api('/api/reseller/me');
+  state.reseller = data.reseller;
+  state.bot = data.bot || {};
+  state.runtime = data.runtime || {};
+  updateShellUI();
 
-    document.getElementById('inputStartMedia').value = br.start_media_url || '';
-    document.getElementById('inputStartMessage').value = br.start_message || '';
-    document.getElementById('inputChannelUrl').value = br.channel_url || '';
-    document.getElementById('inputNokosLink').value = br.nokos_link || '';
+  const b = state.bot || {};
+  const br = b.branding || {};
+  const rt = state.runtime || {};
+  const r = state.reseller || {};
 
-    const badge = document.getElementById('botConfigStateBadge');
-    if (!b.bot_token) {
-      badge.textContent = 'Belum Setup';
-      badge.className = 'badge';
-    } else if (state.runtime?.running) {
-      badge.textContent = '🟢 Online';
-      badge.className = 'badge green';
-    } else {
-      badge.textContent = '🟡 Stopped';
-      badge.className = 'badge yellow';
-    }
-  }
+  const defaultCs = r.username ? `https://t.me/${r.username}` : (r.telegram_id ? `tg://user?id=${r.telegram_id}` : '');
 
-  async function handleVerifyToken() {
-    const token = document.getElementById('inputBotToken').value.trim();
-    const resultDiv = document.getElementById('tokenVerifyResult');
-    if (!token) {
-      showToast('Masukkan token bot terlebih dahulu', 'bad');
-      return;
-    }
+  $('#content').innerHTML = `
+    <div class="neo-card" style="padding:18px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <div>
+          <h2 style="margin:0;font-size:20px">🤖 Pengaturan Bot Toko Reseller</h2>
+          <p style="margin:4px 0 0;font-size:13px;color:var(--muted)">Hubungkan bot Telegram Anda dari @BotFather dan kelola branding toko.</p>
+        </div>
+        <div>
+          ${rt.running ? '<span class="badge ok">🟢 Online</span>' : b.bot_token ? '<span class="badge warn">🟡 Stopped</span>' : '<span class="badge">Belum Setup</span>'}
+        </div>
+      </div>
 
-    resultDiv.classList.remove('hidden');
+      <form id="botSetupForm" class="form-grid">
+        <label class="full">
+          Token Bot (@BotFather) *
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <input name="bot_token" id="resellerBotToken" style="flex:1" placeholder="Contoh: 123456789:ABCdefGhIJKlmNoPQRstUVwxyZ" value="${esc(b.bot_token || '')}" required />
+            <button type="button" id="btnCheckToken" class="neo-btn blue" style="flex-shrink:0">⚡ Cek Token</button>
+          </div>
+          <div id="tokenCheckResult" class="hidden"></div>
+        </label>
+
+        <label>
+          Username Bot
+          <input name="bot_username" id="resellerBotUsername" placeholder="Contoh: TokoSaya_Bot" value="${esc(b.bot_username || '')}" />
+        </label>
+
+        <label>
+          Nama Toko Anda
+          <input name="store_name" placeholder="Contoh: iLink VIP Store" value="${esc(br.store_name || b.bot_name || '')}" />
+        </label>
+
+        <label class="full">
+          Link Customer Service (CS)
+          <input name="cs_contact" placeholder="Contoh: https://t.me/username_anda" value="${esc(br.cs_contact || defaultCs)}" />
+          <small>Kosongkan agar otomatis diarahkan ke akun Telegram Anda.</small>
+        </label>
+
+        <label class="full">
+          Banner Media / Gambar Start (Opsional)
+          <input name="start_media_url" placeholder="URL Foto / Gambar (https://...)" value="${esc(br.start_media_url || '')}" />
+        </label>
+
+        <label class="full">
+          Pesan Pembuka /start (Opsional)
+          <textarea name="start_message" rows="3" placeholder="Pesan sambutan khusus saat pembeli menekan /start...">${esc(br.start_message || '')}</textarea>
+        </label>
+
+        <label class="full">
+          Link Channel / Grup Info (Opsional)
+          <input name="channel_url" placeholder="Contoh: https://t.me/channel_anda" value="${esc(br.channel_url || '')}" />
+        </label>
+
+        <div class="full" style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+          <button type="submit" id="btnSaveBot" class="neo-btn purple wide">💾 Simpan & Jalankan Bot</button>
+          ${b.bot_token ? `
+            <button type="button" id="btnRestartBot" class="neo-btn yellow" style="flex:1">🔄 Restart Bot</button>
+            ${rt.running ? '<button type="button" id="btnStopBot" class="neo-btn red" style="flex:1">⏹ Hentikan</button>' : '<button type="button" id="btnStartBot" class="neo-btn green" style="flex:1">▶ Mulai Bot</button>'}
+          ` : ''}
+        </div>
+      </form>
+    </div>
+  `;
+
+  $('#btnCheckToken').onclick = async () => {
+    const token = $('#resellerBotToken').value.trim();
+    const resultDiv = $('#tokenCheckResult');
+    if (!token) return toast('Masukkan token bot terlebih dahulu', true);
+
     resultDiv.className = 'verify-feedback';
-    resultDiv.textContent = 'Sedang memverifikasi token ke Telegram...';
+    resultDiv.textContent = 'Memverifikasi token ke API Telegram...';
+    resultDiv.classList.remove('hidden');
 
     try {
       const res = await api('/api/reseller/bot/verify-token', {
@@ -335,546 +443,666 @@
       });
       resultDiv.className = 'verify-feedback ok';
       resultDiv.innerHTML = `✅ Token valid! Bot: <b>@${res.bot.username}</b> (${res.bot.first_name})`;
-      document.getElementById('inputBotUsername').value = res.bot.username;
-      if (!document.getElementById('inputStoreName').value) {
-        document.getElementById('inputStoreName').value = res.bot.first_name;
-      }
-      showToast('Token bot berhasil diverifikasi!', 'good');
+      $('#resellerBotUsername').value = res.bot.username;
+      toast('Token bot valid!');
     } catch (e) {
       resultDiv.className = 'verify-feedback bad';
-      resultDiv.textContent = `❌ ${e.message || 'Token tidak valid'}`;
-      showToast(e.message || 'Verifikasi gagal', 'bad');
+      resultDiv.textContent = `❌ ${e.message}`;
+      toast(e.message, true);
     }
-  }
+  };
 
-  async function handleSaveBot(e) {
+  $('#botSetupForm').onsubmit = async (e) => {
     e.preventDefault();
-    const btn = document.getElementById('btnSaveBot');
+    const btn = $('#btnSaveBot');
     btn.disabled = true;
-    btn.textContent = 'Menyimpan & Menjalankan...';
-
-    const token = document.getElementById('inputBotToken').value.trim();
-    const username = document.getElementById('inputBotUsername').value.trim().replace(/^@+/, '');
-    const storeName = document.getElementById('inputStoreName').value.trim();
-    const csContact = document.getElementById('inputBotCs').value.trim();
-    const startMedia = document.getElementById('inputStartMedia').value.trim();
-    const startMsg = document.getElementById('inputStartMessage').value.trim();
-    const channelUrl = document.getElementById('inputChannelUrl').value.trim();
-    const nokosLink = document.getElementById('inputNokosLink').value.trim();
-
+    btn.textContent = 'Menyimpan...';
     try {
-      const res = await api('/api/reseller/bot/setup', {
-        method: 'POST',
-        body: {
-          bot_token: token,
-          bot_username: username,
-          bot_name: storeName,
-          store_name: storeName,
-          cs_contact: csContact,
-          start_media_url: startMedia,
-          start_message: startMsg,
-          channel_url: channelUrl,
-          nokos_link: nokosLink
-        }
-      });
-
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      const res = await api('/api/reseller/bot/setup', { method: 'POST', body });
       state.bot = res.bot;
       state.runtime = res.runtime;
-      updateHeaderUI();
-      renderBotForm();
-      showToast('🎉 Bot toko berhasil disimpan dan dijalankan!', 'good');
+      toast('Pengaturan bot berhasil disimpan & bot aktif!');
+      await loadBot();
     } catch (err) {
-      showToast(err.message || 'Gagal menyimpan bot toko', 'bad');
+      toast(err.message, true);
     } finally {
       btn.disabled = false;
       btn.textContent = '💾 Simpan & Jalankan Bot';
     }
+  };
+
+  if ($('#btnRestartBot')) {
+    $('#btnRestartBot').onclick = async () => {
+      try {
+        await api('/api/reseller/bot/action', { method: 'POST', body: { action: 'restart' } });
+        toast('Bot berhasil di-restart!');
+        await loadBot();
+      } catch (err) { toast(err.message, true); }
+    };
   }
 
-  async function handleBotAction(action) {
-    if (!state.bot) {
-      showToast('Bot belum dibuat. Simpan bot terlebih dahulu.', 'bad');
-      return;
-    }
-    try {
-      showToast(`Memproses ${action} bot...`, 'good');
-      const res = await api('/api/reseller/bot/action', {
-        method: 'POST',
-        body: { action }
-      });
-      state.bot = res.bot;
-      state.runtime = res.runtime;
-      updateHeaderUI();
-      renderBotForm();
-      showToast(`Bot berhasil di-${action}!`, 'good');
-    } catch (e) {
-      showToast(e.message || `Gagal ${action} bot`, 'bad');
-    }
+  if ($('#btnStopBot')) {
+    $('#btnStopBot').onclick = async () => {
+      try {
+        await api('/api/reseller/bot/action', { method: 'POST', body: { action: 'stop' } });
+        toast('Bot dihentikan.');
+        await loadBot();
+      } catch (err) { toast(err.message, true); }
+    };
   }
 
-  // Tab 3: Pricing & Margins
-  async function loadPricingData() {
-    const container = document.getElementById('productPricingList');
-    container.innerHTML = '<div class="loader-card"><div class="loader-spinner"></div><p>Memuat daftar produk...</p></div>';
-
-    try {
-      const res = await api('/api/reseller/products');
-      state.products = res.items || [];
-      state.pricingOverrides = (state.bot?.pricing_overrides) || {};
-      state.pendingPricing = {};
-      updateFloatingSaveBar();
-
-      // Pre-fill global markup inputs
-      const gm = res.global_markup || {};
-      document.getElementById('selectGlobalMarkupMode').value = gm.mode || 'fixed';
-      document.getElementById('inputGlobalMarkupValue').value = gm.value || 2000;
-
-      renderPricingList();
-    } catch (e) {
-      container.innerHTML = `<div class="empty">Gagal memuat produk: ${escapeHtml(e.message)}</div>`;
-    }
+  if ($('#btnStartBot')) {
+    $('#btnStartBot').onclick = async () => {
+      try {
+        await api('/api/reseller/bot/action', { method: 'POST', body: { action: 'start' } });
+        toast('Bot dijalankan!');
+        await loadBot();
+      } catch (err) { toast(err.message, true); }
+    };
   }
+}
 
-  function renderPricingList(searchFilter = '', statusFilter = 'all') {
-    const container = document.getElementById('productPricingList');
-    const q = (searchFilter || document.getElementById('inputSearchProduct').value || '').toLowerCase().trim();
+// ---------------------------------------------------------------------
+// VIEW 3: ATUR MARGIN & VARIAN PRODUK
+// ---------------------------------------------------------------------
+async function loadPricing() {
+  const res = await api('/api/reseller/products');
+  state.products = res.items || [];
+  state.pendingPricing = {};
+  updateSaveBar();
 
-    const filtered = state.products.filter(p => {
-      const matchSearch = !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q);
-      const isEnabled = state.pendingPricing[p.code]?.enabled !== undefined
-        ? state.pendingPricing[p.code].enabled
-        : p.enabled;
+  renderPricingView();
+}
 
-      if (!matchSearch) return false;
-      if (statusFilter === 'enabled') return isEnabled;
-      if (statusFilter === 'disabled') return !isEnabled;
-      return true;
-    });
-
-    if (!filtered.length) {
-      container.innerHTML = '<div class="empty">Tidak ada produk yang cocok dengan pencarian.</div>';
-      return;
-    }
-
-    container.innerHTML = filtered.map(p => {
-      const pending = state.pendingPricing[p.code] || {};
-      const isEnabled = pending.enabled !== undefined ? pending.enabled : p.enabled;
-      const currentMargin = pending.margin !== undefined ? pending.margin : p.current_margin;
-      const calculatedSell = p.base_cost + Number(currentMargin || 0);
-
-      return `
-        <div class="product-price-card ${isEnabled ? '' : 'disabled'}" data-code="${escapeHtml(p.code)}">
-          <div class="price-card-head">
-            <div class="price-card-title">
-              <h4>${escapeHtml(p.name)}</h4>
-              <small>Kode: <code>${escapeHtml(p.code)}</code> · Kategori: ${escapeHtml(p.category || 'Digital')}</small>
-            </div>
-            <label class="switch-label" title="Aktifkan/Nonaktifkan di bot tokomu">
-              <input type="checkbox" class="toggle-product-enabled" data-code="${escapeHtml(p.code)}" ${isEnabled ? 'checked' : ''}>
-              <span class="switch-slider"></span>
-              <span class="switch-text">${isEnabled ? 'Aktif' : 'Off'}</span>
-            </label>
-          </div>
-
-          <div class="price-calc-row">
-            <div class="price-box">
-              <small>MODAL OWNER</small>
-              <strong>${money(p.base_cost)}</strong>
-            </div>
-            <div class="price-box highlight">
-              <small>PROFITMU (+)</small>
-              <strong class="label-profit">+${money(currentMargin)}</strong>
-            </div>
-            <div class="price-box">
-              <small>HARGA JUAL PEMBELI</small>
-              <strong class="label-sell">${money(calculatedSell)}</strong>
-            </div>
-          </div>
-
-          <div class="margin-input-row">
-            <label>Margin Profit (Rp):</label>
-            <input type="number" class="input-margin-val" data-code="${escapeHtml(p.code)}"
-                   value="${currentMargin}" min="0" step="500" placeholder="Contoh: 2000">
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    // Attach listeners
-    container.querySelectorAll('.input-margin-val').forEach(input => {
-      input.addEventListener('input', onMarginInputChange);
-    });
-    container.querySelectorAll('.toggle-product-enabled').forEach(chk => {
-      chk.addEventListener('change', onToggleEnabledChange);
-    });
+function updateSaveBar() {
+  const bar = $('#floatingSaveBar');
+  const count = Object.keys(state.pendingPricing).length;
+  if (!bar) return;
+  if (count > 0) {
+    bar.classList.remove('hidden');
+    $('#pendingChangesCount').textContent = `${count} perubahan margin belum disimpan`;
+  } else {
+    bar.classList.add('hidden');
   }
+}
 
-  function onMarginInputChange(e) {
-    const code = e.target.dataset.code;
-    const margin = Math.max(0, Number(e.target.value) || 0);
-    const card = e.target.closest('.product-price-card');
-    const p = state.products.find(x => x.code === code);
-    if (!p) return;
+function renderPricingView(searchFilter = '', statusFilter = 'all') {
+  const q = (searchFilter || $('#productSearch')?.value || '').toLowerCase().trim();
+  const stFilter = statusFilter !== 'all' ? statusFilter : ($('#statusFilter')?.value || 'all');
 
-    if (!state.pendingPricing[code]) {
-      state.pendingPricing[code] = {
-        margin: p.current_margin,
-        sell_price: p.current_sell_price,
-        enabled: p.enabled
-      };
-    }
-    state.pendingPricing[code].margin = margin;
-    state.pendingPricing[code].sell_price = p.base_cost + margin;
+  const filtered = state.products.filter(p => {
+    const matchSearch = !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q) || (p.variants || []).some(v => v.name.toLowerCase().includes(q));
+    const pEnabled = state.pendingPricing[p.code]?.enabled !== undefined ? state.pendingPricing[p.code].enabled : p.enabled;
+    if (!matchSearch) return false;
+    if (stFilter === 'enabled') return pEnabled;
+    if (stFilter === 'disabled') return !pEnabled;
+    return true;
+  });
 
-    // Update live labels in card
-    card.querySelector('.label-profit').textContent = `+${money(margin)}`;
-    card.querySelector('.label-sell').textContent = money(p.base_cost + margin);
+  $('#content').innerHTML = `
+    <div class="pricing-toolbar neo-card">
+      <div class="searchbox">
+        <input id="productSearch" placeholder="🔍 Cari nama produk / varian..." value="${esc(q)}" />
+      </div>
+      <select id="statusFilter">
+        <option value="all" ${stFilter === 'all' ? 'selected' : ''}>Semua Status</option>
+        <option value="enabled" ${stFilter === 'enabled' ? 'selected' : ''}>Hanya Aktif</option>
+        <option value="disabled" ${stFilter === 'disabled' ? 'selected' : ''}>Hanya Nonaktif</option>
+      </select>
+      <button type="button" id="btnOpenBulkModal" class="neo-btn purple">⚡ Markup Massal</button>
+    </div>
 
-    updateFloatingSaveBar();
-  }
+    <div class="pricing-list" id="pricingCardsList">
+      ${filtered.length ? filtered.map(renderProductPricingCard).join('') : '<div class="empty-product">Tidak ada produk yang cocok dengan pencarian.</div>'}
+    </div>
+  `;
 
-  function onToggleEnabledChange(e) {
-    const code = e.target.dataset.code;
-    const isChecked = e.target.checked;
-    const card = e.target.closest('.product-price-card');
-    const p = state.products.find(x => x.code === code);
-    if (!p) return;
+  // Attach search listeners
+  $('#productSearch').oninput = (e) => renderPricingView(e.target.value, $('#statusFilter').value);
+  $('#statusFilter').onchange = (e) => renderPricingView($('#productSearch').value, e.target.value);
+  $('#btnOpenBulkModal').onclick = showBulkMarkupModal;
 
-    if (!state.pendingPricing[code]) {
-      state.pendingPricing[code] = {
-        margin: p.current_margin,
-        sell_price: p.current_sell_price,
-        enabled: p.enabled
-      };
-    }
-    state.pendingPricing[code].enabled = isChecked;
-    card.classList.toggle('disabled', !isChecked);
-    card.querySelector('.switch-text').textContent = isChecked ? 'Aktif' : 'Off';
+  bindPricingCardEvents();
+}
 
-    updateFloatingSaveBar();
-  }
+function renderProductPricingCard(p) {
+  const pendingP = state.pendingPricing[p.code] || {};
+  const isPEnabled = pendingP.enabled !== undefined ? pendingP.enabled : p.enabled;
+  const currentPMargin = pendingP.margin !== undefined ? pendingP.margin : p.current_margin;
+  const pBaseCost = p.base_cost;
+  const pSellPrice = pBaseCost + Number(currentPMargin || 0);
 
-  function updateFloatingSaveBar() {
-    const bar = document.getElementById('floatingSaveBar');
-    const count = Object.keys(state.pendingPricing).length;
-    if (count > 0) {
-      document.getElementById('pendingChangesCount').textContent = `${count} perubahan harga belum disimpan`;
-      bar.classList.add('show');
-    } else {
-      bar.classList.remove('show');
-    }
-  }
+  const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
 
-  async function handleSavePricingChanges() {
-    if (!state.bot) {
-      showToast('Bot belum dibuat. Harap atur bot terlebih dahulu.', 'bad');
-      return;
-    }
-    const btn = document.getElementById('btnSavePricingChanges');
-    btn.disabled = true;
-    btn.textContent = 'Menyimpan...';
-
-    try {
-      const mergedOverrides = { ...(state.bot.pricing_overrides || {}), ...state.pendingPricing };
-      const res = await api('/api/reseller/products/pricing', {
-        method: 'POST',
-        body: { pricing_overrides: mergedOverrides }
-      });
-
-      state.bot.pricing_overrides = res.pricing_overrides;
-      state.pendingPricing = {};
-      updateFloatingSaveBar();
-      showToast('✅ Pengaturan harga berhasil disimpan!', 'good');
-      loadPricingData();
-    } catch (e) {
-      showToast(e.message || 'Gagal menyimpan harga', 'bad');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = '💾 Simpan Perubahan Harga';
-    }
-  }
-
-  function handleApplyGlobalMarkup() {
-    const mode = document.getElementById('selectGlobalMarkupMode').value;
-    const val = Number(document.getElementById('inputGlobalMarkupValue').value || 0);
-
-    state.products.forEach(p => {
-      let margin = 0;
-      if (mode === 'percent') {
-        margin = Math.round(p.base_cost * (val / 100));
-      } else {
-        margin = Math.round(val);
-      }
-      if (!state.pendingPricing[p.code]) {
-        state.pendingPricing[p.code] = {
-          margin: p.current_margin,
-          sell_price: p.current_sell_price,
-          enabled: p.enabled
-        };
-      }
-      state.pendingPricing[p.code].margin = margin;
-      state.pendingPricing[p.code].sell_price = p.base_cost + margin;
-    });
-
-    renderPricingList();
-    updateFloatingSaveBar();
-    showToast(`Margin diterapkan ke ${state.products.length} produk. Jangan lupa tekan Simpan!`, 'good');
-  }
-
-  // Tab 4: Withdrawals
-  async function loadWithdrawalData() {
-    try {
-      const [resellerData, wdData] = await Promise.all([
-        api('/api/reseller/overview'),
-        api('/api/reseller/withdrawals')
-      ]);
-
-      state.reseller = resellerData.reseller;
-      document.getElementById('withdrawAvailableBalance').textContent = money(state.reseller.profit_balance);
-
-      // Pre-fill bank info if already stored
-      if (state.reseller.bank_name) {
-        document.getElementById('selectWdBank').value = state.reseller.bank_name;
-      }
-      if (state.reseller.bank_account_number) {
-        document.getElementById('inputWdAccNo').value = state.reseller.bank_account_number;
-      }
-      if (state.reseller.bank_account_name) {
-        document.getElementById('inputWdAccName').value = state.reseller.bank_account_name;
-      }
-
-      // Render withdrawal list
-      state.withdrawals = wdData.items || [];
-      document.getElementById('wdTotalCount').textContent = `${state.withdrawals.length} Transaksi`;
-
-      const listContainer = document.getElementById('withdrawalHistoryList');
-      if (!state.withdrawals.length) {
-        listContainer.innerHTML = '<div class="empty">Belum ada riwayat penarikan saldo.</div>';
-      } else {
-        listContainer.innerHTML = state.withdrawals.map(w => {
-          let badgeClass = 'yellow';
-          let badgeText = 'Menunggu';
-          if (w.status === 'approved') {
-            badgeClass = 'green';
-            badgeText = 'Disetujui';
-          } else if (w.status === 'rejected') {
-            badgeClass = 'red';
-            badgeText = 'Ditolak';
-          }
+  const variantsHtml = hasVariants ? `
+    <div class="variants-container">
+      <div class="variants-container-head">
+        <h4>Varian Produk (${p.variants.length})</h4>
+        <button type="button" class="neo-btn white tiny btn-sync-variants" data-code="${esc(p.code)}" data-margin="${currentPMargin}">
+          ⚡ Samakan Margin ke Semua Varian
+        </button>
+      </div>
+      <div class="variant-list">
+        ${p.variants.map(v => {
+          const vKey = `${p.code}:v${v.id}`;
+          const pendingV = state.pendingPricing[vKey] || {};
+          const isVEnabled = pendingV.enabled !== undefined ? pendingV.enabled : v.enabled;
+          const currentVMargin = pendingV.margin !== undefined ? pendingV.margin : v.current_margin;
+          const vBaseCost = v.base_cost;
+          const vSellPrice = vBaseCost + Number(currentVMargin || 0);
+          const stockLabel = v.delivery_mode === 'preorder' ? 'PO' : Number(v.stock || 0) > 0 ? `Ready ${v.stock}` : 'Habis';
 
           return `
-            <div class="withdraw-item">
-              <div class="withdraw-meta">
-                <b>${money(w.amount)}</b>
-                <small>${escapeHtml(w.withdrawal_ref)} · ${formatWIB(w.created_at)}</small>
-                <small>Tujuan: ${escapeHtml(w.bank_name)} - ${escapeHtml(w.account_number)} (${escapeHtml(w.account_name)})</small>
-                ${w.admin_note ? `<small style="color:#d9534f">Catatan: ${escapeHtml(w.admin_note)}</small>` : ''}
+            <div class="variant-card-item ${isVEnabled ? '' : 'disabled'}" data-key="${esc(vKey)}">
+              <div class="variant-head-row">
+                <div class="variant-title-info">
+                  <b>${esc(v.name)}</b>
+                  <span class="badge ${Number(v.stock || 0) > 0 ? 'ok' : 'warn'}">${stockLabel}</span>
+                </div>
+                <div class="toggle-switch-group">
+                  <button type="button" class="toggle-btn toggle-variant-btn ${isVEnabled ? '' : 'off'}" data-key="${esc(vKey)}" data-enabled="${isVEnabled ? 1 : 0}">
+                    ${isVEnabled ? 'ON' : 'OFF'}
+                  </button>
+                </div>
               </div>
-              <div class="withdraw-status">
-                <span class="badge ${badgeClass}">${badgeText}</span>
-                ${w.proof_image ? `<button type="button" class="neo-btn small blue btn-view-proof" data-img="${escapeHtml(w.proof_image)}" style="margin-top:6px">Bukti</button>` : ''}
+
+              <div class="calc-boxes-grid">
+                <div class="calc-box">
+                  <small>Modal Owner</small>
+                  <strong>${money(vBaseCost)}</strong>
+                </div>
+                <div class="calc-box profit">
+                  <small>Margin Profit (Rp)</small>
+                  <input type="number" class="margin-input input-variant-margin" data-key="${esc(vKey)}" data-base="${vBaseCost}" value="${currentVMargin}" min="0" step="500" />
+                </div>
+                <div class="calc-box highlight">
+                  <small>Harga Jual Pembeli</small>
+                  <strong class="label-sell-price">${money(vSellPrice)}</strong>
+                </div>
               </div>
             </div>
           `;
-        }).join('');
+        }).join('')}
+      </div>
+    </div>
+  ` : `
+    <div class="calc-boxes-grid" style="margin-top:12px">
+      <div class="calc-box">
+        <small>Modal Owner</small>
+        <strong>${money(pBaseCost)}</strong>
+      </div>
+      <div class="calc-box profit">
+        <small>Margin Profit (Rp)</small>
+        <input type="number" class="margin-input input-product-margin" data-code="${esc(p.code)}" data-base="${pBaseCost}" value="${currentPMargin}" min="0" step="500" />
+      </div>
+      <div class="calc-box highlight">
+        <small>Harga Jual Pembeli</small>
+        <strong class="label-sell-price">${money(pSellPrice)}</strong>
+      </div>
+    </div>
+  `;
 
-        listContainer.querySelectorAll('.btn-view-proof').forEach(b => {
-          b.addEventListener('click', () => {
-            const imgUrl = b.dataset.img;
-            document.getElementById('proofModalImg').src = imgUrl;
-            document.getElementById('proofModal').classList.remove('hidden');
-          });
-        });
-      }
-    } catch (e) {
-      console.warn('[withdraw:load]', e);
-    }
-  }
-
-  async function handleWithdrawalSubmit(e) {
-    e.preventDefault();
-    const btn = document.getElementById('btnSubmitWithdrawal');
-    btn.disabled = true;
-    btn.textContent = 'Memproses...';
-
-    const amount = Number(document.getElementById('inputWdAmount').value);
-    const bankName = document.getElementById('selectWdBank').value;
-    const accNo = document.getElementById('inputWdAccNo').value.trim();
-    const accName = document.getElementById('inputWdAccName').value.trim();
-
-    if (amount < 10000) {
-      showToast('Minimal penarikan adalah Rp 10.000', 'bad');
-      btn.disabled = false;
-      btn.textContent = 'Kirim Permintaan Penarikan';
-      return;
-    }
-
-    try {
-      await api('/api/reseller/withdrawals', {
-        method: 'POST',
-        body: {
-          amount,
-          bank_name: bankName,
-          account_number: accNo,
-          account_name: accName
-        }
-      });
-
-      showToast('Permintaan penarikan berhasil dikirim! Menunggu transfer dari Owner.', 'good', 4000);
-      document.getElementById('inputWdAmount').value = '';
-      loadWithdrawalData();
-    } catch (err) {
-      showToast(err.message || 'Gagal mengajukan penarikan', 'bad');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Kirim Permintaan Penarikan';
-    }
-  }
-
-  // Tab 5: Orders
-  async function loadOrdersData() {
-    const container = document.getElementById('ordersFullList');
-    container.innerHTML = '<div class="loader-card"><div class="loader-spinner"></div><p>Memuat riwayat penjualan...</p></div>';
-
-    try {
-      const res = await api('/api/reseller/orders');
-      state.orders = res.items || [];
-      document.getElementById('ordersCountBadge').textContent = `${state.orders.length} Pesanan`;
-
-      if (!state.orders.length) {
-        container.innerHTML = '<div class="empty">Belum ada pesanan masuk dari pembeli di bot Anda.</div>';
-        return;
-      }
-
-      container.innerHTML = state.orders.map(o => {
-        let statusBadge = 'green';
-        if (o.status === 'pending_payment') statusBadge = 'yellow';
-        else if (o.status === 'failed' || o.status === 'canceled') statusBadge = 'red';
-
-        return `
-          <div class="order-full-item">
-            <div class="order-item-head">
-              <div>
-                <strong>${escapeHtml(o.product_name)}</strong>
-                ${o.variant_name ? `<br><small>${escapeHtml(o.variant_name)}</small>` : ''}
-                <small>Invoice: <code>${escapeHtml(o.order_ref)}</code> · ${formatWIB(o.created_at)}</small>
-              </div>
-              <span class="badge ${statusBadge}">${escapeHtml(o.status || 'completed').toUpperCase()}</span>
-            </div>
-
-            <div class="order-item-grid">
-              <div>
-                <small>JUMLAH</small>
-                <b>${o.quantity} pcs</b>
-              </div>
-              <div>
-                <small>TOTAL BAYAR</small>
-                <b>${money(o.total_price)}</b>
-              </div>
-              <div>
-                <small>KOMISIMU</small>
-                <b style="color:#0f8526">+${money(o.reseller_profit)}</b>
-              </div>
-            </div>
+  return `
+    <div class="price-product-card ${isPEnabled ? '' : 'disabled'}" data-code="${esc(p.code)}">
+      <div class="product-head-row">
+        <div class="product-main-meta">
+          <div class="product-icon-box">📦</div>
+          <div class="product-title-block">
+            <h3>${esc(p.name)}</h3>
+            <p>Kode: <code>${esc(p.code)}</code> · Kategori: ${esc(p.category || 'Digital')}</p>
           </div>
-        `;
-      }).join('');
-    } catch (e) {
-      container.innerHTML = `<div class="empty">Gagal memuat pesanan: ${escapeHtml(e.message)}</div>`;
+        </div>
+        <div class="toggle-switch-group">
+          <button type="button" class="toggle-btn toggle-product-btn ${isPEnabled ? '' : 'off'}" data-code="${esc(p.code)}" data-enabled="${isPEnabled ? 1 : 0}">
+            ${isPEnabled ? 'PRODUK AKTIF' : 'PRODUK OFF'}
+          </button>
+        </div>
+      </div>
+
+      ${variantsHtml}
+    </div>
+  `;
+}
+
+function bindPricingCardEvents() {
+  // Product level margin input
+  $$('.input-product-margin').forEach(input => {
+    input.oninput = (e) => {
+      const code = e.target.dataset.code;
+      const base = Number(e.target.dataset.base || 0);
+      const val = Math.max(0, Number(e.target.value) || 0);
+      const card = e.target.closest('.price-product-card');
+
+      state.pendingPricing[code] = {
+        ...(state.pendingPricing[code] || {}),
+        margin: val,
+        sell_price: base + val
+      };
+
+      const sellLabel = card.querySelector('.label-sell-price');
+      if (sellLabel) sellLabel.textContent = money(base + val);
+      updateSaveBar();
+    };
+  });
+
+  // Variant level margin input
+  $$('.input-variant-margin').forEach(input => {
+    input.oninput = (e) => {
+      const key = e.target.dataset.key;
+      const base = Number(e.target.dataset.base || 0);
+      const val = Math.max(0, Number(e.target.value) || 0);
+      const card = e.target.closest('.variant-card-item');
+
+      state.pendingPricing[key] = {
+        ...(state.pendingPricing[key] || {}),
+        margin: val,
+        sell_price: base + val
+      };
+
+      const sellLabel = card.querySelector('.label-sell-price');
+      if (sellLabel) sellLabel.textContent = money(base + val);
+      updateSaveBar();
+    };
+  });
+
+  // Product toggle
+  $$('.toggle-product-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      const code = e.target.dataset.code;
+      const cur = Number(e.target.dataset.enabled) === 1;
+      const next = !cur;
+      e.target.dataset.enabled = next ? 1 : 0;
+      e.target.textContent = next ? 'PRODUK AKTIF' : 'PRODUK OFF';
+      e.target.classList.toggle('off', !next);
+      e.target.closest('.price-product-card').classList.toggle('disabled', !next);
+
+      state.pendingPricing[code] = {
+        ...(state.pendingPricing[code] || {}),
+        enabled: next
+      };
+      updateSaveBar();
+    };
+  });
+
+  // Variant toggle
+  $$('.toggle-variant-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      const key = e.target.dataset.key;
+      const cur = Number(e.target.dataset.enabled) === 1;
+      const next = !cur;
+      e.target.dataset.enabled = next ? 1 : 0;
+      e.target.textContent = next ? 'ON' : 'OFF';
+      e.target.classList.toggle('off', !next);
+      e.target.closest('.variant-card-item').classList.toggle('disabled', !next);
+
+      state.pendingPricing[key] = {
+        ...(state.pendingPricing[key] || {}),
+        enabled: next
+      };
+      updateSaveBar();
+    };
+  });
+
+  // Sync margin to all variants of a product
+  $$('.btn-sync-variants').forEach(btn => {
+    btn.onclick = () => {
+      const code = btn.dataset.code;
+      const p = state.products.find(x => x.code === code);
+      if (!p || !p.variants) return;
+
+      const promptMargin = prompt(`Tentukan margin profit (Rp) untuk seluruh varian ${p.name}:`, '2000');
+      if (promptMargin === null) return;
+      const marginVal = Math.max(0, Number(promptMargin.replace(/[^0-9]/g, '')) || 0);
+
+      p.variants.forEach(v => {
+        const vKey = `${p.code}:v${v.id}`;
+        state.pendingPricing[vKey] = {
+          ...(state.pendingPricing[vKey] || {}),
+          margin: marginVal,
+          sell_price: v.base_cost + marginVal
+        };
+      });
+
+      toast(`Margin ${money(marginVal)} diterapkan ke semua varian ${p.name}`);
+      renderPricingView($('#productSearch')?.value, $('#statusFilter')?.value);
+      updateSaveBar();
+    };
+  });
+}
+
+// Floating Bar Action Buttons
+$('#btnDiscardPricing').onclick = () => {
+  state.pendingPricing = {};
+  updateSaveBar();
+  renderPricingView($('#productSearch')?.value, $('#statusFilter')?.value);
+  toast('Perubahan dibatalkan');
+};
+
+$('#btnSavePricingFloating').onclick = async () => {
+  const btn = $('#btnSavePricingFloating');
+  btn.disabled = true;
+  btn.textContent = 'Menyimpan...';
+
+  try {
+    const existing = state.bot?.pricing_overrides || {};
+    const merged = { ...existing };
+
+    for (const [key, patch] of Object.entries(state.pendingPricing)) {
+      merged[key] = {
+        ...(typeof merged[key] === 'object' && merged[key] !== null ? merged[key] : {}),
+        ...patch
+      };
+    }
+
+    const res = await api('/api/reseller/products/pricing', {
+      method: 'POST',
+      body: { pricing_overrides: merged }
+    });
+
+    state.bot.pricing_overrides = res.pricing_overrides || merged;
+    state.pendingPricing = {};
+    updateSaveBar();
+    toast('Semua margin & status varian berhasil disimpan!');
+    await loadPricing();
+  } catch (err) {
+    toast(err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Simpan Perubahan';
+  }
+};
+
+function showBulkMarkupModal() {
+  const html = `
+    <div class="form-grid">
+      <label>
+        Terapkan Margin Cepat
+        <select name="bulk_mode" id="bulkMarkupMode">
+          <option value="fixed">Tambah Nominal Tetap (Rp)</option>
+          <option value="percent">Tambah Persentase (%)</option>
+        </select>
+      </label>
+      <label>
+        Nilai Tambahan Margin
+        <input name="bulk_value" id="bulkMarkupVal" type="number" min="0" value="2000" placeholder="Contoh: 2000" required />
+      </label>
+      <div class="full info-note">
+        Fitur ini akan menghitung margin baru untuk <b>seluruh produk dan varian</b> yang ada di katalog. Anda tetap bisa memeriksa dan menyimpannya setelah menekan tombol Terapkan.
+      </div>
+    </div>
+  `;
+
+  modal('⚡ Markup Margin Massal', html, async (data) => {
+    const mode = data.bulk_mode;
+    const val = Number(data.bulk_value || 0);
+
+    state.products.forEach(p => {
+      if (Array.isArray(p.variants) && p.variants.length) {
+        p.variants.forEach(v => {
+          const vKey = `${p.code}:v${v.id}`;
+          const margin = mode === 'percent' ? Math.round(v.base_cost * val / 100) : val;
+          state.pendingPricing[vKey] = {
+            ...(state.pendingPricing[vKey] || {}),
+            margin,
+            sell_price: v.base_cost + margin
+          };
+        });
+      } else {
+        const margin = mode === 'percent' ? Math.round(p.base_cost * val / 100) : val;
+        state.pendingPricing[p.code] = {
+          ...(state.pendingPricing[p.code] || {}),
+          margin,
+          sell_price: p.base_cost + margin
+        };
+      }
+    });
+
+    toast(`Markup massal diterapkan ke seluruh produk & varian!`);
+    renderPricingView($('#productSearch')?.value, $('#statusFilter')?.value);
+    updateSaveBar();
+  }, { submit: 'Terapkan ke Semua' });
+}
+
+// ---------------------------------------------------------------------
+// VIEW 4: TARIK SALDO
+// ---------------------------------------------------------------------
+async function loadWithdraw() {
+  const me = await api('/api/reseller/me');
+  state.reseller = me.reseller;
+  state.withdrawals = await api('/api/reseller/withdrawals');
+  updateShellUI();
+
+  const r = state.reseller || {};
+  const list = Array.isArray(state.withdrawals.items) ? state.withdrawals.items : [];
+
+  const rowsHtml = list.map(w => `
+    <div class="order-card" style="margin-bottom:12px">
+      <div class="order-head">
+        <div>
+          <small>PENARIKAN #${w.id}</small>
+          <b>${esc(w.bank_name)} · ${esc(w.bank_account_number)} (${esc(w.bank_account_name)})</b>
+        </div>
+        ${badge(w.status)}
+      </div>
+      <div class="order-grid">
+        <div><small>Nominal</small><strong>${money(w.amount)}</strong></div>
+        <div><small>Tanggal</small><strong>${date(w.created_at)}</strong></div>
+        <div><small>Catatan Owner</small><span>${esc(w.admin_note || '-')}</span></div>
+      </div>
+      ${w.proof_file ? `
+        <div style="margin-top:10px">
+          <button type="button" class="neo-btn blue small btn-view-proof" data-url="/api/media?name=${encodeURIComponent(w.proof_file.replace(/^vps:\/\//, ''))}&v=250">
+            👁️ Lihat Bukti Transfer
+          </button>
+        </div>
+      ` : ''}
+    </div>
+  `).join('');
+
+  $('#content').innerHTML = `
+    <div class="dashboard-kpis" style="margin-bottom:16px">
+      <div class="stat-card">
+        <div class="stat-icon green">👛</div>
+        <div>
+          <small>Saldo Komisi Siap Ditarik</small>
+          <strong>${money(r.profit_balance)}</strong>
+          <em>Minimal penarikan Rp 10.000</em>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon purple">💸</div>
+        <div>
+          <small>Akumulasi Dana Ditarik</small>
+          <strong>${money(r.withdrawn_total)}</strong>
+          <em>Total komisi yang telah cair</em>
+        </div>
+      </div>
+    </div>
+
+    <div class="neo-card" style="padding:18px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+        <div>
+          <h3 style="margin:0;font-size:18px">💸 Ajukan Penarikan Saldo Profit</h3>
+          <p style="margin:2px 0 0;font-size:12px;color:var(--muted)">Transfer otomatis diproses oleh Owner ke rekening/e-wallet Anda.</p>
+        </div>
+        <button type="button" id="btnOpenWdModal" class="neo-btn green">＋ Tarik Saldo Sekarang</button>
+      </div>
+      <div class="info-note">
+        💡 Pastikan data bank atau e-wallet Anda sudah benar. Anda akan menerima notifikasi Telegram seketika penarikan disetujui beserta bukti transfer.
+      </div>
+    </div>
+
+    <div class="neo-card" style="padding:18px">
+      <h3 style="margin:0 0 14px;font-size:18px">📋 Riwayat Penarikan Saldo</h3>
+      ${list.length ? rowsHtml : '<div class="empty-product">Belum ada riwayat penarikan saldo.</div>'}
+    </div>
+  `;
+
+  $('#btnOpenWdModal').onclick = showWithdrawModal;
+
+  $$('.btn-view-proof').forEach(btn => {
+    btn.onclick = () => {
+      const src = btn.dataset.url;
+      modal('Bukti Transfer Owner', `<div style="text-align:center"><img src="${esc(src)}" style="max-width:100%;border-radius:10px;border:2px solid #000" alt="Bukti Transfer" /></div>`, null, { noSubmit: true });
+    };
+  });
+}
+
+function showWithdrawModal() {
+  const r = state.reseller || {};
+  const maxWd = Math.max(0, Number(r.profit_balance || 0));
+
+  if (maxWd < 10000) {
+    return toast('Saldo komisi belum mencukupi. Minimal penarikan Rp 10.000', true);
+  }
+
+  const html = `
+    <div class="form-grid">
+      <label>
+        Pilih Bank / E-Wallet
+        <select name="bank_name" required>
+          <option value="DANA">DANA</option>
+          <option value="GOPAY">GoPay</option>
+          <option value="OVO">OVO</option>
+          <option value="SHOPEEPAY">ShopeePay</option>
+          <option value="BCA">BCA</option>
+          <option value="BNI">BNI</option>
+          <option value="BRI">BRI</option>
+          <option value="MANDIRI">MANDIRI</option>
+          <option value="SEABANK">SeaBank</option>
+          <option value="JAGO">Bank Jago</option>
+        </select>
+      </label>
+      <label>
+        Nomor Rekening / No. E-Wallet
+        <input name="bank_account_number" placeholder="Contoh: 081234567890" value="${esc(r.bank_account_number || '')}" required />
+      </label>
+      <label class="full">
+        Nama Pemilik Rekening
+        <input name="bank_account_name" placeholder="Sesuai nama di buku tabungan / e-wallet" value="${esc(r.bank_account_name || '')}" required />
+      </label>
+      <label class="full">
+        Nominal Penarikan (Rp)
+        <input name="amount" type="number" min="10000" max="${maxWd}" value="${maxWd}" required />
+        <small>Tersedia: <b>${money(maxWd)}</b></small>
+      </label>
+    </div>
+  `;
+
+  modal('💸 Formulir Penarikan Saldo', html, async (data) => {
+    data.amount = Number(data.amount || 0);
+    await api('/api/reseller/withdrawals', { method: 'POST', body: data });
+    toast('Pengajuan penarikan berhasil dikirim ke Owner!');
+    await loadWithdraw();
+  }, { submit: 'Kirim Pengajuan' });
+}
+
+// ---------------------------------------------------------------------
+// VIEW 5: PESANAN PEMBELI
+// ---------------------------------------------------------------------
+async function loadOrders() {
+  const res = await api('/api/reseller/orders');
+  state.orders = res.items || [];
+  updateShellUI();
+
+  const orders = state.orders;
+
+  const ordersHtml = orders.map(o => `
+    <div class="order-card" style="margin-bottom:12px">
+      <div class="order-head">
+        <div>
+          <small>REF: #${esc(o.order_ref || String(o.id))}</small>
+          <b>${esc(o.product_name)}</b>
+          ${o.variant_name ? `<span style="display:inline-block;margin-top:2px;font-size:12px;color:var(--muted)">Varian: <b>${esc(o.variant_name)}</b></span>` : ''}
+        </div>
+        ${badge(o.status)}
+      </div>
+      <div class="order-grid">
+        <div><small>Harga Jual</small><strong>${money(o.total_price)}</strong></div>
+        <div><small>Modal Owner</small><strong>${money(o.cost_amount)}</strong></div>
+        <div style="background:#edffdc"><small>Profit Masuk</small><strong style="color:#1a5e00">+${money(o.reseller_profit)}</strong></div>
+        <div class="wide"><small>Waktu Pembelian</small><span>${date(o.created_at)}</span></div>
+      </div>
+    </div>
+  `).join('');
+
+  $('#content').innerHTML = `
+    <div class="neo-card" style="padding:16px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <h2 style="margin:0;font-size:20px">🛒 Riwayat Pesanan Pembeli</h2>
+          <p style="margin:3px 0 0;font-size:13px;color:var(--muted)">Seluruh pesanan otomatis dilayani dan komisi profit masuk ke saldo Anda.</p>
+        </div>
+        <div>
+          <span class="badge ok">Total ${orders.length} Pesanan</span>
+        </div>
+      </div>
+    </div>
+
+    ${orders.length ? ordersHtml : '<div class="empty-product">Belum ada pesanan pembeli yang masuk melalui bot Anda.</div>'}
+  `;
+}
+
+// ---------------------------------------------------------------------
+// INITIALIZATION & TELEGRAM AUTH
+// ---------------------------------------------------------------------
+async function initialize() {
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    try {
+      tg.ready();
+      tg.expand?.();
+      if (tg.setHeaderColor) tg.setHeaderColor('#ffffff');
+      if (tg.setBackgroundColor) tg.setBackgroundColor('#f6f6f2');
+    } catch {}
+  }
+
+  // Attempt auto-authentication with Telegram initData
+  if (!state.token) {
+    let initData = tg?.initData || '';
+    let tgUser = tg?.initDataUnsafe?.user || null;
+
+    if (!initData && !tgUser) {
+      const p = new URLSearchParams(window.location.search);
+      const testId = p.get('id') || p.get('tg_id');
+      if (testId) {
+        tgUser = { id: testId, first_name: p.get('name') || 'Reseller Demo', username: p.get('username') || '' };
+      }
+    }
+
+    try {
+      const res = await api('/api/reseller/auth', {
+        method: 'POST',
+        body: { initData, telegram_user: tgUser }
+      });
+      state.token = res.token;
+      sessionStorage.setItem('ilink_reseller_token', res.token);
+      localStorage.setItem('ilink_reseller_token', res.token);
+      state.reseller = res.reseller;
+      state.bot = res.bot;
+      state.runtime = res.runtime;
+    } catch (err) {
+      console.warn('[reseller:auth_init]', err.message);
     }
   }
 
-  function escapeHtml(str) {
-    return String(str == null ? '' : str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+  updateShellUI();
+  await navigate('dashboard');
+}
+
+(async () => {
+  try {
+    await initialize();
+  } catch (err) {
+    $('#content').innerHTML = `
+      <div class="empty-product" style="padding:30px">
+        <div style="font-size:36px;margin-bottom:12px">⚠️</div>
+        <h3>Gagal Menghubungkan ke Bot</h3>
+        <p style="margin:6px 0 16px;color:var(--muted)">${esc(err.message)}</p>
+        <button type="button" class="neo-btn purple" onclick="window.location.reload()">Coba Lagi</button>
+      </div>
+    `;
   }
-
-  // Setup Event Listeners
-  function setupEvents() {
-    // Nav Bottom Bar
-    document.querySelectorAll('.bottom-nav .nav-item').forEach(btn => {
-      btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-    });
-
-    // Quick Action shortcuts
-    document.querySelectorAll('.quick-nav-btn[data-target]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const target = btn.dataset.target;
-        if (target === 'bot') switchTab('tabBot');
-        else if (target === 'pricing') switchTab('tabPricing');
-        else if (target === 'orders') switchTab('tabOrders');
-      });
-    });
-
-    document.querySelectorAll('.neo-link[data-target="orders"]').forEach(b => {
-      b.addEventListener('click', () => switchTab('tabOrders'));
-    });
-
-    document.getElementById('btnQuickWithdraw')?.addEventListener('click', () => switchTab('tabWithdraw'));
-    document.getElementById('btnGoToBotTab')?.addEventListener('click', () => switchTab('tabBot'));
-
-    document.getElementById('btnOpenBotTelegram')?.addEventListener('click', () => {
-      if (state.bot?.bot_username) {
-        const url = `https://t.me/${state.bot.bot_username.replace(/^@+/, '')}`;
-        if (tg?.openTelegramLink) tg.openTelegramLink(url);
-        else window.open(url, '_blank');
-      } else {
-        showToast('Atur dan jalankan bot terlebih dahulu di tab Bot Toko', 'bad');
-      }
-    });
-
-    // Refresh button
-    document.getElementById('btnRefresh')?.addEventListener('click', () => {
-      switchTab(state.activeTab);
-      showToast('Memperbarui data...', 'good', 1200);
-    });
-
-    // Retry on error
-    document.getElementById('btnRetry')?.addEventListener('click', initAuth);
-
-    // Bot Config Form
-    document.getElementById('btnVerifyToken')?.addEventListener('click', handleVerifyToken);
-    document.getElementById('formBotConfig')?.addEventListener('submit', handleSaveBot);
-    document.getElementById('btnRestartBot')?.addEventListener('click', () => handleBotAction('restart'));
-    document.getElementById('btnStopBot')?.addEventListener('click', () => handleBotAction('stop'));
-
-    // Pricing Filter & Save
-    document.getElementById('inputSearchProduct')?.addEventListener('input', (e) => {
-      renderPricingList(e.target.value);
-    });
-    document.getElementById('btnFilterAll')?.addEventListener('click', () => renderPricingList('', 'all'));
-    document.getElementById('btnFilterEnabled')?.addEventListener('click', () => renderPricingList('', 'enabled'));
-    document.getElementById('btnFilterDisabled')?.addEventListener('click', () => renderPricingList('', 'disabled'));
-    document.getElementById('btnApplyGlobalMarkup')?.addEventListener('click', handleApplyGlobalMarkup);
-    document.getElementById('btnSavePricingChanges')?.addEventListener('click', handleSavePricingChanges);
-
-    // Withdrawal Form
-    document.getElementById('formWithdrawal')?.addEventListener('submit', handleWithdrawalSubmit);
-    document.querySelectorAll('.amount-chip[data-amount]').forEach(c => {
-      c.addEventListener('click', () => {
-        document.getElementById('inputWdAmount').value = c.dataset.amount;
-      });
-    });
-    document.getElementById('btnWdAll')?.addEventListener('click', () => {
-      if (state.reseller) {
-        document.getElementById('inputWdAmount').value = state.reseller.profit_balance || 0;
-      }
-    });
-
-    // Proof Modal
-    document.getElementById('btnCloseProofModal')?.addEventListener('click', () => {
-      document.getElementById('proofModal').classList.add('hidden');
-    });
-    document.getElementById('proofModal')?.addEventListener('click', (e) => {
-      if (e.target.id === 'proofModal') {
-        document.getElementById('proofModal').classList.add('hidden');
-      }
-    });
-  }
-
-  // Start app
-  setupEvents();
-  initAuth();
 })();

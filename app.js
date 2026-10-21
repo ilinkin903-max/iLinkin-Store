@@ -1722,5 +1722,32 @@ function openManualWithdrawalModal(defaultResellerId = null) {
   }
 }
 
-async function remove(path,msg,reload){if(!confirm(msg))return;try{await api(path,{method:'DELETE'});toast('Berhasil dihapus');await reload()}catch(e){toast(e.message,true)}}
-(async()=>{if(!state.token)return showLogin();try{await initialize()}catch{logout(false)}})();
+(async () => {
+  if (!state.token) {
+    const tg = window.Telegram?.WebApp;
+    const initData = tg?.initData || '';
+    const tgUser = tg?.initDataUnsafe?.user || null;
+    if (initData || tgUser) {
+      try {
+        const r = await api('/api/admin/auth/telegram', {
+          method: 'POST',
+          body: { initData, telegram_user: tgUser }
+        });
+        if (r && r.token) {
+          state.token = r.token;
+          sessionStorage.setItem('ilink_owner_token', r.token);
+        }
+      } catch (err) {
+        console.warn('[telegram:owner_auto_login]', err.message);
+      }
+    }
+  }
+
+  if (!state.token) return showLogin();
+  try {
+    await initialize();
+  } catch {
+    logout(false);
+  }
+})();
+

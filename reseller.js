@@ -1118,6 +1118,7 @@ async function initialize() {
       state.runtime = res.runtime;
     } catch (err) {
       console.warn('[reseller:auth_init]', err.message);
+      throw err;
     }
   }
 
@@ -1129,12 +1130,33 @@ async function initialize() {
   try {
     await initialize();
   } catch (err) {
+    const msg = String(err.message || '');
+    let title = 'Gagal Membuka Dashboard';
+    let icon = '⚠️';
+    let hint = msg;
+    if (msg.includes('menunggu persetujuan')) {
+      title = 'Permohonan Menunggu Persetujuan';
+      icon = '⏳';
+      hint = 'Pendaftaran kemitraan reseller Anda sedang dalam antrean verifikasi Owner. Begitu disetujui, dashboard ini akan otomatis terbuka.';
+    } else if (msg.includes('belum terdaftar') || msg.includes('bukan mitra')) {
+      title = 'Belum Terdaftar Sebagai Reseller';
+      icon = '🤝';
+      hint = 'Mini App ini khusus untuk mitra reseller toko. Silakan buka Bot Utama kami untuk mendaftar kemitraan reseller dengan mengirimkan Bot Token Anda.';
+    } else if (msg.includes('ditolak')) {
+      title = 'Pendaftaran Belum Disetujui';
+      icon = '❌';
+      hint = 'Mohon maaf, permohonan kemitraan reseller Anda ditolak oleh Owner. Silakan hubungi Owner atau ajukan ulang melalui Bot Utama.';
+    } else if (msg.includes('dinonaktifkan') || msg.includes('sementara')) {
+      title = 'Akun Kemitraan Ditangguhkan';
+      icon = '⛔';
+      hint = 'Akun kemitraan reseller Anda saat ini ditangguhkan oleh Owner. Silakan hubungi Customer Service.';
+    }
     $('#content').innerHTML = `
-      <div class="empty-product" style="padding:30px">
-        <div style="font-size:36px;margin-bottom:12px">⚠️</div>
-        <h3>Gagal Menghubungkan ke Bot</h3>
-        <p style="margin:6px 0 16px;color:var(--muted)">${esc(err.message)}</p>
-        <button type="button" class="neo-btn purple" onclick="window.location.reload()">Coba Lagi</button>
+      <div class="empty-product" style="padding:40px 20px;text-align:center">
+        <div style="font-size:48px;margin-bottom:14px">${icon}</div>
+        <h3 style="font-size:18px;font-weight:800;margin-bottom:8px">${esc(title)}</h3>
+        <p style="margin:0 auto 20px;max-width:380px;color:var(--muted);font-size:13px;line-height:1.5">${esc(hint)}</p>
+        <button type="button" class="neo-btn purple" onclick="window.location.reload()">🔄 Coba Lagi</button>
       </div>
     `;
   }

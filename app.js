@@ -1,7 +1,7 @@
 const $=(s)=>document.querySelector(s);const $$=(s)=>[...document.querySelectorAll(s)];
 const state={token:sessionStorage.getItem('ilink_owner_token')||'',view:'dashboard',cache:{supplierCatalogs:{}},me:null,overview:null,couponTab:'coupon',settingsTab:'',botTab:'',resellerTab:'resellers',resellerFilter:'',report:{type:'monthly'},legacyMigration:null,notifications:[],notificationTimer:null};
 const titles={dashboard:['Dashboard','Ringkasan performa toko hari ini'],products:['Produk','Katalog, varian, deskripsi, SNK, dan stok'],fresh:['Jaspay Fresh','Produk fresh, harga, mode, setting akun, dan perpanjang'],orders:['Pesanan','Pantau seluruh detail transaksi tanpa tabel horizontal'],reports:['Laporan','Omzet, profit, dan performa penjualan'],coupons:['Kupon','Voucher promo dan kode redeem'],settings:['Pengaturan','Toko, referral, TopUp, pembayaran, supplier, dan backup'],bot:['Bot & Notifikasi','Bot, /start, link, transaksi, dan diagnostik'],broadcast:['Broadcast','Kirim dan pantau pesan massal ke pengguna'],users:['User','Data pengguna Telegram, saldo, referral, dan aktivitas'],resellers:['Reseller Bot','Kelola reseller, bot toko white-label, komisi profit, dan penarikan saldo']};
-function esc(v=''){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}function money(v){return'Rp '+Number(v||0).toLocaleString('id-ID')}function date(v){if(!v)return'-';try{return new Date(v).toLocaleString('id-ID')}catch{return String(v)}}function bytes(v){const n=Number(v||0);if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(1)+' KB';return(n/1048576).toFixed(1)+' MB'}function toast(msg,bad=false){const t=$('#toast');if(!t)return;const m=$('#modal');if(m&&m.open){if(t.parentElement!==m)m.appendChild(t);}else{if(t.parentElement!==document.body)document.body.appendChild(t);}t.textContent=msg;t.className='toast show'+(bad?' bad':'');clearTimeout(toast.t);toast.t=setTimeout(()=>{t.className='toast';if(!m||!m.open){if(t.parentElement!==document.body)document.body.appendChild(t);}},2800);}function badge(status){const s=String(status||'').toLowerCase();const cls=['completed','paid','success','active','running','waiting_delivery'].includes(s)?'ok':['pending','pending_payment','supplier_pending','fresh_processing','fresh_attention','inactive'].includes(s)?'warn':['failed','blocked','canceled','cancelled','expired'].includes(s)?'bad':'purple';return`<span class="badge ${cls}">${esc(status||'-')}</span>`}function firstLetter(v){return esc(String(v||'?').trim().charAt(0).toUpperCase()||'?')}
+function esc(v=''){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}function money(v){return'Rp '+Number(v||0).toLocaleString('id-ID')}function date(v){if(!v)return'-';try{return new Date(v).toLocaleString('id-ID')}catch{return String(v)}}function bytes(v){const n=Number(v||0);if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(1)+' KB';return(n/1048576).toFixed(1)+' MB'}function toast(msg,bad=false){const t=$('#toast');if(!t)return;const m=$('#modal');if(m&&m.open){if(t.parentElement!==m)m.appendChild(t);}else{if(t.parentElement!==document.body)document.body.appendChild(t);}t.textContent=msg;t.className='toast show'+(bad?' bad':'');clearTimeout(toast.t);toast.t=setTimeout(()=>{t.className='toast';if(!m||!m.open){if(t.parentElement!==document.body)document.body.appendChild(t);}},2800);}function badge(status){const s=String(status||'').toLowerCase();const cls=['completed','paid','success','active','running','waiting_delivery'].includes(s)?'ok':['pending','pending_payment','pending_approval','supplier_pending','fresh_processing','fresh_attention','inactive'].includes(s)?'warn':['failed','blocked','canceled','cancelled','expired','rejected','suspended'].includes(s)?'bad':'purple';return`<span class="badge ${cls}">${esc(status||'-')}</span>`}function firstLetter(v){return esc(String(v||'?').trim().charAt(0).toUpperCase()||'?')}
 function bulkTiers(value){let rows=value;if(typeof rows==='string'){try{rows=JSON.parse(rows)}catch{rows=[]}}if(!Array.isArray(rows))rows=[];const byQty=new Map();for(const row of rows){const min=Math.max(2,Math.floor(Number(row?.min_qty??row?.minQty??row?.qty??0)||0)),price=Math.max(0,Math.floor(Number(row?.price??row?.unit_price??0)||0));if(min>=2&&price>0)byQty.set(min,{min_qty:min,price})}return[...byQty.values()].sort((a,b)=>a.min_qty-b.min_qty)}
 function bulkUnitPrice(base,tiers,qty=1){let price=Math.max(0,Number(base||0)),q=Math.max(1,Number(qty||1));for(const t of bulkTiers(tiers)){if(q>=t.min_qty)price=t.price;else break}return price}
 function bulkEditorHtml(prefix,tiers=[]){const rows=bulkTiers(tiers);return`<div class="full bulk-editor"><div class="bulk-editor-head"><div><b>Harga Bulk / Grosir</b><small>Harga per pcs otomatis berubah saat jumlah pesanan mencapai minimal tier.</small></div><button type="button" id="${prefix}Add" class="neo-btn purple small">＋ Tambah Tier</button></div><div id="${prefix}Rows" class="bulk-tier-list"></div><input type="hidden" name="bulk_prices" id="${prefix}Value" value="${esc(JSON.stringify(rows))}"><div class="bulk-help">Contoh: mulai 2 pcs Rp 845/pcs, mulai 50 pcs Rp 200/pcs. Tier diurutkan otomatis dari jumlah terkecil.</div></div>`}
@@ -52,7 +52,7 @@ $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginError').textConte
 function setHeader(view){const[t,s]=titles[view]||[view,''];$('#pageTitle').textContent=t;$('#pageSubtitle').textContent=s;$$('#nav [data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))}
 async function initialize(){state.me=(await api('/api/admin/me')).user;showApp();await navigate('dashboard');await refreshNotifications();if(!state.notificationTimer)state.notificationTimer=setInterval(()=>refreshNotifications(true),60000)}
 async function navigate(view){if(state.broadcastPollTimer){clearInterval(state.broadcastPollTimer);state.broadcastPollTimer=null;}state.view=view;closeNotifications();setHeader(view);$('#content').innerHTML='<div class="empty-product">Memuat data...</div>';try{await({dashboard:loadDashboard,products:loadProducts,fresh:loadFresh,orders:loadOrders,reports:loadReports,coupons:loadCoupons,settings:loadSettings,bot:loadBot,broadcast:loadBroadcast,users:loadUsers,resellers:loadResellers}[view]||loadDashboard)();$('#lastUpdated').textContent='Terakhir diperbarui: '+new Date().toLocaleString('id-ID');refreshNotifications(true)}catch(e){$('#content').innerHTML=`<div class="empty-product">${esc(e.message)}</div>`;toast(e.message,true)}}
-function applyShell(r){const s=r.settings||{};const o=r.stats||{};state.overview=r;$('#brandName').innerHTML=esc(String(s.store_name||'AUTO ORDER')).replace(/\s+/g,'<br>');$('#brandTagline').textContent=s.store_tagline||'Digital Store';$('#ownerName').textContent=s.owner_display_name||state.me?.display_name||'Owner';$('#ownerUsername').textContent='@'+String(s.owner_username||state.me?.owner_username||'owneradmin').replace(/^@/,'');const metric=String(s.store_balance_metric||o.store_balance_metric||'month_profit');const metricMap={month_profit:['Profit Bulan Ini',o.month_profit],month_revenue:['Omzet Bulan Ini',o.month_revenue],today_profit:['Profit Hari Ini',o.today_profit],today_revenue:['Omzet Hari Ini',o.today_revenue],manual:['Saldo Manual',s.store_balance??o.store_balance]};const selected=metricMap[metric]||metricMap.month_profit;$('#storeBalanceLabel').textContent=selected[0];$('#storeBalance').textContent=money(selected[1]||0);const badgeEl=$('#orderBadge');const pending=Number(o.pending_orders||0);badgeEl.textContent=pending;badgeEl.classList.toggle('hidden',pending<1);const resBadgeEl=$('#resellerBadge');if(resBadgeEl){api('/api/admin/resellers/overview').then(ro=>{const pWd=Number(ro?.stats?.pending_withdrawals||0);resBadgeEl.textContent=pWd;resBadgeEl.classList.toggle('hidden',pWd<1);}).catch(()=>null);}const username=state.overview?.bot?.username;$('#telegramBtn').href=username?`https://t.me/${username}`:'#';$('#telegramBtn').textContent='✈ Telegram Mini App';$('#systemSafe').textContent=state.overview?.bot?.running?'Semua sistem berjalan dengan aman':'Dashboard aktif · Bot Telegram offline'}
+function applyShell(r){const s=r.settings||{};const o=r.stats||{};state.overview=r;$('#brandName').innerHTML=esc(String(s.store_name||'AUTO ORDER')).replace(/\s+/g,'<br>');$('#brandTagline').textContent=s.store_tagline||'Digital Store';$('#ownerName').textContent=s.owner_display_name||state.me?.display_name||'Owner';$('#ownerUsername').textContent='@'+String(s.owner_username||state.me?.owner_username||'owneradmin').replace(/^@/,'');const metric=String(s.store_balance_metric||o.store_balance_metric||'month_profit');const metricMap={month_profit:['Profit Bulan Ini',o.month_profit],month_revenue:['Omzet Bulan Ini',o.month_revenue],today_profit:['Profit Hari Ini',o.today_profit],today_revenue:['Omzet Hari Ini',o.today_revenue],manual:['Saldo Manual',s.store_balance??o.store_balance]};const selected=metricMap[metric]||metricMap.month_profit;$('#storeBalanceLabel').textContent=selected[0];$('#storeBalance').textContent=money(selected[1]||0);const badgeEl=$('#orderBadge');const pending=Number(o.pending_orders||0);badgeEl.textContent=pending;badgeEl.classList.toggle('hidden',pending<1);const resBadgeEl=$('#resellerBadge');if(resBadgeEl){api('/api/admin/resellers/overview').then(ro=>{const pWd=Number(ro?.stats?.pending_withdrawals||0);const pRes=Number(ro?.stats?.pending_resellers||0);const pTotal=pWd+pRes;resBadgeEl.textContent=pTotal;resBadgeEl.classList.toggle('hidden',pTotal<1);}).catch(()=>null);}const username=state.overview?.bot?.username;$('#telegramBtn').href=username?`https://t.me/${username}`:'#';$('#telegramBtn').textContent='✈ Telegram Mini App';$('#systemSafe').textContent=state.overview?.bot?.running?'Semua sistem berjalan dengan aman':'Dashboard aktif · Bot Telegram offline'}
 function stat(icon,color,label,value,small){return`<div class="stat-card"><div class="stat-icon ${color}">${icon}</div><div><small>${esc(label)}</small><strong>${esc(value)}</strong><em>${esc(small)}</em></div></div>`}
 function productStockState(p={}){const all=Array.isArray(p.variants)?p.variants:[],vars=all.filter(v=>v.active);if(all.length){if(vars.some(v=>v.delivery_mode!=='preorder'&&Number(v.stock||0)>0))return'ready';if(vars.some(v=>v.delivery_mode==='preorder'))return'preorder';return'empty'}if(p.delivery_mode==='preorder'&&Number(p.stock||0)<1)return'preorder';return Number(p.sale_stock??p.stock??0)>0?'ready':'empty'}
 function stockStateLabel(state,stock=0){return state==='ready'?`READY · ${Number(stock||0)}`:state==='preorder'?'PRE-ORDER':'HABIS'}
@@ -860,16 +860,19 @@ async function loadResellers() {
   const overviewRes = await api('/api/admin/resellers/overview').catch(() => ({ stats: {} }));
   const stats = overviewRes.stats || {};
   const pendingWd = Number(stats.pending_withdrawals || 0);
+  const pendingRes = Number(stats.pending_resellers || 0);
+  const pendingTotal = pendingWd + pendingRes;
 
   const resBadgeEl = $('#resellerBadge');
   if (resBadgeEl) {
-    resBadgeEl.textContent = pendingWd;
-    resBadgeEl.classList.toggle('hidden', pendingWd < 1);
+    resBadgeEl.textContent = pendingTotal;
+    resBadgeEl.classList.toggle('hidden', pendingTotal < 1);
   }
 
   const kpis = `
     <div class="dashboard-kpis">
       ${stat('👥', 'purple', 'Total Reseller', `${stats.total_resellers || 0}`, `${stats.active_resellers || 0} akun aktif`)}
+      ${stat('⏳', pendingRes > 0 ? 'yellow' : 'blue', 'Persetujuan Reseller', `${pendingRes} Pengajuan`, pendingRes > 0 ? 'Menunggu verifikasi owner' : 'Semua pendaftaran diproses')}
       ${stat('🤖', 'blue', 'Bot Toko Reseller', `${stats.total_bots || 0}`, `${stats.active_bots || 0} bot online`)}
       ${stat('💰', 'green', 'Saldo Profit Reseller', money(stats.total_profit_balance), `Total ditarik: ${money(stats.total_withdrawn)}`)}
       ${stat('💸', 'yellow', 'Pending Penarikan', `${pendingWd} Pengajuan`, `${money(stats.pending_withdrawals_amount)} siap dicairkan`)}
@@ -878,7 +881,7 @@ async function loadResellers() {
 
   const tabs = `
     <div class="subnav" id="resellerSubnav" style="margin-bottom:16px;">
-      <button class="subnav-btn ${state.resellerTab === 'resellers' ? 'active' : ''}" data-reseller-tab="resellers">👥 Daftar Reseller</button>
+      <button class="subnav-btn ${state.resellerTab === 'resellers' ? 'active' : ''}" data-reseller-tab="resellers">👥 Daftar Reseller ${pendingRes > 0 ? `<em class="nav-badge" style="display:inline-block;margin-left:4px">${pendingRes}</em>` : ''}</button>
       <button class="subnav-btn ${state.resellerTab === 'bots' ? 'active' : ''}" data-reseller-tab="bots">🤖 Bot Toko Reseller</button>
       <button class="subnav-btn ${state.resellerTab === 'withdrawals' ? 'active' : ''}" data-reseller-tab="withdrawals">💸 Penarikan Saldo ${pendingWd > 0 ? `<em class="nav-badge" style="display:inline-block;margin-left:4px">${pendingWd}</em>` : ''}</button>
       <button class="subnav-btn ${state.resellerTab === 'ledger' ? 'active' : ''}" data-reseller-tab="ledger">📒 Mutasi Profit</button>
@@ -926,22 +929,73 @@ async function renderResellerTabContent() {
 
 // ---------------- TAB 1: DAFTAR RESELLER ----------------
 async function renderResellersList(host) {
-  const res = await api('/api/admin/resellers?limit=500').catch(e => ({ items: [], error: e.message }));
+  const [res, setRes] = await Promise.all([
+    api('/api/admin/resellers?limit=500').catch(e => ({ items: [], error: e.message })),
+    api('/api/admin/settings').catch(() => ({ settings: {} }))
+  ]);
   const items = res.items || [];
   state.cache.resellers = items;
+  const s = setRes.settings || state.overview?.settings || {};
+  const regFee = Math.max(0, Number(s.reseller_registration_fee || 0));
+  const regEnabled = s.reseller_registration_enabled !== false;
 
   host.innerHTML = `
+    <div class="card" style="margin-bottom:14px;padding:12px 16px;background:var(--card-bg,#fff);border:1px solid var(--border,#e2e8f0);border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <strong style="font-size:13px">💰 Biaya Pendaftaran Kemitraan Reseller</strong>
+          <span class="badge ${regEnabled ? 'ok' : 'bad'}">${regEnabled ? 'Pendaftaran Buka' : 'Pendaftaran Tutup'}</span>
+        </div>
+        <small style="color:var(--muted)">Biaya yang otomatis dipotong dari saldo dompet user saat mendaftarkan bot di Bot Toko Utama.</small>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-weight:700;font-size:14px;color:#15803d">${regFee > 0 ? money(regFee) : 'GRATIS'}</div>
+        <button type="button" class="neo-btn blue small" id="editResellerFeeBtn">⚙️ Atur Biaya</button>
+      </div>
+    </div>
+
     <div class="toolbar product-toolbar" style="margin-bottom:14px;">
       <div class="searchbox"><input id="resellerSearch" placeholder="Cari nama, username, telegram ID..."></div>
       <select id="resellerStatusFilter">
         <option value="">Semua Status</option>
-        <option value="active">Aktif</option>
-        <option value="inactive">Nonaktif</option>
+        <option value="pending_approval">⏳ Menunggu Persetujuan</option>
+        <option value="active">🟢 Aktif</option>
+        <option value="suspended">⚠️ Ditangguhkan</option>
+        <option value="rejected">❌ Ditolak</option>
       </select>
       <button id="addResellerBtn" class="neo-btn purple">＋ Tambah Reseller</button>
     </div>
     <div id="resellersCardGrid" class="reseller-grid"></div>
   `;
+
+  $('#editResellerFeeBtn').onclick = () => {
+    modal('Atur Biaya Pendaftaran Reseller', `
+      <div class="field">
+        <label>Biaya Pendaftaran Kemitraan (Rp)</label>
+        <input type="number" name="reseller_registration_fee" value="${regFee}" min="0" step="500" placeholder="0 = Gratis">
+        <small class="muted">Isi 0 jika pendaftaran gratis. Jika diisi nominal (misal 50.000), user wajib punya saldo dompet cukup saat mendaftar.</small>
+      </div>
+      <div class="field">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" name="reseller_registration_enabled" ${regEnabled ? 'checked' : ''}>
+          <b>Buka Pendaftaran Reseller di Bot Utama</b>
+        </label>
+        <small class="muted">Jika dinonaktifkan, pendaftaran kemitraan di bot utama akan ditutup.</small>
+      </div>
+    `, async (data) => {
+      const fee = Math.max(0, Number(data.reseller_registration_fee || 0));
+      const enabled = data.reseller_registration_enabled === 'on' || data.reseller_registration_enabled === 'true';
+      await api('/api/admin/settings', {
+        method: 'POST',
+        body: {
+          reseller_registration_fee: fee,
+          reseller_registration_enabled: enabled
+        }
+      });
+      toast('Biaya dan pengaturan pendaftaran reseller disimpan!');
+      await loadResellers();
+    }, { submit: 'Simpan Pengaturan' });
+  };
 
   $('#addResellerBtn').onclick = () => openResellerModal();
 
@@ -963,8 +1017,9 @@ async function renderResellersList(host) {
 
     grid.innerHTML = filtered.map(r => {
       const markupText = r.markup_mode === 'percent' ? `+${r.markup_value}%` : `+${money(r.markup_value)} / item`;
+      const isPending = r.status === 'pending_approval';
       return `
-        <article class="reseller-card">
+        <article class="reseller-card ${isPending ? 'pending-approval-border' : ''}">
           <div class="reseller-card-head">
             <div>
               <h3>${esc(r.name)}</h3>
@@ -999,9 +1054,13 @@ async function renderResellersList(host) {
               <span style="font-size:9px;color:var(--muted)">A.N: ${esc(r.bank_account_name || '-')}</span>
             </div>
           </div>
-          ${r.notes ? `<div style="font-size:10px;color:var(--muted);background:#fcfaff;padding:6px 10px;border-radius:8px;border:1px solid #e0d6f5"><b>Catatan:</b> ${esc(r.notes)}</div>` : ''}
+          ${r.note ? `<div style="font-size:10px;color:var(--muted);background:#fcfaff;padding:6px 10px;border-radius:8px;border:1px solid #e0d6f5"><b>Catatan:</b> ${esc(r.note)}</div>` : ''}
           <div class="reseller-actions">
-            <button class="neo-btn blue small" data-edit-reseller="${r.id}">✎ Edit Reseller</button>
+            ${isPending ? `
+              <button class="neo-btn green small" data-approve-reseller="${r.id}">✅ Setujui</button>
+              <button class="neo-btn red small" data-reject-reseller="${r.id}">❌ Tolak</button>
+            ` : ''}
+            <button class="neo-btn blue small" data-edit-reseller="${r.id}">✎ Edit</button>
             <button class="neo-btn purple small" data-manage-bots="${r.id}">🤖 Kelola Bot (${r.bots_count || 0})</button>
             <button class="neo-btn green small" data-manual-withdraw="${r.id}">💸 Tarik Saldo</button>
             <button class="neo-btn red small" data-delete-reseller="${r.id}">🗑 Hapus</button>
@@ -1009,6 +1068,42 @@ async function renderResellersList(host) {
         </article>
       `;
     }).join('');
+
+    $$('[data-approve-reseller]').forEach(b => {
+      b.onclick = async () => {
+        const id = b.dataset.approveReseller;
+        const item = items.find(x => String(x.id) === id);
+        if (!confirm(`Setujui pendaftaran reseller "${item?.name || id}"? Bot miliknya akan otomatis diaktifkan & dijalankan.`)) return;
+        try {
+          await api(`/api/admin/resellers/${id}/approve`, { method: 'POST' });
+          toast('Reseller disetujui & bot toko berhasil dijalankan!');
+          await loadResellers();
+        } catch (e) {
+          toast(e.message, true);
+        }
+      };
+    });
+
+    $$('[data-reject-reseller]').forEach(b => {
+      b.onclick = () => {
+        const id = b.dataset.rejectReseller;
+        const item = items.find(x => String(x.id) === id);
+        modal('Tolak Pendaftaran Reseller', `
+          <p style="margin-bottom:12px;font-size:12px">Tolak pendaftaran reseller <b>${esc(item?.name || id)}</b>? Jika ada biaya pendaftaran yang telah dipotong, biaya akan otomatis direfund ke saldo dompet user.</p>
+          <div class="field">
+            <label>Alasan Penolakan</label>
+            <textarea name="reason" placeholder="Contoh: Token bot tidak valid / Nama toko tidak sesuai aturan" rows="3"></textarea>
+          </div>
+        `, async (data) => {
+          await api(`/api/admin/resellers/${id}/reject`, {
+            method: 'POST',
+            body: { reason: data.reason || 'Ditolak oleh Owner' }
+          });
+          toast('Pendaftaran reseller ditolak & notifikasi dikirim ke user.');
+          await loadResellers();
+        }, { submit: 'Tolak Permohonan' });
+      };
+    });
 
     $$('[data-edit-reseller]').forEach(b => {
       b.onclick = () => {
@@ -1400,8 +1495,10 @@ function openResellerModal(item = {}) {
       </label>
       <label>Status Kemitraan
         <select name="status">
-          <option value="active" ${item.status !== 'inactive' ? 'selected' : ''}>Aktif</option>
-          <option value="inactive" ${item.status === 'inactive' ? 'selected' : ''}>Nonaktif</option>
+          <option value="active" ${item.status === 'active' || !item.status ? 'selected' : ''}>Aktif</option>
+          <option value="pending_approval" ${item.status === 'pending_approval' ? 'selected' : ''}>Menunggu Persetujuan</option>
+          <option value="suspended" ${item.status === 'suspended' ? 'selected' : ''}>Ditangguhkan</option>
+          <option value="rejected" ${item.status === 'rejected' ? 'selected' : ''}>Ditolak</option>
         </select>
       </label>
       <label class="full" style="font-weight:900;border-bottom:2px dashed var(--ink);padding-bottom:4px;margin-top:8px">

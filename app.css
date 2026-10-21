@@ -302,6 +302,11 @@ body{overflow-x:hidden}.app-shell{min-height:100vh;display:grid;grid-template-co
 .reseller-card:hover, .bot-card:hover, .withdrawal-card:hover {
   transform: translate(-1px, -1px);
 }
+.pending-approval-border {
+  border-color: #d97706 !important;
+  background: #fffdfa !important;
+  box-shadow: 5px 6px 0 #b45309 !important;
+}
 .reseller-card-head, .bot-card-head, .withdrawal-card-head {
   display: flex;
   justify-content: space-between;

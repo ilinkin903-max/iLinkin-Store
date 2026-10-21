@@ -28,3 +28,16 @@
   - **💸 Penarikan Saldo**: Verifikasi pengajuan pencairan, fitur **Setujui & Transfer** dengan unggah bukti transfer ke VPS yang langsung memotong saldo dan mengirim notifikasi Telegram ke reseller, serta fitur **Tolak Pengajuan** disertai alasan penolakan.
   - **📒 Mutasi Profit (Ledger)**: Audit log mutasi komisi pesanan masuk dan penarikan saldo lengkap dengan riwayat waktu, nominal, saldo akhir, nomor referensi invoice, dan detail bot.
 
+## Reseller Mini App Frontend (`/reseller`)
+- **Telegram Mini App Khusus Reseller (`reseller.html`, `reseller.css`, `reseller.js`)**:
+  - Panel mandiri yang dapat dibuka langsung dari Telegram via command `/reseller` atau tombol menu `‹🚀› Dashboard Reseller`.
+  - Desain modern Neo-Brutalist responsive di ponsel maupun desktop dengan 5 tab interaktif:
+    1. **📊 Beranda**: KPI Saldo Profit, total penjualan, total pesanan, pelanggan, status live bot toko, dan 5 pesanan pembeli terkini.
+    2. **🤖 Bot Toko**: Input token bot BotFather, tombol uji koneksi token instan (`Cek Token`), pengaturan nama toko, banner, teks pesan pembuka, link CS otomatis ke profil Telegram reseller, dan tombol Start / Stop / Restart bot.
+    3. **🏷️ Atur Margin**: Pengaturan margin keuntungan per produk (modal owner vs harga jual) dengan kalkulator harga jual real-time, toggle ON/OFF ketersediaan produk di bot, filter pencarian, dan alat Markup Massal (+Rp / +%).
+    4. **💸 Tarik Saldo**: Formulir pencairan komisi profit ke rekening bank / e-wallet (minimal Rp 10.000) dan riwayat penarikan lengkap beserta status approval dan modal pratinjau bukti transfer.
+    5. **🛒 Pesanan**: Daftar riwayat seluruh pesanan pembeli yang masuk melalui bot toko reseller beserta rincian produk, harga jual, dan laba komisi yang didapatkan.
+- **Routing & Gateway Vercel (`vercel.json`, `api/gateway.js`)**:
+  - Menambahkan rewrite `/reseller` dan `/reseller-dashboard` ke `/reseller.html`.
+  - Memperbarui `api/gateway.js` untuk mengizinkan rute `/api/reseller/*` diteruskan ke backend VPS.
+

@@ -6,7 +6,7 @@ module.exports = async function handler(req, res) {
   if (!backend || !secret) {
     return res.status(503).json({ ok: false, error: 'GATEWAY_NOT_CONFIGURED', message: 'PTERODACTYL_BACKEND_URL / VPS_PROXY_SECRET belum diisi di Vercel.' });
   }
-  if (!rawPath.startsWith('/api/admin/')) {
+  if (!rawPath.startsWith('/api/admin/') && !rawPath.startsWith('/api/reseller/')) {
     return res.status(400).json({ ok: false, error: 'INVALID_GATEWAY_PATH' });
   }
 

@@ -4,7 +4,6 @@ const $$ = (s) => [...document.querySelectorAll(s)];
 const state = {
   token: sessionStorage.getItem('ilink_reseller_token') || localStorage.getItem('ilink_reseller_token') || '',
   view: 'dashboard',
-  me: null,
   reseller: null,
   bot: null,
   runtime: null,
@@ -15,9 +14,9 @@ const state = {
 };
 
 const titles = {
-  dashboard: ['Dashboard Reseller', 'Ringkasan performa toko dan komisi profit Anda'],
+  dashboard: ['Dashboard', 'Ringkasan performa toko dan komisi profit Anda'],
   bot: ['Bot Toko', 'Kelola token bot, nama toko, banner, dan pengaturan layanan'],
-  pricing: ['Atur Margin & Varian', 'Sesuaikan keuntungan harga jual per produk dan per varian'],
+  pricing: ['Katalog & Margin Varian', 'Sesuaikan keuntungan harga jual per produk dan per varian'],
   withdraw: ['Tarik Saldo', 'Pencairan saldo komisi profit ke rekening bank atau e-wallet'],
   orders: ['Pesanan Pembeli', 'Daftar riwayat transaksi pembeli yang masuk melalui bot Anda']
 };
@@ -45,6 +44,10 @@ function date(v) {
   } catch {
     return String(v);
   }
+}
+
+function stat(icon, color, label, value, small) {
+  return `<div class="stat-card"><div class="stat-icon ${color}">${icon}</div><div><small>${esc(label)}</small><strong>${esc(value)}</strong><em>${esc(small)}</em></div></div>`;
 }
 
 function toast(msg, bad = false) {
@@ -139,7 +142,7 @@ async function api(path, options = {}) {
   return data;
 }
 
-// Sidebar Drawer Control
+// Sidebar Drawer Control (Exact parity with Owner Miniapp)
 function closeSidebar() {
   $('#sidebar')?.classList.remove('open');
   $('#sidebarBackdrop')?.classList.remove('show');
@@ -230,7 +233,7 @@ async function navigate(view, silent = false) {
 }
 
 // ---------------------------------------------------------------------
-// VIEW 1: DASHBOARD
+// VIEW 1: DASHBOARD (Identical to Owner loadDashboard())
 // ---------------------------------------------------------------------
 async function loadDashboard() {
   const data = await api('/api/reseller/overview');
@@ -251,103 +254,87 @@ async function loadDashboard() {
     ? '<span class="badge ok">🟢 Online</span>'
     : '<span class="badge warn">🟡 Stopped</span>';
 
-  const recentRows = (state.orders.slice(0, 5) || []).map(o => `
-    <tr>
-      <td><b>#${esc(o.order_ref || String(o.id))}</b><br><small>${date(o.created_at)}</small></td>
-      <td><b>${esc(o.product_name)}</b><br><small>${esc(o.variant_name || '-')}</small></td>
-      <td><strong>${money(o.total_price)}</strong></td>
-      <td><span class="badge ok">+${money(o.reseller_profit)}</span></td>
-      <td>${badge(o.status)}</td>
-    </tr>
+  const recentOrderCards = state.orders.slice(0, 5).map(o => `
+    <article class="order-card">
+      <div class="order-head">
+        <div><small>Invoice</small><b class="mono">#${esc(o.order_ref || String(o.id))}</b></div>
+        ${badge(o.status)}
+      </div>
+      <div class="order-grid">
+        <div><small>Produk</small><strong>${esc(o.product_name)}</strong><span>${esc(o.variant_name || 'Default')}</span></div>
+        <div><small>Qty</small><strong>${o.quantity || 1}</strong></div>
+        <div><small>Harga Jual</small><strong>${money(o.total_price)}</strong></div>
+        <div style="background:#edffdc"><small>Profitmu</small><strong style="color:#1a5e00">+${money(o.reseller_profit)}</strong></div>
+        <div><small>Metode</small><strong>${esc(o.payment_method || 'QRIS')}</strong></div>
+        <div class="wide"><small>Waktu</small><strong>${date(o.created_at)}</strong></div>
+      </div>
+    </article>
   `).join('');
 
   $('#content').innerHTML = `
     <div class="dashboard-kpis">
-      <div class="stat-card">
-        <div class="stat-icon purple">👛</div>
-        <div>
-          <small>Saldo Komisi Profit</small>
-          <strong>${money(stats.profit_balance)}</strong>
-          <em>Sudah ditarik: ${money(stats.withdrawn_total)}</em>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon yellow">💰</div>
-        <div>
-          <small>Total Penjualan</small>
-          <strong>${money(stats.revenue_total)}</strong>
-          <em>Omzet toko Anda</em>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon green">📦</div>
-        <div>
-          <small>Total Pesanan</small>
-          <strong>${Number(stats.orders_count || 0)}</strong>
-          <em>Pesanan berhasil</em>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon blue">👥</div>
-        <div>
-          <small>Pelanggan Bot</small>
-          <strong>${Number(stats.customers_count || 0)} User</strong>
-          <em>Total pembeli terdaftar</em>
-        </div>
-      </div>
+      ${stat('💵', 'green', 'Saldo Komisi Profit', money(stats.profit_balance), 'Siap dicairkan')}
+      ${stat('📈', 'pink', 'Total Omset Toko', money(stats.revenue_total), 'Penjualan toko Anda')}
+      ${stat('🛒', 'purple', 'Total Order', stats.orders_count || 0, 'Pesanan selesai')}
+      ${stat('👥', 'blue', 'Pelanggan Bot', `${stats.customers_count || 0} User`, 'Pembeli terdaftar')}
     </div>
 
-    <div class="neo-card" style="margin-top:16px;padding:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-        <div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <span style="font-size:24px">🤖</span>
-            <div>
-              <h3 style="margin:0;font-size:18px">${esc(b.branding?.store_name || b.bot_name || 'Bot Toko Belum Diatur')}</h3>
-              <p style="margin:2px 0 0;font-size:13px;color:var(--muted)">Username: <b>${b.bot_username ? '@' + b.bot_username : '-'}</b></p>
-            </div>
+    <div class="dashboard-grid">
+      <section class="report-card chart-card">
+        <div class="card-heading">
+          <div>
+            <h3>🤖 Bot Toko White-Label</h3>
+            <p>Status operasional bot reseller Anda</p>
+          </div>
+          ${botStatusBadge}
+        </div>
+        <div style="padding:16px 0">
+          <p style="margin:0 0 10px;font-size:14px">Nama Toko: <b>${esc(b.branding?.store_name || b.bot_name || 'Belum Diatur')}</b></p>
+          <p style="margin:0 0 16px;font-size:14px">Bot Username: <b>${b.bot_username ? '@' + b.bot_username : '-'}</b></p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button type="button" class="neo-btn purple small" id="dashGoBotBtn">⚙️ Atur Konfigurasi Bot</button>
+            ${b.bot_username ? `<a class="neo-btn blue small" href="https://t.me/${b.bot_username.replace(/^@+/, '')}" target="_blank">✈ Buka Bot Telegram</a>` : ''}
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          ${botStatusBadge}
-          <button type="button" class="neo-btn purple small" id="dashGoBotBtn">⚙️ Atur Bot</button>
+      </section>
+
+      <section class="report-card top-products-card">
+        <div class="card-heading">
+          <div>
+            <h3>👛 Saldo & Penarikan</h3>
+            <p>Ringkasan profit yang telah dicairkan</p>
+          </div>
+          <button type="button" class="neo-btn green small" id="dashGoWdBtn">💸 Tarik Saldo</button>
         </div>
-      </div>
+        <div style="padding:16px 0">
+          <p style="margin:0 0 10px;font-size:14px">Total Sudah Ditarik: <b>${money(stats.withdrawn_total)}</b></p>
+          <p style="margin:0 0 16px;font-size:14px">Mode Markup Global: <b>${r.markup_mode === 'percent' ? `+${r.markup_value}%` : `+${money(r.markup_value)}`}</b></p>
+          <button type="button" class="neo-btn white small" id="dashGoPricingBtn">🏷️ Sesuaikan Margin Produk →</button>
+        </div>
+      </section>
     </div>
 
-    <div class="neo-card" style="margin-top:16px;padding:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div>
-          <h3 style="margin:0;font-size:18px">🛒 5 Transaksi Pembeli Terakhir</h3>
-          <p style="margin:3px 0 0;font-size:12px;color:var(--muted)">Pesanan yang masuk melalui bot toko Anda</p>
-        </div>
-        <button type="button" class="neo-btn white small" id="dashGoOrdersBtn">Lihat Semua →</button>
+    <div class="section-title product-section-title" style="margin-top:20px">
+      <div>
+        <h2>🛒 5 Pesanan Pembeli Terkini</h2>
+        <p>Pesanan terbaru yang masuk melalui bot toko Anda</p>
       </div>
-      ${state.orders.length ? `
-        <div style="overflow-x:auto">
-          <table class="neo-table" style="width:100%">
-            <thead>
-              <tr>
-                <th>Invoice</th>
-                <th>Produk</th>
-                <th>Harga Jual</th>
-                <th>Profitmu</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>${recentRows}</tbody>
-          </table>
-        </div>
-      ` : '<div class="empty-product">Belum ada transaksi pembeli di bot toko Anda.</div>'}
+      <span>
+        <button id="dashGoOrdersBtn" class="neo-btn purple">Lihat Semua Pesanan →</button>
+      </span>
     </div>
+
+    ${state.orders.length ? `<div class="order-list">${recentOrderCards}</div>` : '<div class="empty-product">Belum ada transaksi pesanan di bot toko Anda.</div>'}
   `;
 
   $('#dashGoBotBtn').onclick = () => navigate('bot');
+  $('#dashGoWdBtn').onclick = () => navigate('withdraw');
+  $('#dashGoPricingBtn').onclick = () => navigate('pricing');
   $('#dashGoOrdersBtn').onclick = () => navigate('orders');
 }
 
 // ---------------------------------------------------------------------
-// VIEW 2: BOT TOKO
+// VIEW 2: BOT TOKO (Identical to Owner bot settings)
 // ---------------------------------------------------------------------
 async function loadBot() {
   const data = await api('/api/reseller/me');
@@ -364,17 +351,17 @@ async function loadBot() {
   const defaultCs = r.username ? `https://t.me/${r.username}` : (r.telegram_id ? `tg://user?id=${r.telegram_id}` : '');
 
   $('#content').innerHTML = `
-    <div class="neo-card" style="padding:18px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
-        <div>
-          <h2 style="margin:0;font-size:20px">🤖 Pengaturan Bot Toko Reseller</h2>
-          <p style="margin:4px 0 0;font-size:13px;color:var(--muted)">Hubungkan bot Telegram Anda dari @BotFather dan kelola branding toko.</p>
-        </div>
-        <div>
-          ${rt.running ? '<span class="badge ok">🟢 Online</span>' : b.bot_token ? '<span class="badge warn">🟡 Stopped</span>' : '<span class="badge">Belum Setup</span>'}
-        </div>
+    <div class="section-title product-section-title">
+      <div>
+        <h2>🤖 Pengaturan Bot Toko Reseller</h2>
+        <p>Hubungkan token bot dari @BotFather dan kelola branding toko white-label Anda.</p>
       </div>
+      <span>
+        ${rt.running ? '<span class="badge ok">🟢 Online</span>' : b.bot_token ? '<span class="badge warn">🟡 Stopped</span>' : '<span class="badge">Belum Setup</span>'}
+      </span>
+    </div>
 
+    <div class="neo-card" style="padding:18px">
       <form id="botSetupForm" class="form-grid">
         <label class="full">
           Token Bot (@BotFather) *
@@ -416,7 +403,7 @@ async function loadBot() {
           <input name="channel_url" placeholder="Contoh: https://t.me/channel_anda" value="${esc(br.channel_url || '')}" />
         </label>
 
-        <div class="full" style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+        <div class="full" style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
           <button type="submit" id="btnSaveBot" class="neo-btn purple wide">💾 Simpan & Jalankan Bot</button>
           ${b.bot_token ? `
             <button type="button" id="btnRestartBot" class="neo-btn yellow" style="flex:1">🔄 Restart Bot</button>
@@ -505,7 +492,7 @@ async function loadBot() {
 }
 
 // ---------------------------------------------------------------------
-// VIEW 3: ATUR MARGIN & VARIAN PRODUK
+// VIEW 3: KATALOG PRODUK & ATUR MARGIN VARIAN (Identical to Owner loadProducts())
 // ---------------------------------------------------------------------
 async function loadPricing() {
   const res = await api('/api/reseller/products');
@@ -528,46 +515,67 @@ function updateSaveBar() {
   }
 }
 
-function renderPricingView(searchFilter = '', statusFilter = 'all') {
+function categories(rows) {
+  return [...new Set(rows.map(x => x.category).filter(Boolean))].sort().map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
+}
+
+function renderPricingView(searchFilter = '', statusFilter = 'all', categoryFilter = '') {
   const q = (searchFilter || $('#productSearch')?.value || '').toLowerCase().trim();
-  const stFilter = statusFilter !== 'all' ? statusFilter : ($('#statusFilter')?.value || 'all');
+  const stFilter = statusFilter !== 'all' ? statusFilter : ($('#productStatus')?.value || 'all');
+  const catFilter = categoryFilter || ($('#productCategory')?.value || '');
 
   const filtered = state.products.filter(p => {
-    const matchSearch = !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q) || (p.variants || []).some(v => v.name.toLowerCase().includes(q));
+    const matchSearch = !q || [p.name, p.code, p.category].some(x => String(x || '').toLowerCase().includes(q)) || (p.variants || []).some(v => v.name.toLowerCase().includes(q));
+    const matchCat = !catFilter || p.category === catFilter;
     const pEnabled = state.pendingPricing[p.code]?.enabled !== undefined ? state.pendingPricing[p.code].enabled : p.enabled;
-    if (!matchSearch) return false;
+    if (!matchSearch || !matchCat) return false;
     if (stFilter === 'enabled') return pEnabled;
     if (stFilter === 'disabled') return !pEnabled;
     return true;
   });
 
   $('#content').innerHTML = `
-    <div class="pricing-toolbar neo-card">
-      <div class="searchbox">
-        <input id="productSearch" placeholder="🔍 Cari nama produk / varian..." value="${esc(q)}" />
+    <div class="section-title product-section-title">
+      <div>
+        <h2>📦 Katalog Produk & Atur Margin Varian</h2>
+        <p>Sesuaikan margin keuntungan per produk dan varian untuk bot toko Anda.</p>
       </div>
-      <select id="statusFilter">
+      <span>
+        <button id="btnOpenBulkModal" class="neo-btn purple">⚡ Markup Massal</button>
+      </span>
+    </div>
+
+    <div class="toolbar product-toolbar">
+      <div class="searchbox"><input id="productSearch" placeholder="Cari nama produk atau varian..." value="${esc(q)}" /></div>
+      <select id="productCategory">
+        <option value="">Semua Kategori</option>
+        ${categories(state.products)}
+      </select>
+      <select id="productStatus">
         <option value="all" ${stFilter === 'all' ? 'selected' : ''}>Semua Status</option>
         <option value="enabled" ${stFilter === 'enabled' ? 'selected' : ''}>Hanya Aktif</option>
         <option value="disabled" ${stFilter === 'disabled' ? 'selected' : ''}>Hanya Nonaktif</option>
       </select>
-      <button type="button" id="btnOpenBulkModal" class="neo-btn purple">⚡ Markup Massal</button>
     </div>
 
-    <div class="pricing-list" id="pricingCardsList">
-      ${filtered.length ? filtered.map(renderProductPricingCard).join('') : '<div class="empty-product">Tidak ada produk yang cocok dengan pencarian.</div>'}
+    <div id="productGrid" class="product-grid">
+      ${filtered.length ? filtered.map((p, idx) => renderProductCard(p, idx)).join('') : '<div class="empty-product"><h3>Belum ada produk</h3><p>Tidak ada produk yang cocok dengan pencarian.</p></div>'}
     </div>
   `;
 
-  // Attach search listeners
-  $('#productSearch').oninput = (e) => renderPricingView(e.target.value, $('#statusFilter').value);
-  $('#statusFilter').onchange = (e) => renderPricingView($('#productSearch').value, e.target.value);
+  if (catFilter) $('#productCategory').value = catFilter;
+
+  // Filter events
+  const onFilter = () => renderPricingView($('#productSearch').value, $('#productStatus').value, $('#productCategory').value);
+  $('#productSearch').oninput = onFilter;
+  $('#productCategory').onchange = onFilter;
+  $('#productStatus').onchange = onFilter;
   $('#btnOpenBulkModal').onclick = showBulkMarkupModal;
 
   bindPricingCardEvents();
 }
 
-function renderProductPricingCard(p) {
+function renderProductCard(p, idx = 0) {
   const pendingP = state.pendingPricing[p.code] || {};
   const isPEnabled = pendingP.enabled !== undefined ? pendingP.enabled : p.enabled;
   const currentPMargin = pendingP.margin !== undefined ? pendingP.margin : p.current_margin;
@@ -575,16 +583,18 @@ function renderProductPricingCard(p) {
   const pSellPrice = pBaseCost + Number(currentPMargin || 0);
 
   const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
+  const icon = ['📦', '⚡', '📱', '🎮', '💎'][idx % 5];
 
-  const variantsHtml = hasVariants ? `
-    <div class="variants-container">
-      <div class="variants-container-head">
-        <h4>Varian Produk (${p.variants.length})</h4>
-        <button type="button" class="neo-btn white tiny btn-sync-variants" data-code="${esc(p.code)}" data-margin="${currentPMargin}">
-          ⚡ Samakan Margin ke Semua Varian
-        </button>
+  const variantsListHtml = hasVariants ? `
+    <div class="variant-editor" style="margin-top:14px">
+      <div class="variant-editor-head">
+        <div>
+          <h3>Varian Produk (${p.variants.length})</h3>
+          <p>Atur margin keuntungan & aktifkan/nonaktifkan varian individual untuk bot Anda.</p>
+        </div>
+        <button type="button" class="neo-btn white small btn-sync-variants" data-code="${esc(p.code)}">⚡ Samakan Semua</button>
       </div>
-      <div class="variant-list">
+      <div class="variant-edit-list">
         ${p.variants.map(v => {
           const vKey = `${p.code}:v${v.id}`;
           const pendingV = state.pendingPricing[vKey] || {};
@@ -595,32 +605,31 @@ function renderProductPricingCard(p) {
           const stockLabel = v.delivery_mode === 'preorder' ? 'PO' : Number(v.stock || 0) > 0 ? `Ready ${v.stock}` : 'Habis';
 
           return `
-            <div class="variant-card-item ${isVEnabled ? '' : 'disabled'}" data-key="${esc(vKey)}">
-              <div class="variant-head-row">
-                <div class="variant-title-info">
+            <div class="variant-edit-card" data-key="${esc(vKey)}" style="${isVEnabled ? '' : 'opacity:0.6;background:#f5f5f5'}">
+              <div>
+                <div style="display:flex;align-items:center;gap:8px">
                   <b>${esc(v.name)}</b>
-                  <span class="badge ${Number(v.stock || 0) > 0 ? 'ok' : 'warn'}">${stockLabel}</span>
+                  <span class="stock-state-pill ${Number(v.stock || 0) > 0 ? 'ready' : 'empty'}" style="font-size:10px">${stockLabel}</span>
                 </div>
-                <div class="toggle-switch-group">
-                  <button type="button" class="toggle-btn toggle-variant-btn ${isVEnabled ? '' : 'off'}" data-key="${esc(vKey)}" data-enabled="${isVEnabled ? 1 : 0}">
-                    ${isVEnabled ? 'ON' : 'OFF'}
-                  </button>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">
+                  <div style="background:#fff;border:1px solid #ccc;border-radius:6px;padding:4px 8px">
+                    <small style="display:block;font-size:10px;color:var(--muted)">Modal Owner</small>
+                    <b style="font-size:12px">${money(vBaseCost)}</b>
+                  </div>
+                  <div style="background:#edffdc;border:1px solid #82d847;border-radius:6px;padding:4px 8px">
+                    <small style="display:block;font-size:10px;color:#1a5e00">Margin Profit (+)</small>
+                    <input type="number" class="input-variant-margin" data-key="${esc(vKey)}" data-base="${vBaseCost}" value="${currentVMargin}" min="0" step="500" style="width:100%;font-size:12px;font-weight:700;padding:2px;border:1px solid #000;border-radius:4px" />
+                  </div>
+                  <div style="background:#fffbd4;border:1px solid #ffd91a;border-radius:6px;padding:4px 8px">
+                    <small style="display:block;font-size:10px;color:#705300">Harga Jual</small>
+                    <b class="label-sell-price" style="font-size:12px">${money(vSellPrice)}</b>
+                  </div>
                 </div>
               </div>
-
-              <div class="calc-boxes-grid">
-                <div class="calc-box">
-                  <small>Modal Owner</small>
-                  <strong>${money(vBaseCost)}</strong>
-                </div>
-                <div class="calc-box profit">
-                  <small>Margin Profit (Rp)</small>
-                  <input type="number" class="margin-input input-variant-margin" data-key="${esc(vKey)}" data-base="${vBaseCost}" value="${currentVMargin}" min="0" step="500" />
-                </div>
-                <div class="calc-box highlight">
-                  <small>Harga Jual Pembeli</small>
-                  <strong class="label-sell-price">${money(vSellPrice)}</strong>
-                </div>
+              <div style="display:flex;align-items:center">
+                <button type="button" class="toggle toggle-variant-btn ${isVEnabled ? '' : 'off'}" data-key="${esc(vKey)}" data-enabled="${isVEnabled ? 1 : 0}">
+                  ${isVEnabled ? 'ON' : 'OFF'}
+                </button>
               </div>
             </div>
           `;
@@ -628,52 +637,59 @@ function renderProductPricingCard(p) {
       </div>
     </div>
   ` : `
-    <div class="calc-boxes-grid" style="margin-top:12px">
-      <div class="calc-box">
+    <div class="product-info" style="margin-top:10px">
+      <div class="info-box">
         <small>Modal Owner</small>
         <strong>${money(pBaseCost)}</strong>
+        <em>Harga dasar</em>
       </div>
-      <div class="calc-box profit">
-        <small>Margin Profit (Rp)</small>
-        <input type="number" class="margin-input input-product-margin" data-code="${esc(p.code)}" data-base="${pBaseCost}" value="${currentPMargin}" min="0" step="500" />
-      </div>
-      <div class="calc-box highlight">
+      <div class="info-box price">
         <small>Harga Jual Pembeli</small>
         <strong class="label-sell-price">${money(pSellPrice)}</strong>
+        <em>Profit +${money(currentPMargin)}</em>
       </div>
+    </div>
+    <div style="margin-top:10px">
+      <label style="font-size:12px;font-weight:700">Margin Profit Toko Anda (Rp):
+        <input type="number" class="input-product-margin" data-code="${esc(p.code)}" data-base="${pBaseCost}" value="${currentPMargin}" min="0" step="500" style="margin-top:4px;width:100%" />
+      </label>
     </div>
   `;
 
   return `
-    <div class="price-product-card ${isPEnabled ? '' : 'disabled'}" data-code="${esc(p.code)}">
-      <div class="product-head-row">
-        <div class="product-main-meta">
-          <div class="product-icon-box">📦</div>
-          <div class="product-title-block">
+    <article class="product-card ${isPEnabled ? '' : 'stock-empty'}" data-product-card="${esc(p.code)}">
+      <span class="product-index">${String(idx + 1).padStart(2, '0')}</span>
+      <div class="product-thumb">
+        <span class="thumb-fallback">${icon}</span>
+        ${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}" loading="lazy" onerror="this.remove()">` : ''}
+      </div>
+      <div class="product-body">
+        <div class="product-head">
+          <div class="product-title">
             <h3>${esc(p.name)}</h3>
-            <p>Kode: <code>${esc(p.code)}</code> · Kategori: ${esc(p.category || 'Digital')}</p>
+            <p>Kode: <code>${esc(p.code)}</code> · ${esc(p.category || 'Produk Digital')}</p>
+          </div>
+          <div class="product-head-actions">
+            <span class="stock-state-pill ${isPEnabled ? 'ready' : 'empty'}">${isPEnabled ? 'AKTIF' : 'OFF'}</span>
+            <button class="toggle toggle-product-btn ${isPEnabled ? '' : 'off'}" data-code="${esc(p.code)}" data-enabled="${isPEnabled ? 1 : 0}">
+              ${isPEnabled ? 'ON' : 'OFF'}
+            </button>
           </div>
         </div>
-        <div class="toggle-switch-group">
-          <button type="button" class="toggle-btn toggle-product-btn ${isPEnabled ? '' : 'off'}" data-code="${esc(p.code)}" data-enabled="${isPEnabled ? 1 : 0}">
-            ${isPEnabled ? 'PRODUK AKTIF' : 'PRODUK OFF'}
-          </button>
-        </div>
-      </div>
 
-      ${variantsHtml}
-    </div>
+        ${variantsListHtml}
+      </div>
+    </article>
   `;
 }
 
 function bindPricingCardEvents() {
-  // Product level margin input
   $$('.input-product-margin').forEach(input => {
     input.oninput = (e) => {
       const code = e.target.dataset.code;
       const base = Number(e.target.dataset.base || 0);
       const val = Math.max(0, Number(e.target.value) || 0);
-      const card = e.target.closest('.price-product-card');
+      const card = e.target.closest('.product-card');
 
       state.pendingPricing[code] = {
         ...(state.pendingPricing[code] || {}),
@@ -687,13 +703,12 @@ function bindPricingCardEvents() {
     };
   });
 
-  // Variant level margin input
   $$('.input-variant-margin').forEach(input => {
     input.oninput = (e) => {
       const key = e.target.dataset.key;
       const base = Number(e.target.dataset.base || 0);
       const val = Math.max(0, Number(e.target.value) || 0);
-      const card = e.target.closest('.variant-card-item');
+      const card = e.target.closest('.variant-edit-card');
 
       state.pendingPricing[key] = {
         ...(state.pendingPricing[key] || {}),
@@ -707,16 +722,21 @@ function bindPricingCardEvents() {
     };
   });
 
-  // Product toggle
   $$('.toggle-product-btn').forEach(btn => {
     btn.onclick = (e) => {
       const code = e.target.dataset.code;
       const cur = Number(e.target.dataset.enabled) === 1;
       const next = !cur;
       e.target.dataset.enabled = next ? 1 : 0;
-      e.target.textContent = next ? 'PRODUK AKTIF' : 'PRODUK OFF';
+      e.target.textContent = next ? 'ON' : 'OFF';
       e.target.classList.toggle('off', !next);
-      e.target.closest('.price-product-card').classList.toggle('disabled', !next);
+      const card = e.target.closest('.product-card');
+      card.classList.toggle('stock-empty', !next);
+      const pill = card.querySelector('.product-head-actions .stock-state-pill');
+      if (pill) {
+        pill.className = `stock-state-pill ${next ? 'ready' : 'empty'}`;
+        pill.textContent = next ? 'AKTIF' : 'OFF';
+      }
 
       state.pendingPricing[code] = {
         ...(state.pendingPricing[code] || {}),
@@ -726,7 +746,6 @@ function bindPricingCardEvents() {
     };
   });
 
-  // Variant toggle
   $$('.toggle-variant-btn').forEach(btn => {
     btn.onclick = (e) => {
       const key = e.target.dataset.key;
@@ -735,7 +754,9 @@ function bindPricingCardEvents() {
       e.target.dataset.enabled = next ? 1 : 0;
       e.target.textContent = next ? 'ON' : 'OFF';
       e.target.classList.toggle('off', !next);
-      e.target.closest('.variant-card-item').classList.toggle('disabled', !next);
+      const card = e.target.closest('.variant-edit-card');
+      card.style.opacity = next ? '1' : '0.6';
+      card.style.background = next ? '#faf7ff' : '#f5f5f5';
 
       state.pendingPricing[key] = {
         ...(state.pendingPricing[key] || {}),
@@ -745,7 +766,6 @@ function bindPricingCardEvents() {
     };
   });
 
-  // Sync margin to all variants of a product
   $$('.btn-sync-variants').forEach(btn => {
     btn.onclick = () => {
       const code = btn.dataset.code;
@@ -766,17 +786,16 @@ function bindPricingCardEvents() {
       });
 
       toast(`Margin ${money(marginVal)} diterapkan ke semua varian ${p.name}`);
-      renderPricingView($('#productSearch')?.value, $('#statusFilter')?.value);
+      renderPricingView($('#productSearch')?.value, $('#productStatus')?.value, $('#productCategory')?.value);
       updateSaveBar();
     };
   });
 }
 
-// Floating Bar Action Buttons
 $('#btnDiscardPricing').onclick = () => {
   state.pendingPricing = {};
   updateSaveBar();
-  renderPricingView($('#productSearch')?.value, $('#statusFilter')?.value);
+  renderPricingView($('#productSearch')?.value, $('#productStatus')?.value, $('#productCategory')?.value);
   toast('Perubahan dibatalkan');
 };
 
@@ -860,13 +879,13 @@ function showBulkMarkupModal() {
     });
 
     toast(`Markup massal diterapkan ke seluruh produk & varian!`);
-    renderPricingView($('#productSearch')?.value, $('#statusFilter')?.value);
+    renderPricingView($('#productSearch')?.value, $('#productStatus')?.value, $('#productCategory')?.value);
     updateSaveBar();
   }, { submit: 'Terapkan ke Semua' });
 }
 
 // ---------------------------------------------------------------------
-// VIEW 4: TARIK SALDO
+// VIEW 4: TARIK SALDO (Identical to Owner layout)
 // ---------------------------------------------------------------------
 async function loadWithdraw() {
   const me = await api('/api/reseller/me');
@@ -878,66 +897,53 @@ async function loadWithdraw() {
   const list = Array.isArray(state.withdrawals.items) ? state.withdrawals.items : [];
 
   const rowsHtml = list.map(w => `
-    <div class="order-card" style="margin-bottom:12px">
+    <article class="order-card" style="margin-bottom:12px">
       <div class="order-head">
         <div>
           <small>PENARIKAN #${w.id}</small>
-          <b>${esc(w.bank_name)} · ${esc(w.bank_account_number)} (${esc(w.bank_account_name)})</b>
+          <b class="mono">${esc(w.bank_name)} · ${esc(w.bank_account_number)} (${esc(w.bank_account_name)})</b>
         </div>
         ${badge(w.status)}
       </div>
       <div class="order-grid">
         <div><small>Nominal</small><strong>${money(w.amount)}</strong></div>
-        <div><small>Tanggal</small><strong>${date(w.created_at)}</strong></div>
+        <div><small>Tanggal Pengajuan</small><strong>${date(w.created_at)}</strong></div>
         <div><small>Catatan Owner</small><span>${esc(w.admin_note || '-')}</span></div>
       </div>
       ${w.proof_file ? `
-        <div style="margin-top:10px">
+        <div class="order-actions" style="margin-top:10px">
           <button type="button" class="neo-btn blue small btn-view-proof" data-url="/api/media?name=${encodeURIComponent(w.proof_file.replace(/^vps:\/\//, ''))}&v=250">
             👁️ Lihat Bukti Transfer
           </button>
         </div>
       ` : ''}
-    </div>
+    </article>
   `).join('');
 
   $('#content').innerHTML = `
-    <div class="dashboard-kpis" style="margin-bottom:16px">
-      <div class="stat-card">
-        <div class="stat-icon green">👛</div>
-        <div>
-          <small>Saldo Komisi Siap Ditarik</small>
-          <strong>${money(r.profit_balance)}</strong>
-          <em>Minimal penarikan Rp 10.000</em>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon purple">💸</div>
-        <div>
-          <small>Akumulasi Dana Ditarik</small>
-          <strong>${money(r.withdrawn_total)}</strong>
-          <em>Total komisi yang telah cair</em>
-        </div>
-      </div>
+    <div class="dashboard-kpis">
+      ${stat('💵', 'green', 'Saldo Komisi Siap Ditarik', money(r.profit_balance), 'Minimal penarikan Rp 10.000')}
+      ${stat('💸', 'purple', 'Akumulasi Dana Ditarik', money(r.withdrawn_total), 'Total komisi yang telah cair')}
     </div>
 
-    <div class="neo-card" style="padding:18px;margin-bottom:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
-        <div>
-          <h3 style="margin:0;font-size:18px">💸 Ajukan Penarikan Saldo Profit</h3>
-          <p style="margin:2px 0 0;font-size:12px;color:var(--muted)">Transfer otomatis diproses oleh Owner ke rekening/e-wallet Anda.</p>
-        </div>
+    <div class="section-title product-section-title" style="margin-top:20px">
+      <div>
+        <h2>💸 Pengajuan Penarikan Saldo Profit</h2>
+        <p>Transfer pencairan dana diproses oleh Owner ke rekening bank atau e-wallet Anda.</p>
+      </div>
+      <span>
         <button type="button" id="btnOpenWdModal" class="neo-btn green">＋ Tarik Saldo Sekarang</button>
-      </div>
-      <div class="info-note">
-        💡 Pastikan data bank atau e-wallet Anda sudah benar. Anda akan menerima notifikasi Telegram seketika penarikan disetujui beserta bukti transfer.
+      </span>
+    </div>
+
+    <div class="section-title product-section-title" style="margin-top:20px">
+      <div>
+        <h2>📋 Riwayat Penarikan Saldo</h2>
+        <p>Pantau status pengajuan pencairan dana dan bukti transfer dari owner.</p>
       </div>
     </div>
 
-    <div class="neo-card" style="padding:18px">
-      <h3 style="margin:0 0 14px;font-size:18px">📋 Riwayat Penarikan Saldo</h3>
-      ${list.length ? rowsHtml : '<div class="empty-product">Belum ada riwayat penarikan saldo.</div>'}
-    </div>
+    ${list.length ? `<div class="order-list">${rowsHtml}</div>` : '<div class="empty-product">Belum ada riwayat penarikan saldo.</div>'}
   `;
 
   $('#btnOpenWdModal').onclick = showWithdrawModal;
@@ -1000,49 +1006,76 @@ function showWithdrawModal() {
 }
 
 // ---------------------------------------------------------------------
-// VIEW 5: PESANAN PEMBELI
+// VIEW 5: PESANAN PEMBELI (Identical to Owner loadOrders())
 // ---------------------------------------------------------------------
 async function loadOrders() {
   const res = await api('/api/reseller/orders');
   state.orders = res.items || [];
   updateShellUI();
 
-  const orders = state.orders;
+  renderOrdersView();
+}
 
-  const ordersHtml = orders.map(o => `
-    <div class="order-card" style="margin-bottom:12px">
+function renderOrdersView(filterStatus = '', search = '') {
+  const q = (search || $('#orderSearch')?.value || '').toLowerCase().trim();
+  const st = filterStatus || ($('#orderStatus')?.value || '');
+
+  const rows = state.orders.filter(o => {
+    const matchQ = !q || [o.order_ref, o.product_name, o.variant_name].some(x => String(x || '').toLowerCase().includes(q));
+    const matchSt = !st || o.status === st;
+    return matchQ && matchSt;
+  });
+
+  const ordersHtml = rows.map(o => `
+    <article class="order-card">
       <div class="order-head">
         <div>
-          <small>REF: #${esc(o.order_ref || String(o.id))}</small>
-          <b>${esc(o.product_name)}</b>
-          ${o.variant_name ? `<span style="display:inline-block;margin-top:2px;font-size:12px;color:var(--muted)">Varian: <b>${esc(o.variant_name)}</b></span>` : ''}
+          <small>Invoice</small>
+          <b class="mono">#${esc(o.order_ref || String(o.id))}</b>
         </div>
         ${badge(o.status)}
       </div>
       <div class="order-grid">
+        <div><small>Produk</small><strong>${esc(o.product_name)}</strong><span>${esc(o.variant_name || 'Default')}</span></div>
+        <div><small>Qty</small><strong>${o.quantity || 1}</strong></div>
         <div><small>Harga Jual</small><strong>${money(o.total_price)}</strong></div>
         <div><small>Modal Owner</small><strong>${money(o.cost_amount)}</strong></div>
         <div style="background:#edffdc"><small>Profit Masuk</small><strong style="color:#1a5e00">+${money(o.reseller_profit)}</strong></div>
-        <div class="wide"><small>Waktu Pembelian</small><span>${date(o.created_at)}</span></div>
+        <div><small>Metode Bayar</small><strong>${esc(o.payment_method || 'QRIS')}</strong></div>
+        <div class="wide"><small>Waktu Transaksi</small><strong>${date(o.created_at)}</strong></div>
       </div>
-    </div>
+    </article>
   `).join('');
 
   $('#content').innerHTML = `
-    <div class="neo-card" style="padding:16px;margin-bottom:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-        <div>
-          <h2 style="margin:0;font-size:20px">🛒 Riwayat Pesanan Pembeli</h2>
-          <p style="margin:3px 0 0;font-size:13px;color:var(--muted)">Seluruh pesanan otomatis dilayani dan komisi profit masuk ke saldo Anda.</p>
-        </div>
-        <div>
-          <span class="badge ok">Total ${orders.length} Pesanan</span>
-        </div>
+    <div class="section-title product-section-title">
+      <div>
+        <h2>🛒 Riwayat Pesanan Pembeli</h2>
+        <p>Seluruh pesanan otomatis dilayani dan komisi profit langsung masuk ke saldo Anda.</p>
       </div>
+      <span>
+        <span class="badge ok">Total ${state.orders.length} Pesanan</span>
+      </span>
     </div>
 
-    ${orders.length ? ordersHtml : '<div class="empty-product">Belum ada pesanan pembeli yang masuk melalui bot Anda.</div>'}
+    <div class="toolbar order-toolbar">
+      <div class="searchbox"><input id="orderSearch" placeholder="Cari nomor invoice atau produk..." value="${esc(q)}" /></div>
+      <select id="orderStatus">
+        <option value="">Semua Status</option>
+        <option value="completed" ${st === 'completed' ? 'selected' : ''}>Completed</option>
+        <option value="paid" ${st === 'paid' ? 'selected' : ''}>Paid</option>
+        <option value="pending" ${st === 'pending' ? 'selected' : ''}>Pending</option>
+        <option value="failed" ${st === 'failed' ? 'selected' : ''}>Failed</option>
+      </select>
+    </div>
+
+    <div class="order-list">
+      ${rows.length ? ordersHtml : '<div class="empty-product">Belum ada transaksi pesanan yang sesuai filter.</div>'}
+    </div>
   `;
+
+  $('#orderSearch').oninput = () => renderOrdersView($('#orderStatus').value, $('#orderSearch').value);
+  $('#orderStatus').onchange = () => renderOrdersView($('#orderStatus').value, $('#orderSearch').value);
 }
 
 // ---------------------------------------------------------------------
@@ -1059,7 +1092,7 @@ async function initialize() {
     } catch {}
   }
 
-  // Attempt auto-authentication with Telegram initData
+  // Auto-authentication with Telegram initData
   if (!state.token) {
     let initData = tg?.initData || '';
     let tgUser = tg?.initDataUnsafe?.user || null;

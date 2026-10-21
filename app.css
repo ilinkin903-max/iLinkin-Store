@@ -400,3 +400,36 @@ body{overflow-x:hidden}.app-shell{min-height:100vh;display:grid;grid-template-co
   .reseller-actions .neo-btn, .bot-actions .neo-btn, .withdrawal-actions .neo-btn { width: 100%; }
 }
 
+.reseller-fee-card {
+  background: #ffffff;
+  border: var(--border);
+  box-shadow: var(--shadow);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.reseller-fee-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.reseller-fee-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.reseller-fee-title strong {
+  font-size: 15px;
+  font-weight: 950;
+}
+.reseller-fee-amount {
+  font-size: 20px;
+  font-weight: 1000;
+  color: #15803d;
+}
+

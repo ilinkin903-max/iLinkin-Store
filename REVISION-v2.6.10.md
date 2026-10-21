@@ -40,4 +40,9 @@
 - **Routing & Gateway Vercel (`vercel.json`, `api/gateway.js`)**:
   - Menambahkan rewrite `/reseller` dan `/reseller-dashboard` ke `/reseller.html`.
   - Memperbarui `api/gateway.js` untuk mengizinkan rute `/api/reseller/*` diteruskan ke backend VPS.
+- **Pembaruan Alur Pendaftaran Reseller 5-Tahap & Fix Sakelar Pendaftaran**:
+  - Modal Atur Biaya Pendaftaran di Tab Reseller (`app.js`) kini menyinkronkan pengaturan via `PATCH /api/admin/settings` dengan parsing boolean checkbox yang akurat.
+  - Menambahkan filter status baru di dropdown dashboard: `💳 Menunggu Pembayaran` (`awaiting_payment`) dan `🤖 Menunggu Bot Token` (`awaiting_token`).
+  - Label status badge kini menampilkan terjemahan Bahasa Indonesia yang rapi ("Menunggu Persetujuan", "Menunggu Pembayaran", "Menunggu Bot Token", "Aktif", "Ditangguhkan", "Ditolak").
+
 

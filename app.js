@@ -172,24 +172,265 @@ async function saveBackupSettings(e){e.preventDefault();const x=Object.fromEntri
 async function testPayment(channel){const ch=channel||state.cache.settings?.autogopay_payment_method||'gopay';const host=$(`#qrisStatus-${ch}`);if(host)host.innerHTML='<span class="muted">Mengecek...</span>';try{const r=await api(`/api/admin/integrations/payment-status?channel=${encodeURIComponent(ch)}`);if(host)host.innerHTML=`<span class="badge ${r.data.ok?'ok':'bad'}">${esc(r.data.message)}</span>`;return r.data}catch(e){if(host)host.innerHTML=`<span class="badge bad">${esc(e.message)}</span>`;return null}}
 async function testSupplier(source){try{const r=await api(`/api/admin/integrations/supplier-status?source=${source}`);$('#supplierStatus').innerHTML=`<span class="badge ok">${esc(source)} · Saldo ${esc(Number(r.data.balance||0).toLocaleString('id-ID'))} ${esc(r.data.balanceUnit||'')}</span>`}catch(e){$('#supplierStatus').innerHTML=`<span class="badge bad">${esc(source)} · ${esc(e.message)}</span>`}}
 async function refreshSupplierHub(force=false){const host=$('#supplierHub');if(!host)return;host.innerHTML='<div class="empty compact">Memuat saldo dan katalog supplier...</div>';const sources=[['prodseller','ProdSeller'],['aiversehub','AIVerseHub']];const cards=[];for(const[source,label]of sources){try{const[st,rows]=await Promise.all([api(`/api/admin/integrations/supplier-status?source=${source}${force?'&force=1':''}`),loadSupplierCatalog(source,force)]);cards.push(`<article class="supplier-panel"><div class="supplier-panel-head"><div><h4>${esc(label)}</h4><p>${esc(st.data.account||st.data.membership||'API reseller')}</p></div><div class="supplier-balance"><small>Balance API</small><b>${esc(Number(st.data.balance||0).toLocaleString('id-ID'))} ${esc(st.data.balanceUnit||'')}</b></div></div><div class="supplier-summary"><span>${rows.length} produk</span>${st.data.membership?`<span>Membership: ${esc(st.data.membership)}</span>`:''}</div><div class="supplier-catalog">${rows.length?rows.map(x=>`<div class="supplier-product"><div><b>${esc(x.name)}</b><small>ID ${esc(x.id)} · ${esc(supplierPrice(x))} · stok ${x.stock==null?'?':x.stock}</small></div><div class="supplier-product-actions">${badge(x.inStock===false?'offline':'active')}<button type="button" class="neo-btn blue tiny" data-supplier-import data-source="${esc(source)}" data-product-id="${esc(x.id)}">Masukkan</button></div></div>`).join(''):'<div class="empty compact">Katalog kosong.</div>'}</div><p class="muted">Tombol Masukkan bisa membuat produk baru atau menghubungkan item supplier sebagai varian produk yang sudah ada.</p></article>`)}catch(e){cards.push(`<article class="supplier-panel"><div class="supplier-panel-head"><div><h4>${esc(label)}</h4><p>Belum siap / gagal terhubung.</p></div>${badge('offline')}</div><div class="empty compact">${esc(e.message)}</div></article>`)}}host.innerHTML=`<div class="supplier-grid">${cards.join('')}</div>`;$$('[data-supplier-import]',host).forEach(b=>b.onclick=()=>openSupplierImport(b.dataset.source,b.dataset.productId));}
-async function loadFresh(){
-  const res=await api('/api/admin/settings'),x=res.settings||{};state.cache.settings={...(state.cache.settings||{}),...x};
-  $('#content').innerHTML=`<div class="fresh-admin-page"><section class="settings-section single-panel"><div class="section-head"><div><h3>⚡ Jaspay Fresh</h3><p>Kelola generate Fresh Jaspay dan Ready Stok milik toko secara terpisah.</p></div><button id="refreshJaspayHub" class="neo-btn yellow small">↻ Refresh Fresh</button></div><form id="jaspaySettingsForm" class="form-grid"><label>Status Produk Fresh<select name="jaspay_enabled"><option value="true" ${x.jaspay_enabled===true?'selected':''}>Aktif</option><option value="false" ${x.jaspay_enabled!==true?'selected':''}>Nonaktif</option></select></label><label>Partial / Gagal<select name="jaspay_partial_mode"><option value="refund_wallet" ${String(x.jaspay_partial_mode||'refund_wallet')==='refund_wallet'?'selected':''}>Refund sesuai aturan ke Saldo Bot</option></select></label><label class="full">Teks Halaman READY STOK <textarea name="jaspay_ready_intro" rows="11" spellcheck="false">${esc(x.jaspay_ready_intro||'')}</textarea><small>Mendukung Telegram HTML seperti &lt;b&gt;tebal&lt;/b&gt;. Produk, harga, dan jumlah stok dikelola dari kartu Produk Fresh di bawah.</small></label><div class="full info-note"><b>Generate Fresh</b> diproses oleh API Jaspay. <b>Ready Stok</b> adalah inventory lokal milik toko: akun kamu sendiri, stok berkurang otomatis saat terjual, dan harganya mengikuti kombinasi harga Produk Fresh yang kamu pilih.</div><div class="full form-actions"><button class="neo-btn purple" type="submit">Simpan Produk Fresh</button></div></form></section><section class="settings-section single-panel"><div id="jaspayHub"><div class="empty compact">Memuat status API, stok lokal, dan katalog Fresh...</div></div></section></div>`;
-  $('#jaspaySettingsForm').onsubmit=async e=>{e.preventDefault();const b=Object.fromEntries(new FormData(e.target).entries());b.jaspay_enabled=b.jaspay_enabled==='true';try{const saved=await api('/api/admin/settings',{method:'PATCH',body:b});state.cache.settings={...(state.cache.settings||{}),...(saved.settings||b)};toast(`Produk Fresh ${b.jaspay_enabled?'diaktifkan':'dinonaktifkan'}`);await refreshJaspayHub(false)}catch(err){toast(err.message,true)}};
-  $('#refreshJaspayHub').onclick=()=>refreshJaspayHub(true);await refreshJaspayHub(false);
+function freshProductEmoji(key=''){
+  const k=String(key||'').toLowerCase();
+  if(k.includes('zoom'))return '📹';
+  if(k.includes('canva'))return '🎨';
+  if(k.includes('picsart'))return '🖌️';
+  if(k.includes('meitu'))return '📸';
+  if(k.includes('wink'))return '✨';
+  if(k.includes('outlook'))return '✉️';
+  if(k.includes('hotmail'))return '📧';
+  if(k.includes('apple')||k.includes('music'))return '🎵';
+  if(k.includes('vpn')||k.includes('express'))return '🛡️';
+  if(k.includes('hma'))return '🔒';
+  if(k.includes('scribd'))return '📚';
+  if(k.includes('remini'))return '🪄';
+  if(k.includes('adspower'))return '🌐';
+  return '⚡';
 }
+
+function freshProductCard(r, index, globalEnabled=true, maintenance=false){
+  const p=r.presentation||{};
+  const apiRange=freshPriceRange(r);
+  const sellMin=Number(r.sell_price_min??r.sell_price??0);
+  const sellMax=Number(r.sell_price_max??r.sell_price??0);
+  const sellRange=sellMin===sellMax?money(sellMin):`${money(sellMin)} – ${money(sellMax)}`;
+  const apiReady=!maintenance&&r.available!==false;
+  const isGenActive=apiReady&&globalEnabled&&Boolean(r.enabled);
+  const readyCfg=p.ready_stock||{};
+  const readyCount=Math.max(0,Number(r.ready_stock_count||0));
+  const isReadyActive=readyCfg.enabled===true;
+
+  const cardState=readyCount>0?'ready':(isGenActive?'preorder':'empty');
+  const cardStatePill=readyCount>0?`Ready ${readyCount}`:(isGenActive?'GEN ON':(!apiReady?'API OFF':'NONAKTIF'));
+
+  const emoji=p.emoji||freshProductEmoji(r.product_key);
+  const thumb=`<span class="thumb-fallback">${emoji}</span>${p.image_url?`<img src="${esc(mediaSrc(p.image_url))}" alt="${esc(r.name||r.product_key)}" loading="lazy" onerror="this.remove()">`:''}`;
+
+  const modes=Array.isArray(r.options?.mode?.pilihan)?r.options.mode.pilihan.map(String):[];
+  const priceRows=Array.isArray(r.price_options)?r.price_options:[];
+
+  const chips=[];
+  if(modes.length){
+    chips.push(...modes.slice(0,3).map(m=>`<span class="variant-chip">${esc(p.mode_labels?.[m]||m)}</span>`));
+    if(modes.length>3)chips.push(`<span class="variant-chip muted">+${modes.length-3} Mode</span>`);
+  }
+  if(priceRows.length>1){
+    chips.push(`<span class="variant-chip stock-ready">${priceRows.length} Opsi Harga</span>`);
+  }
+  if(isReadyActive){
+    chips.push(`<span class="variant-chip ${readyCount>0?'stock-ready':'stock-empty'}">Ready Toko: ${readyCount}</span>`);
+  }else{
+    chips.push(`<span class="variant-chip muted">Ready Toko: OFF</span>`);
+  }
+  if(Number(r.qty_max||1)>1){
+    chips.push(`<span class="variant-chip muted">Maks ${r.qty_max} qty</span>`);
+  }
+
+  return `<article class="product-card stock-${cardState}" data-fresh-card="${esc(r.product_key)}">
+    <span class="product-index">${String(index+1).padStart(2,'0')}</span>
+    <div class="product-thumb">${thumb}</div>
+    <div class="product-body">
+      <div class="product-head">
+        <div class="product-title">
+          <h3>${esc(r.name||r.product_key)}</h3>
+          <p>Key: <code>${esc(r.product_key)}</code> · ${priceRows.length||1} Opsi Harga</p>
+          <span class="tag-chip"># FRESH BOT</span>
+        </div>
+        <div class="product-head-actions">
+          <span class="stock-state-pill ${cardState}">${cardStatePill}</span>
+          <button class="toggle ${r.enabled?'':'off'}" data-jaspay-toggle="${esc(r.product_key)}" data-enabled="${r.enabled?'1':'0'}" title="Aktifkan/Matikan Generate API">${r.enabled?'ON':'OFF'}</button>
+        </div>
+      </div>
+      <div class="product-info">
+        <div class="info-box stock-box ${readyCount>0?'ready':(isReadyActive?'empty':'preorder')}">
+          <small>📦 Stok Ready Lokal</small>
+          <strong>${readyCount}</strong>
+          <em>${isReadyActive?(readyCount>0?'Tampil di Bot':'Stok Kosong'):'Ready Toko OFF'}</em>
+        </div>
+        <div class="info-box price">
+          <small>🏷 Harga Jual</small>
+          <strong>${sellRange}</strong>
+          <em>Modal API: ${apiRange}</em>
+        </div>
+      </div>
+      <div class="variant-row">${chips.join('')}</div>
+      <div class="product-actions">
+        <button class="neo-btn blue small" data-jaspay-edit="${esc(r.product_key)}">✎ ATUR</button>
+        <button class="neo-btn green small" data-jaspay-ready-stock="${esc(r.product_key)}">📦 STOK READY (${readyCount})</button>
+        <button class="neo-btn ${r.enabled?'yellow':'purple'} small" data-jaspay-toggle="${esc(r.product_key)}" data-enabled="${r.enabled?'1':'0'}">${r.enabled?'⏸ MATIKAN':'▶ AKTIFKAN'}</button>
+      </div>
+    </div>
+  </article>`;
+}
+
+function renderFreshProductCards(rows, globalEnabled=true, maintenance=false){
+  if(!rows||!rows.length){
+    return `<div class="empty-product"><h3>Belum ada produk Fresh</h3><p>Pastikan JASPAY_API_KEY terisi di server VPS lalu tekan Refresh Fresh.</p></div>`;
+  }
+  return rows.map((r,i)=>freshProductCard(r,i,globalEnabled,maintenance)).join('');
+}
+
+async function loadFresh(){
+  const res=await api('/api/admin/settings'),x=res.settings||{};
+  state.cache.settings={...(state.cache.settings||{}),...x};
+  $('#content').innerHTML=`<div class="fresh-admin-page">
+    <div class="section-title product-section-title">
+      <div>
+        <h2>⚡ Jaspay Fresh &amp; Ready Stok</h2>
+        <p>Katalog produk fresh otomatis (API Bot) dan stok ready toko.</p>
+      </div>
+      <div class="section-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button id="toggleFreshConfig" type="button" class="neo-btn white small">⚙️ Pengaturan Global</button>
+        <button id="refreshJaspayHub" type="button" class="neo-btn purple small">↻ Refresh Fresh</button>
+      </div>
+    </div>
+
+    <section id="freshConfigSection" class="settings-section single-panel hidden" style="margin-bottom:14px">
+      <div class="section-head">
+        <div>
+          <h3>⚙️ Pengaturan Global Fresh &amp; Ready Stok</h3>
+          <p>Atur sakelar utama bot dan pesan pengantar halaman READY STOK.</p>
+        </div>
+      </div>
+      <form id="jaspaySettingsForm" class="form-grid">
+        <label>Status Produk Fresh
+          <select name="jaspay_enabled">
+            <option value="true" ${x.jaspay_enabled===true?'selected':''}>Aktif</option>
+            <option value="false" ${x.jaspay_enabled!==true?'selected':''}>Nonaktif</option>
+          </select>
+        </label>
+        <label>Partial / Gagal
+          <select name="jaspay_partial_mode">
+            <option value="refund_wallet" ${String(x.jaspay_partial_mode||'refund_wallet')==='refund_wallet'?'selected':''}>Refund sesuai aturan ke Saldo Bot</option>
+          </select>
+        </label>
+        <label class="full">Teks Halaman READY STOK
+          <textarea name="jaspay_ready_intro" rows="8" spellcheck="false">${esc(x.jaspay_ready_intro||'')}</textarea>
+          <small>Mendukung Telegram HTML seperti &lt;b&gt;tebal&lt;/b&gt;. Produk, harga, dan jumlah stok dikelola dari kartu Produk Fresh di bawah.</small>
+        </label>
+        <div class="full info-note"><b>Generate Fresh</b> diproses oleh API Jaspay. <b>Ready Stok</b> adalah inventory lokal milik toko: akun kamu sendiri, stok berkurang otomatis saat terjual, dan harganya mengikuti kombinasi harga Produk Fresh yang kamu pilih.</div>
+        <div class="full form-actions">
+          <button class="neo-btn purple" type="submit">Simpan Pengaturan Fresh</button>
+        </div>
+      </form>
+    </section>
+
+    <div id="jaspayHub">
+      <div class="empty compact">Memuat status API, stok lokal, katalog, dan daftar harga Fresh...</div>
+    </div>
+  </div>`;
+
+  $('#toggleFreshConfig').onclick=()=>{
+    const sec=$('#freshConfigSection');
+    if(!sec)return;
+    const isHidden=sec.classList.toggle('hidden');
+    $('#toggleFreshConfig').textContent=isHidden?'⚙️ Pengaturan Global':'✕ Tutup Pengaturan';
+  };
+
+  $('#jaspaySettingsForm').onsubmit=async e=>{
+    e.preventDefault();
+    const b=Object.fromEntries(new FormData(e.target).entries());
+    b.jaspay_enabled=b.jaspay_enabled==='true';
+    try{
+      const saved=await api('/api/admin/settings',{method:'PATCH',body:b});
+      state.cache.settings={...(state.cache.settings||{}),...(saved.settings||b)};
+      toast(`Produk Fresh ${b.jaspay_enabled?'diaktifkan':'dinonaktifkan'}`);
+      await refreshJaspayHub(false);
+    }catch(err){toast(err.message,true);}
+  };
+
+  $('#refreshJaspayHub').onclick=()=>refreshJaspayHub(true);
+  await refreshJaspayHub(false);
+}
+
 async function refreshJaspayHub(force=false){
-  const host=$('#jaspayHub');if(!host)return;host.innerHTML='<div class="empty compact">Memuat status API, stok lokal, katalog, dan daftar harga Fresh...</div>';
+  const host=$('#jaspayHub');if(!host)return;
+  host.innerHTML='<div class="empty compact">Memuat status API, stok lokal, katalog, dan daftar harga Fresh...</div>';
   try{
-    const[st,pr]=await Promise.all([api(`/api/admin/integrations/jaspay/status${force?'?force=1':''}`),api(`/api/admin/integrations/jaspay/products${force?'?force=1':''}`)]);
-    const x=st.data||{},q=x.queue||{},rows=pr.items||[],maintenance=Boolean(st.maintenance||pr.maintenance),globalEnabled=st.enabled===true,apiLatency=Math.max(Number(st.health?.last_latency_ms||0),Number(pr.health?.last_latency_ms||0)),manualReady=Math.max(0,Number(pr.manual_ready_stock_total||0));state.cache.jaspayProducts=rows;
-    const statusLabel=maintenance?'Maintenance':globalEnabled?'Aktif':'Nonaktif';const dotState=!maintenance&&globalEnabled?'online':'offline';
-    host.innerHTML=`<div class="supplier-panel"><div class="supplier-panel-head"><div><h4><button type="button" class="fresh-status-button" data-fresh-status="${maintenance?'maintenance':globalEnabled?'enabled':'disabled'}" title="${maintenance?'Bot sedang di update/perbaikan.':globalEnabled?'Produk Fresh aktif':'Produk Fresh dinonaktifkan'}"><span class="fresh-api-dot ${dotState}"></span></button> Jaspay Fresh</h4><p>${maintenance?'API generate sedang maintenance. Ready Stok lokal tetap tersimpan di VPS.':globalEnabled?'Generate API dan Ready Stok lokal tersedia sesuai status produk.':'Sakelar global Fresh sedang NONAKTIF. Pengaturan dan stok lokal tetap dapat dikelola.'}</p></div><div class="supplier-balance"><small>${maintenance?'Status API':'Saldo API Jaspay'}</small><b>${maintenance?'Sedang perbaikan':x.balance==null?'-':Number(x.balance||0).toLocaleString('en-US',{maximumFractionDigits:2})}</b></div></div>${maintenance?`<div class="warning-note"><b>🔴 Maintenance API Generate</b><br>${esc(st.health?.message||pr.health?.message||st.error||pr.error||'Bot sedang di update/perbaikan.')}<br><small>Inventory Ready Stok lokal tidak mengambil stok dari endpoint Ready Stock Jaspay.</small></div>`:''}<div class="supplier-summary"><span>Global ${globalEnabled?'ON':'OFF'}</span><span>Ready Stok Lokal ${manualReady}</span><span>Limit API ${Number(x.daily_limit||0).toLocaleString('id-ID')}</span><span>Terpakai API ${Number(x.daily_spent||0).toLocaleString('id-ID')}</span><span>Sisa API ${Number(x.daily_remaining||0).toLocaleString('id-ID')}</span><span>Running ${Number(x.orders_running||0)}</span><span>Antrean ${Number(q.in_use||0)}/${Number(q.max||0)} · menunggu ${Number(q.waiting||0)}</span><span>Latency API ${apiLatency?apiLatency+' ms':'-'}</span></div><div class="supplier-catalog">${rows.length?rows.map(r=>{const apiRange=freshPriceRange(r),sellMin=Number(r.sell_price_min??r.sell_price??0),sellMax=Number(r.sell_price_max??r.sell_price??0),sellRange=sellMin===sellMax?money(sellMin):`${money(sellMin)} – ${money(sellMax)}`,apiReady=!maintenance&&r.available!==false,active=apiReady&&globalEnabled&&r.enabled,readyCfg=r.presentation?.ready_stock||{},readyCount=Math.max(0,Number(r.ready_stock_count||0));return`<div class="supplier-product fresh-admin-product"><div><b><span class="fresh-product-dot ${active?'online':'offline'}"></span> ${esc(r.name||r.product_key)}</b><small>Key ${esc(r.product_key)} · API ${apiRange} · Jual ${sellRange} · ${Array.isArray(r.price_options)?r.price_options.length:1} kombinasi harga</small><div class="fresh-local-stock-meta"><span>Ready Lokal <b>${readyCount}</b></span><span>${readyCfg.enabled===true?'Tampil di READY STOK':'Ready Stok OFF'}</span></div></div><div class="supplier-product-actions">${badge(apiReady?'API READY':'API OFF')}${badge(r.enabled?'GEN ON':'GEN OFF')}<button class="neo-btn ${r.enabled?'white':'green'} tiny" data-jaspay-toggle="${esc(r.product_key)}" data-enabled="${r.enabled?'1':'0'}">${r.enabled?'Matikan Generate':'Aktifkan Generate'}</button><button class="neo-btn green tiny" data-jaspay-ready-stock="${esc(r.product_key)}">▦ Stok Ready (${readyCount})</button><button class="neo-btn blue tiny" data-jaspay-edit="${esc(r.product_key)}">Atur</button></div></div>`}).join(''):'<div class="empty compact">Katalog Fresh belum tersedia. Pastikan JASPAY_API_KEY terisi di VPS.</div>'}</div></div>`;
-    $$('[data-jaspay-edit]',host).forEach(b=>b.onclick=()=>openJaspayProduct(b.dataset.jaspayEdit));
-    $$('[data-jaspay-ready-stock]',host).forEach(b=>b.onclick=()=>openJaspayReadyStock(b.dataset.jaspayReadyStock));
-    $$('[data-jaspay-toggle]',host).forEach(b=>b.onclick=async()=>{const key=b.dataset.jaspayToggle,next=b.dataset.enabled!=='1';try{b.disabled=true;await api(`/api/admin/integrations/jaspay/products/${encodeURIComponent(key)}`,{method:'PATCH',body:{enabled:next}});toast(`Produk Fresh ${next?'diaktifkan':'dinonaktifkan'}`);await refreshJaspayHub(false)}catch(e){toast(e.message,true)}finally{b.disabled=false}});
-    $$('[data-fresh-status]',host).forEach(b=>b.onclick=()=>{if(b.dataset.freshStatus==='maintenance')toast('API generate sedang di update/perbaikan. Ready Stok lokal tetap tersimpan.',true);else if(b.dataset.freshStatus==='disabled')toast('Produk Fresh sedang dinonaktifkan secara global.',true);else toast('Produk Fresh aktif dan API online')});
-  }catch(e){host.innerHTML=`<div class="warning-note"><b>Jaspay Fresh belum siap:</b> ${esc(e.message)}<br><small>Pastikan koneksi backend aktif. Ready Stok lokal tetap berada di database VPS.</small></div>`}
+    const[st,pr]=await Promise.all([
+      api(`/api/admin/integrations/jaspay/status${force?'?force=1':''}`),
+      api(`/api/admin/integrations/jaspay/products${force?'?force=1':''}`)
+    ]);
+    const x=st.data||{},q=x.queue||{},rows=pr.items||[];
+    const maintenance=Boolean(st.maintenance||pr.maintenance);
+    const globalEnabled=st.enabled===true;
+    const apiLatency=Math.max(Number(st.health?.last_latency_ms||0),Number(pr.health?.last_latency_ms||0));
+    const manualReady=Math.max(0,Number(pr.manual_ready_stock_total||0));
+    state.cache.jaspayProducts=rows;
+
+    const statusLabel=maintenance?'Maintenance':(globalEnabled?'Aktif':'Nonaktif');
+    const dotState=!maintenance&&globalEnabled?'online':'offline';
+
+    host.innerHTML=`
+      <div class="dashboard-kpis fresh-kpis">
+        ${stat('⚡', dotState==='online'?'green':'yellow', 'Status Fresh', statusLabel, maintenance?'Sedang perbaikan':(globalEnabled?'API Online':'Global OFF'))}
+        ${stat('👛', 'pink', 'Saldo API Jaspay', maintenance?'Perbaikan':(x.balance==null?'-':Number(x.balance||0).toLocaleString('en-US',{maximumFractionDigits:2})+' Credit'), 'Saldo akun supplier')}
+        ${stat('📦', 'green', 'Ready Stok Toko', manualReady+' Akun', 'Inventory milik toko')}
+        ${stat('⏳', 'purple', 'Antrean API', `${Number(q.in_use||0)}/${Number(q.max||0)}`, `Menunggu: ${Number(q.waiting||0)}`)}
+      </div>
+
+      ${maintenance?`<div class="warning-note" style="margin-bottom:12px"><b>🔴 Maintenance API Generate</b><br>${esc(st.health?.message||pr.health?.message||st.error||pr.error||'Bot sedang di update/perbaikan.')}<br><small>Inventory Ready Stok lokal tidak mengambil stok dari endpoint Ready Stock Jaspay.</small></div>`:''}
+
+      <div class="toolbar product-toolbar">
+        <div class="searchbox"><input id="freshSearch" placeholder="Cari nama atau key produk fresh..."></div>
+        <select id="freshFilterStatus">
+          <option value="">Semua Status</option>
+          <option value="active">Generate Aktif (ON)</option>
+          <option value="inactive">Generate Nonaktif (OFF)</option>
+          <option value="api_ready">API Ready</option>
+          <option value="has_stock">Ada Stok Ready Lokal</option>
+          <option value="no_stock">Stok Ready Kosong</option>
+        </select>
+        <span id="freshProductCount" class="muted" style="font-size:11px;font-weight:800;margin-left:auto">${rows.length} produk</span>
+      </div>
+
+      <div id="freshProductGrid" class="product-grid">
+        ${renderFreshProductCards(rows, globalEnabled, maintenance)}
+      </div>
+    `;
+
+    const filter=()=>{
+      const q=($('#freshSearch')?.value||'').toLowerCase().trim();
+      const st=$('#freshFilterStatus')?.value||'';
+      const filtered=(state.cache.jaspayProducts||[]).filter(r=>{
+        const matchQ=!q||[r.name,r.product_key].some(v=>String(v||'').toLowerCase().includes(q));
+        if(!matchQ)return false;
+        if(st==='active')return r.enabled&&r.available!==false;
+        if(st==='inactive')return !r.enabled||r.available===false;
+        if(st==='api_ready')return r.available!==false;
+        if(st==='has_stock')return Number(r.ready_stock_count||0)>0;
+        if(st==='no_stock')return Number(r.ready_stock_count||0)===0;
+        return true;
+      });
+      const grid=$('#freshProductGrid');
+      if(grid)grid.innerHTML=renderFreshProductCards(filtered,globalEnabled,maintenance);
+      const counter=$('#freshProductCount');
+      if(counter)counter.textContent=`${filtered.length} dari ${rows.length} produk`;
+      bindFreshProductActions();
+    };
+
+    if($('#freshSearch'))$('#freshSearch').oninput=filter;
+    if($('#freshFilterStatus'))$('#freshFilterStatus').onchange=filter;
+    bindFreshProductActions();
+  }catch(e){
+    host.innerHTML=`<div class="warning-note"><b>Jaspay Fresh belum siap:</b> ${esc(e.message)}<br><small>Pastikan koneksi backend aktif. Ready Stok lokal tetap berada di database VPS.</small></div>`;
+  }
+}
+
+function bindFreshProductActions(){
+  $$('[data-jaspay-edit]').forEach(b=>b.onclick=()=>openJaspayProduct(b.dataset.jaspayEdit));
+  $$('[data-jaspay-ready-stock]').forEach(b=>b.onclick=()=>openJaspayReadyStock(b.dataset.jaspayReadyStock));
+  $$('[data-jaspay-toggle]').forEach(b=>b.onclick=async()=>{
+    const key=b.dataset.jaspayToggle,next=b.dataset.enabled!=='1';
+    try{
+      b.disabled=true;
+      await api(`/api/admin/integrations/jaspay/products/${encodeURIComponent(key)}`,{method:'PATCH',body:{enabled:next}});
+      toast(`Produk Fresh ${key} ${next?'diaktifkan':'dinonaktifkan'}`);
+      await refreshJaspayHub(false);
+    }catch(e){toast(e.message,true);}finally{b.disabled=false;}
+  });
 }
 async function openJaspayReadyStock(key){
   const r=(state.cache.jaspayProducts||[]).find(x=>String(x.product_key)===String(key));if(!r)return toast('Produk Fresh tidak ditemukan.',true);

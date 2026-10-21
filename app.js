@@ -1,7 +1,7 @@
 const $=(s)=>document.querySelector(s);const $$=(s)=>[...document.querySelectorAll(s)];
-const state={token:sessionStorage.getItem('ilink_owner_token')||'',view:'dashboard',cache:{supplierCatalogs:{}},me:null,overview:null,couponTab:'coupon',settingsTab:'',botTab:'',report:{type:'monthly'},legacyMigration:null,notifications:[],notificationTimer:null};
-const titles={dashboard:['Dashboard','Ringkasan performa toko hari ini'],products:['Produk','Katalog, varian, deskripsi, SNK, dan stok'],fresh:['Jaspay Fresh','Produk fresh, harga, mode, setting akun, dan perpanjang'],orders:['Pesanan','Pantau seluruh detail transaksi tanpa tabel horizontal'],reports:['Laporan','Omzet, profit, dan performa penjualan'],coupons:['Kupon','Voucher promo dan kode redeem'],settings:['Pengaturan','Toko, referral, TopUp, pembayaran, supplier, dan backup'],bot:['Bot & Notifikasi','Bot, /start, link, transaksi, dan diagnostik'],broadcast:['Broadcast','Kirim dan pantau pesan massal ke pengguna'],users:['User','Data pengguna Telegram, saldo, referral, dan aktivitas']};
-function esc(v=''){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}function money(v){return'Rp '+Number(v||0).toLocaleString('id-ID')}function date(v){if(!v)return'-';try{return new Date(v).toLocaleString('id-ID')}catch{return String(v)}}function bytes(v){const n=Number(v||0);if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(1)+' KB';return(n/1048576).toFixed(1)+' MB'}function toast(msg,bad=false){const t=$('#toast');t.textContent=msg;t.className='toast show'+(bad?' bad':'');clearTimeout(toast.t);toast.t=setTimeout(()=>t.className='toast',2800)}function badge(status){const s=String(status||'').toLowerCase();const cls=['completed','paid','success','active','running','waiting_delivery'].includes(s)?'ok':['pending','pending_payment','supplier_pending','fresh_processing','fresh_attention','inactive'].includes(s)?'warn':['failed','blocked','canceled','cancelled','expired'].includes(s)?'bad':'purple';return`<span class="badge ${cls}">${esc(status||'-')}</span>`}function firstLetter(v){return esc(String(v||'?').trim().charAt(0).toUpperCase()||'?')}
+const state={token:sessionStorage.getItem('ilink_owner_token')||'',view:'dashboard',cache:{supplierCatalogs:{}},me:null,overview:null,couponTab:'coupon',settingsTab:'',botTab:'',resellerTab:'resellers',resellerFilter:'',report:{type:'monthly'},legacyMigration:null,notifications:[],notificationTimer:null};
+const titles={dashboard:['Dashboard','Ringkasan performa toko hari ini'],products:['Produk','Katalog, varian, deskripsi, SNK, dan stok'],fresh:['Jaspay Fresh','Produk fresh, harga, mode, setting akun, dan perpanjang'],orders:['Pesanan','Pantau seluruh detail transaksi tanpa tabel horizontal'],reports:['Laporan','Omzet, profit, dan performa penjualan'],coupons:['Kupon','Voucher promo dan kode redeem'],settings:['Pengaturan','Toko, referral, TopUp, pembayaran, supplier, dan backup'],bot:['Bot & Notifikasi','Bot, /start, link, transaksi, dan diagnostik'],broadcast:['Broadcast','Kirim dan pantau pesan massal ke pengguna'],users:['User','Data pengguna Telegram, saldo, referral, dan aktivitas'],resellers:['Reseller Bot','Kelola reseller, bot toko white-label, komisi profit, dan penarikan saldo']};
+function esc(v=''){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}function money(v){return'Rp '+Number(v||0).toLocaleString('id-ID')}function date(v){if(!v)return'-';try{return new Date(v).toLocaleString('id-ID')}catch{return String(v)}}function bytes(v){const n=Number(v||0);if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(1)+' KB';return(n/1048576).toFixed(1)+' MB'}function toast(msg,bad=false){const t=$('#toast');if(!t)return;const m=$('#modal');if(m&&m.open){if(t.parentElement!==m)m.appendChild(t);}else{if(t.parentElement!==document.body)document.body.appendChild(t);}t.textContent=msg;t.className='toast show'+(bad?' bad':'');clearTimeout(toast.t);toast.t=setTimeout(()=>{t.className='toast';if(!m||!m.open){if(t.parentElement!==document.body)document.body.appendChild(t);}},2800);}function badge(status){const s=String(status||'').toLowerCase();const cls=['completed','paid','success','active','running','waiting_delivery'].includes(s)?'ok':['pending','pending_payment','supplier_pending','fresh_processing','fresh_attention','inactive'].includes(s)?'warn':['failed','blocked','canceled','cancelled','expired'].includes(s)?'bad':'purple';return`<span class="badge ${cls}">${esc(status||'-')}</span>`}function firstLetter(v){return esc(String(v||'?').trim().charAt(0).toUpperCase()||'?')}
 function bulkTiers(value){let rows=value;if(typeof rows==='string'){try{rows=JSON.parse(rows)}catch{rows=[]}}if(!Array.isArray(rows))rows=[];const byQty=new Map();for(const row of rows){const min=Math.max(2,Math.floor(Number(row?.min_qty??row?.minQty??row?.qty??0)||0)),price=Math.max(0,Math.floor(Number(row?.price??row?.unit_price??0)||0));if(min>=2&&price>0)byQty.set(min,{min_qty:min,price})}return[...byQty.values()].sort((a,b)=>a.min_qty-b.min_qty)}
 function bulkUnitPrice(base,tiers,qty=1){let price=Math.max(0,Number(base||0)),q=Math.max(1,Number(qty||1));for(const t of bulkTiers(tiers)){if(q>=t.min_qty)price=t.price;else break}return price}
 function bulkEditorHtml(prefix,tiers=[]){const rows=bulkTiers(tiers);return`<div class="full bulk-editor"><div class="bulk-editor-head"><div><b>Harga Bulk / Grosir</b><small>Harga per pcs otomatis berubah saat jumlah pesanan mencapai minimal tier.</small></div><button type="button" id="${prefix}Add" class="neo-btn purple small">＋ Tambah Tier</button></div><div id="${prefix}Rows" class="bulk-tier-list"></div><input type="hidden" name="bulk_prices" id="${prefix}Value" value="${esc(JSON.stringify(rows))}"><div class="bulk-help">Contoh: mulai 2 pcs Rp 845/pcs, mulai 50 pcs Rp 200/pcs. Tier diurutkan otomatis dari jumlah terkecil.</div></div>`}
@@ -51,8 +51,8 @@ function showLogin(){$('#loginView').classList.remove('hidden');$('#appView').cl
 $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginError').textContent='';try{const r=await api('/api/admin/auth/login',{method:'POST',body:{username:$('#loginUsername').value,password:$('#loginPassword').value}});state.token=r.token;sessionStorage.setItem('ilink_owner_token',r.token);$('#loginPassword').value='';await initialize()}catch(err){$('#loginError').textContent=err.message}};$('#logoutBtn').onclick=()=>logout();$('#refreshBtn').onclick=()=>navigate(state.view,true);$('#notifBtn').onclick=e=>{e.stopPropagation();toggleNotifications()};$('#notificationPanel').onclick=e=>e.stopPropagation();$('#notifMarkAll').onclick=async()=>{try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{all:true}});renderNotifications(r);toast('Semua notifikasi ditandai dibaca')}catch(e){toast(e.message,true)}};$('#notificationList').onclick=async e=>{const b=e.target.closest('[data-notif-key]');if(!b)return;try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{keys:[b.dataset.notifKey]}});renderNotifications(r)}catch{}closeNotifications();if(b.dataset.notifView)navigate(b.dataset.notifView)};document.addEventListener('click',closeNotifications);function closeSidebar(){$('#sidebar').classList.remove('open');$('#sidebarBackdrop')?.classList.remove('show');$('#menuBtn')?.setAttribute('aria-expanded','false')}$('#menuBtn').onclick=e=>{e.stopPropagation();const open=$('#sidebar').classList.toggle('open');$('#sidebarBackdrop')?.classList.toggle('show',open);$('#menuBtn').setAttribute('aria-expanded',open?'true':'false')};$('#sidebarBackdrop').onclick=closeSidebar;document.addEventListener('click',e=>{const side=$('#sidebar'),menu=$('#menuBtn');if(side?.classList.contains('open')&&!side.contains(e.target)&&!menu?.contains(e.target))closeSidebar()});$('#nav').onclick=e=>{const b=e.target.closest('[data-view]');if(b){closeSidebar();navigate(b.dataset.view)}};
 function setHeader(view){const[t,s]=titles[view]||[view,''];$('#pageTitle').textContent=t;$('#pageSubtitle').textContent=s;$$('#nav [data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))}
 async function initialize(){state.me=(await api('/api/admin/me')).user;showApp();await navigate('dashboard');await refreshNotifications();if(!state.notificationTimer)state.notificationTimer=setInterval(()=>refreshNotifications(true),60000)}
-async function navigate(view){if(state.broadcastPollTimer){clearInterval(state.broadcastPollTimer);state.broadcastPollTimer=null;}state.view=view;closeNotifications();setHeader(view);$('#content').innerHTML='<div class="empty-product">Memuat data...</div>';try{await({dashboard:loadDashboard,products:loadProducts,fresh:loadFresh,orders:loadOrders,reports:loadReports,coupons:loadCoupons,settings:loadSettings,bot:loadBot,broadcast:loadBroadcast,users:loadUsers}[view]||loadDashboard)();$('#lastUpdated').textContent='Terakhir diperbarui: '+new Date().toLocaleString('id-ID');refreshNotifications(true)}catch(e){$('#content').innerHTML=`<div class="empty-product">${esc(e.message)}</div>`;toast(e.message,true)}}
-function applyShell(r){const s=r.settings||{};const o=r.stats||{};state.overview=r;$('#brandName').innerHTML=esc(String(s.store_name||'AUTO ORDER')).replace(/\s+/g,'<br>');$('#brandTagline').textContent=s.store_tagline||'Digital Store';$('#ownerName').textContent=s.owner_display_name||state.me?.display_name||'Owner';$('#ownerUsername').textContent='@'+String(s.owner_username||state.me?.owner_username||'owneradmin').replace(/^@/,'');const metric=String(s.store_balance_metric||o.store_balance_metric||'month_profit');const metricMap={month_profit:['Profit Bulan Ini',o.month_profit],month_revenue:['Omzet Bulan Ini',o.month_revenue],today_profit:['Profit Hari Ini',o.today_profit],today_revenue:['Omzet Hari Ini',o.today_revenue],manual:['Saldo Manual',s.store_balance??o.store_balance]};const selected=metricMap[metric]||metricMap.month_profit;$('#storeBalanceLabel').textContent=selected[0];$('#storeBalance').textContent=money(selected[1]||0);const badgeEl=$('#orderBadge');const pending=Number(o.pending_orders||0);badgeEl.textContent=pending;badgeEl.classList.toggle('hidden',pending<1);const username=state.overview?.bot?.username;$('#telegramBtn').href=username?`https://t.me/${username}`:'#';$('#telegramBtn').textContent='✈ Telegram Mini App';$('#systemSafe').textContent=state.overview?.bot?.running?'Semua sistem berjalan dengan aman':'Dashboard aktif · Bot Telegram offline'}
+async function navigate(view){if(state.broadcastPollTimer){clearInterval(state.broadcastPollTimer);state.broadcastPollTimer=null;}state.view=view;closeNotifications();setHeader(view);$('#content').innerHTML='<div class="empty-product">Memuat data...</div>';try{await({dashboard:loadDashboard,products:loadProducts,fresh:loadFresh,orders:loadOrders,reports:loadReports,coupons:loadCoupons,settings:loadSettings,bot:loadBot,broadcast:loadBroadcast,users:loadUsers,resellers:loadResellers}[view]||loadDashboard)();$('#lastUpdated').textContent='Terakhir diperbarui: '+new Date().toLocaleString('id-ID');refreshNotifications(true)}catch(e){$('#content').innerHTML=`<div class="empty-product">${esc(e.message)}</div>`;toast(e.message,true)}}
+function applyShell(r){const s=r.settings||{};const o=r.stats||{};state.overview=r;$('#brandName').innerHTML=esc(String(s.store_name||'AUTO ORDER')).replace(/\s+/g,'<br>');$('#brandTagline').textContent=s.store_tagline||'Digital Store';$('#ownerName').textContent=s.owner_display_name||state.me?.display_name||'Owner';$('#ownerUsername').textContent='@'+String(s.owner_username||state.me?.owner_username||'owneradmin').replace(/^@/,'');const metric=String(s.store_balance_metric||o.store_balance_metric||'month_profit');const metricMap={month_profit:['Profit Bulan Ini',o.month_profit],month_revenue:['Omzet Bulan Ini',o.month_revenue],today_profit:['Profit Hari Ini',o.today_profit],today_revenue:['Omzet Hari Ini',o.today_revenue],manual:['Saldo Manual',s.store_balance??o.store_balance]};const selected=metricMap[metric]||metricMap.month_profit;$('#storeBalanceLabel').textContent=selected[0];$('#storeBalance').textContent=money(selected[1]||0);const badgeEl=$('#orderBadge');const pending=Number(o.pending_orders||0);badgeEl.textContent=pending;badgeEl.classList.toggle('hidden',pending<1);const resBadgeEl=$('#resellerBadge');if(resBadgeEl){api('/api/admin/resellers/overview').then(ro=>{const pWd=Number(ro?.stats?.pending_withdrawals||0);resBadgeEl.textContent=pWd;resBadgeEl.classList.toggle('hidden',pWd<1);}).catch(()=>null);}const username=state.overview?.bot?.username;$('#telegramBtn').href=username?`https://t.me/${username}`:'#';$('#telegramBtn').textContent='✈ Telegram Mini App';$('#systemSafe').textContent=state.overview?.bot?.running?'Semua sistem berjalan dengan aman':'Dashboard aktif · Bot Telegram offline'}
 function stat(icon,color,label,value,small){return`<div class="stat-card"><div class="stat-icon ${color}">${icon}</div><div><small>${esc(label)}</small><strong>${esc(value)}</strong><em>${esc(small)}</em></div></div>`}
 function productStockState(p={}){const all=Array.isArray(p.variants)?p.variants:[],vars=all.filter(v=>v.active);if(all.length){if(vars.some(v=>v.delivery_mode!=='preorder'&&Number(v.stock||0)>0))return'ready';if(vars.some(v=>v.delivery_mode==='preorder'))return'preorder';return'empty'}if(p.delivery_mode==='preorder'&&Number(p.stock||0)<1)return'preorder';return Number(p.sale_stock??p.stock??0)>0?'ready':'empty'}
 function stockStateLabel(state,stock=0){return state==='ready'?`READY · ${Number(stock||0)}`:state==='preorder'?'PRE-ORDER':'HABIS'}
@@ -437,27 +437,49 @@ async function openJaspayReadyStock(key){
   try{
     const data=await api(`/api/admin/integrations/jaspay/ready-stock?product_key=${encodeURIComponent(key)}`),items=Array.isArray(data.items)?data.items:[],text=items.map(x=>String(x.value||'')).filter(Boolean).join('\n'),cfg=r.presentation?.ready_stock||{};
     modal('▦ Stok Ready · '+r.name,`<div class="ready-stock-editor"><div class="ready-stock-stats"><span>Available <b>${Number(data.available_count??data.count??0)}</b></span><span>Reserved <b>${Number(data.reserved_count||0)}</b></span><span>Terjual <b>${Number(data.sold_count||0)}</b></span></div><div class="info-note">Stok ini <b>milik toko sendiri</b>, bukan stok endpoint Jaspay. Satu baris = satu akun/data yang akan dikirim persis kepada pembeli. Harga mengikuti kombinasi harga Produk Fresh yang dipilih di menu <b>Atur</b>.</div><div class="form-grid"><label>Mode Update<select name="mode"><option value="replace" selected>Ganti seluruh stok available</option><option value="add">Tambahkan ke stok existing</option></select></label><label>Status Ready Stok<input disabled value="${cfg.enabled===true?'Aktif di halaman READY STOK':'Belum diaktifkan di menu Atur'}"></label><label class="full">Data Akun Ready Stok<textarea name="text" rows="15" spellcheck="false" placeholder="email|password|data lain, satu akun per baris">${esc(text)}</textarea><small>Baris Reserved tidak ikut terhapus saat mode Ganti, supaya order QRIS yang sedang menunggu tidak kehilangan stok.</small></label></div></div>`,async b=>{
-      const out=await api('/api/admin/integrations/jaspay/ready-stock',{method:'POST',body:{product_key:key,mode:b.mode||'replace',text:b.text||''}});toast(`Stok Ready disimpan · available ${Number(out.available_count??out.count??0)}`);await refreshJaspayHub(false);
+      const out=await api('/api/admin/integrations/jaspay/ready-stock',{method:'POST',body:{product_key:key,mode:b.mode||'replace',text:b.text||''}});toast(`Stok Ready disimpan · available ${Number(out.available_count??out.count??0)}`);refreshJaspayHub(false).catch(()=>null);
     },{submit:'Simpan Stok Ready'});
   }catch(e){toast(e.message,true)}
 }
 function openJaspayProduct(key){
   const r=(state.cache.jaspayProducts||[]).find(x=>String(x.product_key)===String(key));if(!r)return toast('Produk Fresh tidak ditemukan.',true);
-  const p=r.presentation||{},modes=Array.isArray(r.options?.mode?.pilihan)?r.options.mode.pilihan.map(String):[],supportsNew=modes.includes('baru'),supportsRenew=modes.includes('perpanjang'),labels=p.mode_labels||{},descs=p.mode_descriptions||{},styles=p.mode_styles||{},modeOrder=Array.isArray(p.mode_order)?p.mode_order:[],orderDefaults=p.order_defaults||{},accountSettings=p.account_settings||{},renewal=p.renewal_pricing||{},hidden=new Set(Array.isArray(p.hidden_modes)?p.hidden_modes:[]),priceRows=Array.isArray(r.price_options)?r.price_options:[],readyCfg=p.ready_stock&&typeof p.ready_stock==='object'?p.ready_stock:{},readyIndex=priceRows.findIndex(x=>freshOptionKey(x.options||{})===freshOptionKey(readyCfg.options||{}));
+  const p=r.presentation||{},modes=Array.isArray(r.options?.mode?.pilihan)?r.options.mode.pilihan.map(String):[],supportsNew=modes.includes('baru'),supportsRenew=modes.includes('perpanjang'),labels=p.mode_labels||{},descs=p.mode_descriptions||{},styles=p.mode_styles||{},modeOrder=Array.isArray(p.mode_order)?p.mode_order:[],orderDefaults=p.order_defaults||{},accountSettings=p.account_settings||{},renewal=p.renewal_pricing||{},hidden=new Set(Array.isArray(p.hidden_modes)?p.hidden_modes:[]),priceRows=Array.isArray(r.price_options)?r.price_options:[],readyCfg=p.ready_stock&&typeof p.ready_stock==='object'?p.ready_stock:{};
+  let readyIndex=priceRows.findIndex(x=>freshOptionKey(x.options||{})===freshOptionKey(readyCfg.options||{}));
+  if(readyIndex<0&&priceRows.length>0&&readyCfg.options&&Object.keys(readyCfg.options).length){
+    readyIndex=priceRows.findIndex(x=>{
+      const xKey=freshOptionKey(Object.fromEntries(Object.entries(x.options||{}).filter(([k])=>!['accounts','accounts_token','password','domain','name','username','usernames','email','emails','recovery','recovery_email','recovery_provider','order_id','suffix_digits'].includes(k))));
+      const cfgKey=freshOptionKey(Object.fromEntries(Object.entries(readyCfg.options||{}).filter(([k])=>!['accounts','accounts_token','password','domain','name','username','usernames','email','emails','recovery','recovery_email','recovery_provider','order_id','suffix_digits'].includes(k))));
+      return xKey===cfgKey;
+    });
+  }
+  if(readyIndex<0&&priceRows.length>0)readyIndex=0;
   const styleOptions=(cur)=>`<option value="success" ${cur==='success'||!cur?'selected':''}>Hijau</option><option value="primary" ${cur==='primary'?'selected':''}>Biru</option><option value="danger" ${cur==='danger'?'selected':''}>Merah</option>`;
   const modeFields=modes.length?`<div class="full settings-subcard"><h4>🎛 Tampilan Mode di Bot</h4><p class="muted">Atur nama, deskripsi, urutan, warna tombol, dan apakah mode ditampilkan ke customer.</p>${modes.map((m,i)=>`<div class="form-grid compact-grid"><label>Mode API<input disabled value="${esc(m)}"></label><label>Nama Tombol<input name="mode_label_${i}" value="${esc(labels[m]||String(m).replace(/[_-]+/g,' ').replace(/\b\w/g,x=>x.toUpperCase()))}"></label><label>Urutan<input name="mode_order_${i}" type="number" min="1" value="${Math.max(1,(modeOrder.indexOf(String(m))>=0?modeOrder.indexOf(String(m)):i)+1)}"></label><label>Warna Tombol<select name="mode_style_${i}">${styleOptions(styles[m]||'success')}</select></label><label class="full">Deskripsi Mode<textarea name="mode_desc_${i}" rows="2">${esc(descs[m]||'')}</textarea></label><label>Tampilkan<select name="mode_show_${i}"><option value="true" ${!hidden.has(String(m))?'selected':''}>Ya</option><option value="false" ${hidden.has(String(m))?'selected':''}>Tidak</option></select></label><input type="hidden" name="mode_key_${i}" value="${esc(m)}"></div>`).join('')}</div>`:'';
   const accountSection=supportsNew?`<div class="full settings-subcard"><h4>🧩 Default Pembuatan Akun</h4><p class="muted">Hanya muncul karena produk ini mendukung mode Akun Baru. Nilai awal dipakai Bot ketika membuat akun fresh.</p><div class="form-grid"><label>Nama Default<input name="order_default_name" placeholder="Mr iLink" value="${esc(orderDefaults.name||'')}"></label><label>Domain Default<input name="order_default_domain" placeholder="ilinkin.store" value="${esc(orderDefaults.domain||'')}"></label><label>Password Default<input name="order_default_password" type="text" autocomplete="off" placeholder="Password akun fresh" value="${esc(orderDefaults.password||'')}"></label><label>Angka / Suffix Digit<input name="order_default_suffix_digits" type="number" min="0" max="12" value="${esc(orderDefaults.suffix_digits??'')}"></label><label>User boleh Setting Akun<select name="account_allow_edit"><option value="true" ${accountSettings.allow_user_edit!==false?'selected':''}>Ya</option><option value="false" ${accountSettings.allow_user_edit===false?'selected':''}>Tidak</option></select></label><label>Boleh ubah Nama<select name="account_edit_name"><option value="true" ${accountSettings.edit_name!==false?'selected':''}>Ya</option><option value="false" ${accountSettings.edit_name===false?'selected':''}>Tidak</option></select></label><label>Boleh ubah Domain<select name="account_edit_domain"><option value="true" ${accountSettings.edit_domain!==false?'selected':''}>Ya</option><option value="false" ${accountSettings.edit_domain===false?'selected':''}>Tidak</option></select></label><label>Boleh ubah Password<select name="account_edit_password"><option value="true" ${accountSettings.edit_password!==false?'selected':''}>Ya</option><option value="false" ${accountSettings.edit_password===false?'selected':''}>Tidak</option></select></label><label>Boleh ubah Angka<select name="account_edit_suffix"><option value="true" ${accountSettings.edit_suffix_digits!==false?'selected':''}>Ya</option><option value="false" ${accountSettings.edit_suffix_digits===false?'selected':''}>Tidak</option></select></label></div></div>`:'';
   const renewalSection=supportsRenew?`<div class="full settings-subcard"><h4>↻ Harga & Refund Perpanjang</h4><p class="muted">Hanya muncul karena produk ini mempunyai mode Perpanjang.</p><div class="form-grid"><label>Harga Perpanjang 7 Hari<input name="renew_sell_7" type="number" min="0" placeholder="0 = ikut harga umum" value="${Number(renewal?.['7']?.sell_price||0)}"></label><label>Refund Gagal 7 Hari<input name="renew_refund_7" type="number" min="0" placeholder="Kosong = refund penuh" value="${renewal?.['7']?.refund_fail??''}"></label><label>Harga Perpanjang 14 Hari<input name="renew_sell_14" type="number" min="0" placeholder="contoh 12000" value="${Number(renewal?.['14']?.sell_price||0)}"></label><label>Refund Gagal 14 Hari<input name="renew_refund_14" type="number" min="0" placeholder="contoh 4000" value="${renewal?.['14']?.refund_fail??''}"></label></div><div class="info-note">Jika item gagal diproses, nilai refund yang kamu atur dikembalikan ke Saldo Bot user.</div></div>`:'';
   const apiPriceSection=`<div class="full settings-subcard"><h4>💵 Harga Jual per Pilihan API</h4><p class="muted">Setiap kombinasi paket, varian, mode, login, dan durasi dapat memiliki harga jual sendiri. Isi Harga Jual Kustom untuk mengunci harga kombinasi tersebut; kosongkan agar mengikuti Mode Harga umum di atas.</p>${freshPriceMatrixHtml(r,{editable:true})}</div>`;
-  const readyPriceOptions=priceRows.map((x,i)=>{const label=Object.entries(x.options||{}).filter(([k])=>!['accounts','accounts_token','password','domain','name','username','usernames','email','emails','recovery','recovery_email','recovery_provider','order_id','suffix_digits'].includes(k)).map(([k,v])=>freshOptionLabel(k,v,p)).join(' · ')||'Harga dasar';return`<option value="${i}" ${(readyIndex===i||readyIndex<0&&priceRows.length===1&&i===0)?'selected':''}>${esc(label)} — ${money(x.sell_price)}</option>`}).join('');
-  const readySection=`<div class="full settings-subcard ready-stock-config"><h4>▦ Ready Stok Lokal</h4><p class="muted">Ready Stok adalah akun milik toko sendiri. Pilih kombinasi harga Fresh yang dipakai; jumlah akun dikelola melalui tombol Stok Ready pada katalog.</p><div class="form-grid"><label>Tampilkan di READY STOK<select name="ready_stock_enabled"><option value="true" ${readyCfg.enabled===true?'selected':''}>Ya</option><option value="false" ${readyCfg.enabled!==true?'selected':''}>Tidak</option></select></label><label>Nama Tombol Ready<input name="ready_stock_label" maxlength="60" value="${esc(readyCfg.label||p.menu_label||r.name||'')}"></label><label class="full">Pakai Harga / Paket<select name="ready_stock_price_index"><option value="">Pilih kombinasi harga Fresh</option>${readyPriceOptions}</select><small>Harga Ready Stok tidak disimpan terpisah. Jika harga kombinasi Fresh berubah, harga Ready Stok ikut berubah otomatis.</small></label><div class="full ready-stock-config-summary">Stok available saat ini: <b>${Number(r.ready_stock_count||0)}</b> akun</div></div></div>`;
+  const readyPriceOptions=priceRows.map((x,i)=>{const label=Object.entries(x.options||{}).filter(([k])=>!['accounts','accounts_token','password','domain','name','username','usernames','email','emails','recovery','recovery_email','recovery_provider','order_id','suffix_digits'].includes(k)).map(([k,v])=>freshOptionLabel(k,v,p)).join(' · ')||'Harga dasar';return`<option value="${i}" ${readyIndex===i?'selected':''}>${esc(label)} — ${money(x.sell_price)}</option>`}).join('');
+  const readySection=`<div class="full settings-subcard ready-stock-config"><h4>▦ Ready Stok Lokal</h4><p class="muted">Ready Stok adalah akun milik toko sendiri. Pilih kombinasi harga Fresh yang dipakai; jumlah akun dikelola melalui tombol Stok Ready pada katalog.</p><div class="form-grid"><label>Tampilkan di READY STOK<select name="ready_stock_enabled"><option value="true" ${readyCfg.enabled===true?'selected':''}>Ya</option><option value="false" ${readyCfg.enabled!==true?'selected':''}>Tidak</option></select></label><label>Nama Tombol Ready<input name="ready_stock_label" maxlength="60" value="${esc(readyCfg.label||p.menu_label||r.name||'')}"></label><label class="full">Pakai Harga / Paket<select name="ready_stock_price_index">${priceRows.length?readyPriceOptions:'<option value="0">Harga dasar</option>'}</select><small>Harga Ready Stok tidak disimpan terpisah. Jika harga kombinasi Fresh berubah, harga Ready Stok ikut berubah otomatis.</small></label><div class="full ready-stock-config-summary">Stok available saat ini: <b>${Number(r.ready_stock_count||0)}</b> akun</div></div></div>`;
   modal('Atur Produk Fresh · '+r.name,`<div class="form-grid"><label>Status Generate API<select name="enabled"><option value="true" ${r.enabled?'selected':''}>Aktif</option><option value="false" ${!r.enabled?'selected':''}>Nonaktif</option></select></label><label>Mode Harga<select name="pricing_mode"><option value="markup_fixed" ${r.pricing_mode==='markup_fixed'?'selected':''}>Harga API + Markup Nominal</option><option value="markup_percent" ${r.pricing_mode==='markup_percent'?'selected':''}>Harga API + Markup Persen</option><option value="fixed" ${r.pricing_mode==='fixed'?'selected':''}>Harga Jual Tetap</option></select></label><label>Nilai Harga / Markup<input name="pricing_value" type="number" min="0" step="1" value="${Number(r.pricing_value||0)}"></label><label>Rentang Harga API<input disabled value="${esc(freshPriceRange(r))}"></label><label>Harga Jual Mulai<input disabled value="${money(r.sell_price_min??r.sell_price)}"></label><label>Maksimal / order<input disabled value="${Number(r.qty_max||1)} akun"></label>${apiPriceSection}${readySection}<div class="full settings-subcard"><h4>🤖 Tampilan Customer</h4><div class="form-grid"><label>Emoji Produk<input name="customer_emoji" maxlength="8" value="${esc(p.emoji||'⚡')}"></label><label>Nama di Menu<input name="customer_menu_label" maxlength="80" value="${esc(p.menu_label||r.name||'')}"></label><label class="full">Judul Halaman<input name="customer_title" maxlength="100" value="${esc(p.title||r.name||'')}"></label><label class="full">Deskripsi Singkat<textarea name="customer_short" rows="2">${esc(p.short_description||'')}</textarea></label><label class="full">Deskripsi Lengkap<textarea name="customer_description" rows="5">${esc(p.description||'')}</textarea></label><label>Teks Tombol Deskripsi<input name="description_button" maxlength="40" value="${esc(p.description_button||'☷ Deskripsi')}"></label><label>Warna Deskripsi<select name="description_button_style">${styleOptions(p.description_button_style||'primary')}</select></label><label>Warna Kembali<select name="back_button_style">${styleOptions(p.back_button_style||'primary')}</select></label></div></div>${accountSection}${renewalSection}${modeFields}<label class="full">Catatan Owner<textarea name="description" rows="3">${esc(r.description||'')}</textarea></label></div>`,async b=>{
-    b.enabled=b.enabled==='true';b.pricing_value=Number(b.pricing_value||0);
-    const presentation={emoji:b.customer_emoji||'⚡',menu_label:b.customer_menu_label||r.name,title:b.customer_title||r.name,short_description:b.customer_short||'',description:b.customer_description||'',description_button:b.description_button||'☷ Deskripsi',description_button_style:b.description_button_style||'primary',back_button_style:b.back_button_style||'primary',ready_stock:{enabled:b.ready_stock_enabled==='true',label:b.ready_stock_label||p.menu_label||r.name,options:{}},order_defaults:supportsNew?{domain:b.order_default_domain||'',password:b.order_default_password||'',name:b.order_default_name||'',suffix_digits:b.order_default_suffix_digits===''?'':Math.max(0,Number(b.order_default_suffix_digits||0))}:{...(p.order_defaults||{})},account_settings:supportsNew?{allow_user_edit:b.account_allow_edit==='true',edit_name:b.account_edit_name==='true',edit_domain:b.account_edit_domain==='true',edit_password:b.account_edit_password==='true',edit_suffix_digits:b.account_edit_suffix==='true'}:{...(p.account_settings||{})},renewal_pricing:supportsRenew?{'7':{sell_price:Math.max(0,Number(b.renew_sell_7||0)),refund_fail:b.renew_refund_7===''?'':Math.max(0,Number(b.renew_refund_7||0))},'14':{sell_price:Math.max(0,Number(b.renew_sell_14||0)),refund_fail:b.renew_refund_14===''?'':Math.max(0,Number(b.renew_refund_14||0))}}:{...(p.renewal_pricing||{})},mode_labels:{},mode_descriptions:{},mode_styles:{},mode_order:[],hidden_modes:[],price_overrides:{...(p.price_overrides&&typeof p.price_overrides==='object'&&!Array.isArray(p.price_overrides)?p.price_overrides:{})}};
-    const readyRaw=String(b.ready_stock_price_index??'').trim();const readyIdx=readyRaw===''?(priceRows.length===1?0:-1):Number(readyRaw);if(presentation.ready_stock.enabled&&(readyIdx<0||readyIdx>=priceRows.length))throw new Error('Pilih kombinasi harga untuk Ready Stok.');presentation.ready_stock.options=readyIdx>=0&&priceRows[readyIdx]?{...(priceRows[readyIdx].options||{})}:{...(readyCfg.options||{})};for(let i=0;i<priceRows.length;i++){const pk=b[`price_key_${i}`]||priceRows[i].price_key||'';if(!pk)continue;delete presentation.price_overrides[pk];const raw=b[`price_override_${i}`];if(raw!==undefined&&raw!==null&&String(raw).trim()!==''){const value=Number(raw);if(Number.isFinite(value)&&value>0)presentation.price_overrides[pk]=Math.round(value);}}
+    b.enabled=b.enabled==='true';b.pricing_value=Math.max(0,Number(b.pricing_value||0));
+    const isReadyStockEnabled=b.ready_stock_enabled==='true';
+    const presentation={emoji:b.customer_emoji||'⚡',menu_label:b.customer_menu_label||r.name,title:b.customer_title||r.name,short_description:b.customer_short||'',description:b.customer_description||'',description_button:b.description_button||'☷ Deskripsi',description_button_style:b.description_button_style||'primary',back_button_style:b.back_button_style||'primary',ready_stock:{enabled:isReadyStockEnabled,label:b.ready_stock_label||p.menu_label||r.name,options:{}},order_defaults:supportsNew?{domain:b.order_default_domain||'',password:b.order_default_password||'',name:b.order_default_name||'',suffix_digits:b.order_default_suffix_digits===''?'':Math.max(0,Number(b.order_default_suffix_digits||0))}:{...(p.order_defaults||{})},account_settings:supportsNew?{allow_user_edit:b.account_allow_edit==='true',edit_name:b.account_edit_name==='true',edit_domain:b.account_edit_domain==='true',edit_password:b.account_edit_password==='true',edit_suffix_digits:b.account_edit_suffix==='true'}:{...(p.account_settings||{})},renewal_pricing:supportsRenew?{'7':{sell_price:Math.max(0,Number(b.renew_sell_7||0)),refund_fail:b.renew_refund_7===''?'':Math.max(0,Number(b.renew_refund_7||0))},'14':{sell_price:Math.max(0,Number(b.renew_sell_14||0)),refund_fail:b.renew_refund_14===''?'':Math.max(0,Number(b.renew_refund_14||0))}}:{...(p.renewal_pricing||{})},mode_labels:{},mode_descriptions:{},mode_styles:{},mode_order:[],hidden_modes:[],price_overrides:{...(p.price_overrides&&typeof p.price_overrides==='object'&&!Array.isArray(p.price_overrides)?p.price_overrides:{})}};
+    const readyRaw=String(b.ready_stock_price_index??'').trim();
+    let readyIdx=readyRaw===''?(priceRows.length>0?(readyIndex>=0?readyIndex:0):-1):Number(readyRaw);
+    if(!Number.isFinite(readyIdx))readyIdx=0;
+    if(priceRows.length>0){
+      if(readyIdx<0||readyIdx>=priceRows.length)readyIdx=0;
+      presentation.ready_stock.options={...(priceRows[readyIdx]?.options||{})};
+    }else{
+      presentation.ready_stock.options={...(readyCfg.options||{})};
+    }
+    for(let i=0;i<priceRows.length;i++){const pk=b[`price_key_${i}`]||priceRows[i].price_key||'';if(!pk)continue;delete presentation.price_overrides[pk];const raw=b[`price_override_${i}`];if(raw!==undefined&&raw!==null&&String(raw).trim()!==''){const value=Number(raw);if(Number.isFinite(value)&&value>0)presentation.price_overrides[pk]=Math.round(value);}}
     const ordered=[];for(let i=0;i<modes.length;i++){const mk=b[`mode_key_${i}`]||modes[i];presentation.mode_labels[mk]=b[`mode_label_${i}`]||mk;presentation.mode_descriptions[mk]=b[`mode_desc_${i}`]||'';presentation.mode_styles[mk]=b[`mode_style_${i}`]||'success';ordered.push({key:mk,n:Math.max(1,Number(b[`mode_order_${i}`]||i+1)),i});if(b[`mode_show_${i}`]!=='true')presentation.hidden_modes.push(mk);}presentation.mode_order=ordered.sort((a,c)=>a.n-c.n||a.i-c.i).map(x=>x.key);
     const body={enabled:b.enabled,pricing_mode:b.pricing_mode,pricing_value:b.pricing_value,description:b.description||'',presentation};
-    await api(`/api/admin/integrations/jaspay/products/${encodeURIComponent(r.product_key)}`,{method:'PATCH',body});toast('Produk Fresh disimpan');await refreshJaspayHub(false);
+    const res=await api(`/api/admin/integrations/jaspay/products/${encodeURIComponent(r.product_key)}`,{method:'PATCH',body});
+    if(res?.item){const idx=(state.cache.jaspayProducts||[]).findIndex(x=>String(x.product_key)===String(r.product_key));if(idx>=0)state.cache.jaspayProducts[idx]=res.item;}
+    toast('Produk Fresh disimpan');
+    refreshJaspayHub(false).catch(err=>console.error('[jaspay-refresh]',err));
   },{submit:'Simpan Produk Fresh'});
 }
 
@@ -729,7 +751,47 @@ async function loadUsers(){
 function userCards(rows){return rows.length?rows.map(u=>`<article class="user-card"><div class="user-avatar">${firstLetter(u.first_name||u.username||u.telegram_id)}</div><div class="user-main"><h3>${esc([u.first_name,u.last_name].filter(Boolean).join(' ')||u.username||u.telegram_id)}</h3><p>${u.username?'@'+esc(u.username)+' · ':''}<span class="mono">${esc(u.telegram_id)}</span></p><div class="user-meta"><span>Referral <b>${esc(u.referral_code||'-')}</b></span><span>Saldo Utama <b>${money(u.balance_main)}</b></span><span>Saldo Referral <b>${money(u.balance_referral)}</b></span><span>Total <b>${money(u.balance_total)}</b></span><span>Status ${badge(u.status)}</span><span>Aktif <b>${esc(date(u.last_seen_at))}</b></span></div></div><div class="user-actions">${u.status==='blocked'?`<button class="neo-btn green small" data-unblock-user="${esc(u.telegram_id)}">Aktifkan</button>`:''}<button class="neo-btn yellow small" data-wallet-user="${esc(u.telegram_id)}">Saldo</button><button class="neo-btn blue small" data-chat-user="${esc(u.telegram_id)}">Chat</button><button class="neo-btn red small" data-delete-user="${esc(u.telegram_id)}">Hapus</button></div></article>`).join(''):'<div class="empty-product">Belum ada user Telegram. User akan muncul setelah berinteraksi dengan bot.</div>'}
 function filterUsers(){const q=$('#userSearch').value.toLowerCase(),st=$('#userStatus').value;const rows=state.cache.users.filter(u=>(!q||[u.telegram_id,u.username,u.first_name,u.last_name,u.referral_code].some(x=>String(x||'').toLowerCase().includes(q)))&&(!st||u.status===st));$('#userCards').innerHTML=userCards(rows);const total=state.cache.users.length;if($('#userCount')){const act=state.cache.users.filter(u=>u.status==='active').length;const blk=state.cache.users.filter(u=>u.status==='blocked').length;$('#userCount').textContent=rows.length===total?`${total} user (${act} aktif, ${blk} blocked)`:`${rows.length} / ${total} user`;}bindUserActions()}
 function bindUserActions(){$$('[data-unblock-user]').forEach(b=>b.onclick=async()=>{try{await api(`/api/admin/users/${encodeURIComponent(b.dataset.unblockUser)}`,{method:'PATCH',body:{status:'active'}});toast('User diaktifkan');loadUsers()}catch(e){toast(e.message,true)}});$$('[data-wallet-user]').forEach(b=>b.onclick=()=>openWallet(state.cache.users.find(x=>String(x.telegram_id)===b.dataset.walletUser)));$$('[data-chat-user]').forEach(b=>b.onclick=()=>openSendMessage(b.dataset.chatUser));$$('[data-delete-user]').forEach(b=>b.onclick=()=>remove(`/api/admin/users/${encodeURIComponent(b.dataset.deleteUser)}`,'Hapus pengguna?',loadUsers))}
-function modal(title,html,onSubmit,{submit='Simpan',hideSubmit=false}={}){$('#modalTitle').textContent=title;$('#modalBody').innerHTML=html;$('#modalSubmit').textContent=submit;$('#modalSubmit').classList.toggle('hidden',hideSubmit);$('#modalForm').onsubmit=async e=>{e.preventDefault();if(hideSubmit)return;try{const fd=new FormData(e.target);await onSubmit(Object.fromEntries(fd.entries()));$('#modal').close()}catch(err){toast(err.message,true)}};if(!$('#modal').open)$('#modal').showModal()}$('#modalClose').onclick=$('#modalCancel').onclick=()=>$('#modal').close();
+function modal(title,html,onSubmit,{submit='Simpan',hideSubmit=false}={}){
+  $('#modalTitle').textContent=title;
+  $('#modalBody').innerHTML=html;
+  $('#modalSubmit').textContent=submit;
+  $('#modalSubmit').classList.toggle('hidden',hideSubmit);
+  const alertEl=$('#modalAlert');
+  if(alertEl){alertEl.textContent='';alertEl.classList.add('hidden');}
+  $('#modalForm').onsubmit=async e=>{
+    e.preventDefault();
+    if(hideSubmit)return;
+    const btn=$('#modalSubmit');
+    const oldText=btn?btn.textContent:'Simpan';
+    try{
+      if(btn){btn.disabled=true;btn.textContent='Menyimpan...';}
+      if(alertEl)alertEl.classList.add('hidden');
+      const fd=new FormData(e.target);
+      await onSubmit(Object.fromEntries(fd.entries()));
+      $('#modal').close();
+    }catch(err){
+      toast(err.message||'Gagal menyimpan',true);
+      if(alertEl){
+        alertEl.textContent='⚠️ '+(err.message||'Gagal menyimpan');
+        alertEl.classList.remove('hidden');
+        $('#modalBody').scrollTop=0;
+      }
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent=oldText;}
+    }
+  };
+  if(!$('#modal').open)$('#modal').showModal();
+}
+const modalEl=$('#modal');
+if(modalEl){
+  $('#modalClose').onclick=$('#modalCancel').onclick=()=>modalEl.close();
+  modalEl.addEventListener('close',()=>{
+    const t=$('#toast');
+    if(t&&t.parentElement!==document.body)document.body.appendChild(t);
+    const alertEl=$('#modalAlert');
+    if(alertEl){alertEl.textContent='';alertEl.classList.add('hidden');}
+  });
+}
 function variantEditorHtml(item){
   if(!item.id)return `<div class="variant-editor"><div class="variant-editor-head"><div><h3>Varian Produk</h3><p>Simpan produk terlebih dahulu, lalu buka Edit untuk menambahkan varian.</p></div></div></div>`;
   if(item.supplier_source)return `<div class="variant-editor supplier-root-editor"><div class="variant-editor-head"><div><h3>🔌 Produk Supplier Langsung</h3><p>Produk ini adalah produk biasa, bukan varian. Checkout langsung memakai supplier yang terhubung.</p></div><button type="button" id="syncProductSupplier" class="neo-btn green small">↻ Sync Supplier</button></div><div class="supplier-root-summary"><span>Supplier <b>${esc(String(item.supplier_source).toUpperCase())}</b></span><span>ID <code>${esc(item.supplier_product_id||'-')}</code></span><span>Stok API <b>${item.supplier_stock==null?'?':Number(item.supplier_stock)}</b></span><span>Harga API <b>${Number(item.supplier_price||0).toLocaleString('id-ID',{maximumFractionDigits:6})}</b></span></div><p class="muted">Jika membutuhkan varian, tambahkan item supplier sebagai <b>Varian produk yang ada</b> dari menu Supplier / Reseller.</p></div>`;
@@ -789,5 +851,876 @@ function openOrderEdit(o){modal('Edit Pesanan · '+o.order_ref,`<div class="form
 function openWallet(u){if(!u)return;modal('Atur Saldo · '+(u.first_name||u.username||u.telegram_id),`<div class="form-grid"><label>Saldo Utama<input name="balance_main" type="number" min="0" value="${Number(u.balance_main||0)}"></label><label>Saldo Referral<input name="balance_referral" type="number" min="0" value="${Number(u.balance_referral||0)}"></label><label class="full">Telegram ID<input value="${esc(u.telegram_id)}" disabled></label></div>`,async b=>{b.balance_main=Number(b.balance_main||0);b.balance_referral=Number(b.balance_referral||0);await api(`/api/admin/users/${encodeURIComponent(u.telegram_id)}/wallet`,{method:'POST',body:b});toast('Saldo diperbarui');navigate(state.view)})}function openSendMessage(id){modal('Kirim Pesan Telegram',`<label class="field">Telegram ID<input value="${esc(id)}" disabled></label><label class="field" style="margin-top:10px">Pesan<textarea name="message" required rows="8"></textarea></label>`,async b=>{await api('/api/admin/bot/send',{method:'POST',body:{chat_id:id,message:b.message}});toast('Pesan dikirim')},{submit:'Kirim'})}
 function openCoupon(x={}){const edit=!!x.id;modal(edit?'Edit Kupon':'Tambah Kupon',`<div class="form-grid"><label>Kode<input name="code" required value="${esc(x.code||'')}"></label><label>Nama Promo<input name="name" value="${esc(x.name||'')}"></label><label>Tipe<select name="discount_type"><option value="fixed" ${x.discount_type!=='percent'?'selected':''}>Nominal</option><option value="percent" ${x.discount_type==='percent'?'selected':''}>Persen</option></select></label><label>Diskon<input name="discount_value" type="number" min="0" value="${Number(x.discount_value||0)}"></label><label>Maks Diskon<input name="max_discount" type="number" min="0" value="${Number(x.max_discount||0)}"></label><label>Minimal Belanja<input name="min_purchase" type="number" min="0" value="${Number(x.min_purchase||0)}"></label><label>Limit Pemakaian<input name="usage_limit" type="number" min="0" value="${Number(x.usage_limit||0)}"></label><label>Status<select name="active"><option value="true" ${x.active!==0?'selected':''}>Aktif</option><option value="false" ${x.active===0?'selected':''}>Nonaktif</option></select></label><label>Mulai<input name="starts_at" type="datetime-local" value=""></label><label>Expired<input name="expires_at" type="datetime-local" value=""></label></div>`,async b=>{['discount_value','max_discount','min_purchase','usage_limit'].forEach(k=>b[k]=Number(b[k]||0));b.active=b.active==='true';if(b.starts_at)b.starts_at=new Date(b.starts_at).toISOString();if(b.expires_at)b.expires_at=new Date(b.expires_at).toISOString();await api(edit?`/api/admin/coupons/${x.id}`:'/api/admin/coupons',{method:edit?'PATCH':'POST',body:b});toast('Kupon disimpan');loadCoupons()})}
 function openRedeem(){const products=state.cache.products||[];modal('Generate Redeem Code',`<div class="form-grid"><label>Jumlah Kode<input name="count" type="number" min="1" max="200" value="1"></label><label>Tipe<select name="type" id="redeemType"><option value="balance">Saldo</option><option value="product">Produk</option></select></label><label>Nilai / Qty<input name="value" type="number" min="0" value="10000"></label><label>Produk<select name="product_id"><option value="">-</option>${products.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label><label>Expired<input name="expires_at" type="datetime-local"></label><label>Kode Custom (jumlah 1)<input name="code"></label></div>`,async b=>{b.count=Number(b.count||1);b.value=Number(b.value||0);b.product_id=b.product_id?Number(b.product_id):null;if(b.expires_at)b.expires_at=new Date(b.expires_at).toISOString();const r=await api('/api/admin/redeem',{method:'POST',body:b});toast(`${r.items.length} kode dibuat`);loadCoupons()})}
+// ==========================================
+// RESELLER & MULTI-TENANT BOT SYSTEM (v2.6.10)
+// ==========================================
+
+async function loadResellers() {
+  state.resellerTab = state.resellerTab || 'resellers';
+  const overviewRes = await api('/api/admin/resellers/overview').catch(() => ({ stats: {} }));
+  const stats = overviewRes.stats || {};
+  const pendingWd = Number(stats.pending_withdrawals || 0);
+
+  const resBadgeEl = $('#resellerBadge');
+  if (resBadgeEl) {
+    resBadgeEl.textContent = pendingWd;
+    resBadgeEl.classList.toggle('hidden', pendingWd < 1);
+  }
+
+  const kpis = `
+    <div class="dashboard-kpis">
+      ${stat('👥', 'purple', 'Total Reseller', `${stats.total_resellers || 0}`, `${stats.active_resellers || 0} akun aktif`)}
+      ${stat('🤖', 'blue', 'Bot Toko Reseller', `${stats.total_bots || 0}`, `${stats.active_bots || 0} bot online`)}
+      ${stat('💰', 'green', 'Saldo Profit Reseller', money(stats.total_profit_balance), `Total ditarik: ${money(stats.total_withdrawn)}`)}
+      ${stat('💸', 'yellow', 'Pending Penarikan', `${pendingWd} Pengajuan`, `${money(stats.pending_withdrawals_amount)} siap dicairkan`)}
+    </div>
+  `;
+
+  const tabs = `
+    <div class="subnav" id="resellerSubnav" style="margin-bottom:16px;">
+      <button class="subnav-btn ${state.resellerTab === 'resellers' ? 'active' : ''}" data-reseller-tab="resellers">👥 Daftar Reseller</button>
+      <button class="subnav-btn ${state.resellerTab === 'bots' ? 'active' : ''}" data-reseller-tab="bots">🤖 Bot Toko Reseller</button>
+      <button class="subnav-btn ${state.resellerTab === 'withdrawals' ? 'active' : ''}" data-reseller-tab="withdrawals">💸 Penarikan Saldo ${pendingWd > 0 ? `<em class="nav-badge" style="display:inline-block;margin-left:4px">${pendingWd}</em>` : ''}</button>
+      <button class="subnav-btn ${state.resellerTab === 'ledger' ? 'active' : ''}" data-reseller-tab="ledger">📒 Mutasi Profit</button>
+    </div>
+  `;
+
+  $('#content').innerHTML = `
+    <div class="section-title product-section-title">
+      <div>
+        <h2>👥 Reseller & White-Label Bot Toko</h2>
+        <p>Buka kemitraan reseller otomatis: Bot Telegram independen, markup fleksibel, dan pembayaran terpusat QRIS Owner.</p>
+      </div>
+    </div>
+    ${kpis}
+    ${tabs}
+    <div id="resellerTabBody"><div class="empty compact">Memuat data...</div></div>
+  `;
+
+  $$('#resellerSubnav [data-reseller-tab]').forEach(b => {
+    b.onclick = () => {
+      state.resellerTab = b.dataset.resellerTab;
+      $$('#resellerSubnav .subnav-btn').forEach(x => x.classList.toggle('active', x === b));
+      renderResellerTabContent();
+    };
+  });
+
+  await renderResellerTabContent();
+}
+
+async function renderResellerTabContent() {
+  const host = $('#resellerTabBody');
+  if (!host) return;
+  host.innerHTML = '<div class="empty compact">Memuat tab...</div>';
+
+  if (state.resellerTab === 'resellers') {
+    await renderResellersList(host);
+  } else if (state.resellerTab === 'bots') {
+    await renderResellerBotsList(host);
+  } else if (state.resellerTab === 'withdrawals') {
+    await renderResellerWithdrawalsList(host);
+  } else if (state.resellerTab === 'ledger') {
+    await renderResellerLedgerList(host);
+  }
+}
+
+// ---------------- TAB 1: DAFTAR RESELLER ----------------
+async function renderResellersList(host) {
+  const res = await api('/api/admin/resellers?limit=500').catch(e => ({ items: [], error: e.message }));
+  const items = res.items || [];
+  state.cache.resellers = items;
+
+  host.innerHTML = `
+    <div class="toolbar product-toolbar" style="margin-bottom:14px;">
+      <div class="searchbox"><input id="resellerSearch" placeholder="Cari nama, username, telegram ID..."></div>
+      <select id="resellerStatusFilter">
+        <option value="">Semua Status</option>
+        <option value="active">Aktif</option>
+        <option value="inactive">Nonaktif</option>
+      </select>
+      <button id="addResellerBtn" class="neo-btn purple">＋ Tambah Reseller</button>
+    </div>
+    <div id="resellersCardGrid" class="reseller-grid"></div>
+  `;
+
+  $('#addResellerBtn').onclick = () => openResellerModal();
+
+  const filter = () => {
+    const q = String($('#resellerSearch')?.value || '').toLowerCase().trim();
+    const st = String($('#resellerStatusFilter')?.value || '').trim();
+    const filtered = items.filter(r => {
+      const matchQ = !q || [r.name, r.username, r.telegram_id, r.phone].some(x => String(x || '').toLowerCase().includes(q));
+      const matchSt = !st || r.status === st;
+      return matchQ && matchSt;
+    });
+
+    const grid = $('#resellersCardGrid');
+    if (!grid) return;
+    if (!filtered.length) {
+      grid.innerHTML = '<div class="empty-product"><h3>Belum ada reseller</h3><p>Tekan Tambah Reseller untuk mendaftarkan mitra pertama.</p></div>';
+      return;
+    }
+
+    grid.innerHTML = filtered.map(r => {
+      const markupText = r.markup_mode === 'percent' ? `+${r.markup_value}%` : `+${money(r.markup_value)} / item`;
+      return `
+        <article class="reseller-card">
+          <div class="reseller-card-head">
+            <div>
+              <h3>${esc(r.name)}</h3>
+              <p style="margin:3px 0;font-size:11px;color:var(--muted)">
+                ${r.username ? '@' + esc(r.username) + ' · ' : ''}
+                Telegram ID: <code class="mono">${esc(r.telegram_id || '-')}</code>
+                ${r.phone ? ' · ' + esc(r.phone) : ''}
+              </p>
+            </div>
+            <div>${badge(r.status)}</div>
+          </div>
+          <div class="reseller-meta">
+            <div>
+              <small>📈 Markup Harga</small>
+              <strong>${esc(markupText)}</strong>
+            </div>
+            <div>
+              <small>🤖 Bot Terdaftar</small>
+              <strong>${r.bots_count || 0} Bot (${r.active_bots_count || 0} Aktif)</strong>
+            </div>
+            <div>
+              <small>💰 Saldo Profit</small>
+              <strong style="color:#15803d">${money(r.profit_balance)}</strong>
+            </div>
+            <div>
+              <small>💸 Total Ditarik</small>
+              <strong>${money(r.withdrawn_total)}</strong>
+            </div>
+            <div>
+              <small>🏦 Rekening Pencairan</small>
+              <strong>${esc(r.bank_name || '-')} ${esc(r.bank_account_number || '')}</strong>
+              <span style="font-size:9px;color:var(--muted)">A.N: ${esc(r.bank_account_name || '-')}</span>
+            </div>
+          </div>
+          ${r.notes ? `<div style="font-size:10px;color:var(--muted);background:#fcfaff;padding:6px 10px;border-radius:8px;border:1px solid #e0d6f5"><b>Catatan:</b> ${esc(r.notes)}</div>` : ''}
+          <div class="reseller-actions">
+            <button class="neo-btn blue small" data-edit-reseller="${r.id}">✎ Edit Reseller</button>
+            <button class="neo-btn purple small" data-manage-bots="${r.id}">🤖 Kelola Bot (${r.bots_count || 0})</button>
+            <button class="neo-btn green small" data-manual-withdraw="${r.id}">💸 Tarik Saldo</button>
+            <button class="neo-btn red small" data-delete-reseller="${r.id}">🗑 Hapus</button>
+          </div>
+        </article>
+      `;
+    }).join('');
+
+    $$('[data-edit-reseller]').forEach(b => {
+      b.onclick = () => {
+        const item = items.find(x => String(x.id) === b.dataset.editReseller);
+        if (item) openResellerModal(item);
+      };
+    });
+    $$('[data-manage-bots]').forEach(b => {
+      b.onclick = () => {
+        state.resellerTab = 'bots';
+        state.resellerFilter = b.dataset.manageBots;
+        $$('#resellerSubnav .subnav-btn').forEach(x => x.classList.toggle('active', x.dataset.resellerTab === 'bots'));
+        renderResellerTabContent();
+      };
+    });
+    $$('[data-manual-withdraw]').forEach(b => {
+      b.onclick = () => openManualWithdrawalModal(b.dataset.manualWithdraw);
+    });
+    $$('[data-delete-reseller]').forEach(b => {
+      b.onclick = async () => {
+        if (!confirm('Hapus reseller ini? Semua bot miliknya akan dinonaktifkan.')) return;
+        try {
+          await api(`/api/admin/resellers/${b.dataset.deleteReseller}`, { method: 'DELETE' });
+          toast('Reseller berhasil dihapus');
+          await loadResellers();
+        } catch (e) {
+          toast(e.message, true);
+        }
+      };
+    });
+  };
+
+  $('#resellerSearch').oninput = filter;
+  $('#resellerStatusFilter').onchange = filter;
+  filter();
+}
+
+// ---------------- TAB 2: BOT TOKO RESELLER ----------------
+async function renderResellerBotsList(host) {
+  const [botsRes, resellersRes] = await Promise.all([
+    api('/api/admin/reseller-bots?limit=500').catch(() => ({ items: [] })),
+    api('/api/admin/resellers?limit=500').catch(() => ({ items: [] }))
+  ]);
+  const bots = botsRes.items || [];
+  const resellers = resellersRes.items || [];
+  state.cache.resellerBots = bots;
+  state.cache.resellers = resellers;
+
+  const resellerOptions = resellers.map(r => `<option value="${r.id}" ${state.resellerFilter === String(r.id) ? 'selected' : ''}>${esc(r.name)} (@${esc(r.username || '-')})</option>`).join('');
+
+  host.innerHTML = `
+    <div class="toolbar product-toolbar" style="margin-bottom:14px;">
+      <div class="searchbox"><input id="botSearch" placeholder="Cari nama bot, username @..."></div>
+      <select id="botResellerFilter">
+        <option value="">Semua Reseller</option>
+        ${resellerOptions}
+      </select>
+      <select id="botStatusFilter">
+        <option value="">Semua Status</option>
+        <option value="active">Aktif (Online)</option>
+        <option value="inactive">Nonaktif (Stopped)</option>
+      </select>
+      <button id="addBotBtn" class="neo-btn purple">＋ Pasang Bot Baru</button>
+    </div>
+    <div id="botsCardGrid" class="bot-grid"></div>
+  `;
+
+  $('#addBotBtn').onclick = () => openResellerBotModal({}, state.resellerFilter || null);
+
+  const filter = () => {
+    const q = String($('#botSearch')?.value || '').toLowerCase().trim();
+    const resId = String($('#botResellerFilter')?.value || '').trim();
+    const st = String($('#botStatusFilter')?.value || '').trim();
+
+    const filtered = bots.filter(b => {
+      const matchQ = !q || [b.bot_name, b.bot_username, b.store_name].some(x => String(x || '').toLowerCase().includes(q));
+      const matchRes = !resId || String(b.reseller_id) === resId;
+      const matchSt = !st || b.status === st;
+      return matchQ && matchRes && matchSt;
+    });
+
+    const grid = $('#botsCardGrid');
+    if (!grid) return;
+    if (!filtered.length) {
+      grid.innerHTML = '<div class="empty-product"><h3>Belum ada Bot Toko</h3><p>Pasang bot reseller pertama dengan memasukkan token dari @BotFather.</p></div>';
+      return;
+    }
+
+    grid.innerHTML = filtered.map(b => {
+      const rt = b.runtime || { running: false, last_error: '' };
+      let rtBadge = `<span class="bot-runtime-badge stopped">🔴 Offline / Stopped</span>`;
+      if (rt.running) {
+        rtBadge = `<span class="bot-runtime-badge online">🟢 Online (Polling)</span>`;
+      } else if (rt.last_error) {
+        rtBadge = `<span class="bot-runtime-badge error" title="${esc(rt.last_error)}">⚠️ Error: ${esc(rt.last_error).slice(0, 30)}</span>`;
+      }
+
+      const resOwner = resellers.find(r => r.id === b.reseller_id);
+
+      return `
+        <article class="bot-card">
+          <div class="bot-card-head">
+            <div>
+              <h3>${esc(b.store_name || b.bot_name || 'Bot Toko')}</h3>
+              <p style="margin:3px 0;font-size:11px;color:var(--muted)">
+                Username: <a href="https://t.me/${esc(b.bot_username)}" target="_blank" style="font-weight:900;color:var(--purple)">@${esc(b.bot_username)}</a> · 
+                Pemilik: <b>${esc(b.reseller_name || resOwner?.name || `Reseller #${b.reseller_id}`)}</b>
+              </p>
+            </div>
+            <div>${rtBadge}</div>
+          </div>
+          <div class="bot-meta">
+            <div>
+              <small>🏪 Nama Toko</small>
+              <strong>${esc(b.store_name || '-')}</strong>
+            </div>
+            <div>
+              <small>🎨 Banner Header</small>
+              <strong>${b.start_photo_url ? '✅ Terpasang' : 'Standar Teks'}</strong>
+            </div>
+            <div>
+              <small>💬 CS / Admin Toko</small>
+              <strong>${esc(b.support_contact || '-')}</strong>
+            </div>
+            <div>
+              <small>📢 Channel Toko</small>
+              <strong>${esc(b.channel_url || '-')}</strong>
+            </div>
+          </div>
+          <div class="bot-actions">
+            ${rt.running
+              ? `<button class="neo-btn red small" data-stop-bot="${b.id}">⏹ Hentikan</button>`
+              : `<button class="neo-btn green small" data-start-bot="${b.id}">▶ Jalankan</button>`
+            }
+            <button class="neo-btn yellow small" data-restart-bot="${b.id}">↻ Restart</button>
+            <button class="neo-btn purple small" data-branding-bot="${b.id}">🎨 Atur Branding & /start</button>
+            <button class="neo-btn blue small" data-edit-bot="${b.id}">✎ Edit Token</button>
+            <button class="neo-btn red small" data-delete-bot="${b.id}">🗑 Hapus</button>
+          </div>
+        </article>
+      `;
+    }).join('');
+
+    $$('[data-start-bot]').forEach(btn => {
+      btn.onclick = async () => {
+        try {
+          btn.disabled = true;
+          btn.textContent = 'Memulai...';
+          await api(`/api/admin/reseller-bots/${btn.dataset.startBot}/start`, { method: 'POST', body: {} });
+          toast('Bot berhasil dijalankan!');
+          await renderResellerTabContent();
+        } catch (e) {
+          toast(e.message, true);
+        } finally {
+          btn.disabled = false;
+        }
+      };
+    });
+    $$('[data-stop-bot]').forEach(btn => {
+      btn.onclick = async () => {
+        try {
+          btn.disabled = true;
+          btn.textContent = 'Menghentikan...';
+          await api(`/api/admin/reseller-bots/${btn.dataset.stopBot}/stop`, { method: 'POST', body: {} });
+          toast('Bot berhasil dihentikan');
+          await renderResellerTabContent();
+        } catch (e) {
+          toast(e.message, true);
+        } finally {
+          btn.disabled = false;
+        }
+      };
+    });
+    $$('[data-restart-bot]').forEach(btn => {
+      btn.onclick = async () => {
+        try {
+          btn.disabled = true;
+          btn.textContent = 'Restarting...';
+          await api(`/api/admin/reseller-bots/${btn.dataset.restartBot}/restart`, { method: 'POST', body: {} });
+          toast('Bot berhasil direstart');
+          await renderResellerTabContent();
+        } catch (e) {
+          toast(e.message, true);
+        } finally {
+          btn.disabled = false;
+        }
+      };
+    });
+    $$('[data-branding-bot]').forEach(btn => {
+      btn.onclick = () => {
+        const item = bots.find(x => String(x.id) === btn.dataset.brandingBot);
+        if (item) openResellerBotBrandingModal(item);
+      };
+    });
+    $$('[data-edit-bot]').forEach(btn => {
+      btn.onclick = () => {
+        const item = bots.find(x => String(x.id) === btn.dataset.editBot);
+        if (item) openResellerBotModal(item);
+      };
+    });
+    $$('[data-delete-bot]').forEach(btn => {
+      btn.onclick = async () => {
+        if (!confirm('Hapus bot ini? Bot akan dihentikan dari sistem.')) return;
+        try {
+          await api(`/api/admin/reseller-bots/${btn.dataset.deleteBot}`, { method: 'DELETE' });
+          toast('Bot berhasil dihapus');
+          await renderResellerTabContent();
+        } catch (e) {
+          toast(e.message, true);
+        }
+      };
+    });
+  };
+
+  $('#botSearch').oninput = filter;
+  $('#botResellerFilter').onchange = filter;
+  $('#botStatusFilter').onchange = filter;
+  filter();
+}
+
+// ---------------- TAB 3: PENARIKAN SALDO (WITHDRAWALS) ----------------
+async function renderResellerWithdrawalsList(host) {
+  const res = await api('/api/admin/reseller-withdrawals?limit=300').catch(() => ({ items: [] }));
+  const items = res.items || [];
+
+  host.innerHTML = `
+    <div class="toolbar product-toolbar" style="margin-bottom:14px;">
+      <select id="withdrawalStatusFilter">
+        <option value="">Semua Status</option>
+        <option value="pending" selected>Menunggu Approval (Pending)</option>
+        <option value="approved">Disetujui (Approved)</option>
+        <option value="rejected">Ditolak (Rejected)</option>
+      </select>
+      <button id="addManualWdBtn" class="neo-btn purple">＋ Buat Pengajuan Manual</button>
+    </div>
+    <div id="withdrawalsGrid" class="withdrawal-grid"></div>
+  `;
+
+  $('#addManualWdBtn').onclick = () => openManualWithdrawalModal();
+
+  const filter = () => {
+    const st = String($('#withdrawalStatusFilter')?.value || '').trim();
+    const filtered = items.filter(w => !st || w.status === st);
+    const grid = $('#withdrawalsGrid');
+    if (!grid) return;
+    if (!filtered.length) {
+      grid.innerHTML = '<div class="empty-product"><h3>Tidak ada data penarikan</h3><p>Belum ada pengajuan pencairan saldo profit pada filter ini.</p></div>';
+      return;
+    }
+
+    grid.innerHTML = filtered.map(w => {
+      return `
+        <article class="withdrawal-card">
+          <div class="withdrawal-card-head">
+            <div>
+              <h3>Ref: <code>${esc(w.withdrawal_ref)}</code> · ${money(w.amount)}</h3>
+              <p style="margin:3px 0;font-size:11px;color:var(--muted)">
+                Reseller: <b>${esc(w.reseller_name || `ID #${w.reseller_id}`)}</b> ${w.reseller_username ? `(@${esc(w.reseller_username)})` : ''} · 
+                Diajukan: ${date(w.created_at)}
+              </p>
+            </div>
+            <div>${badge(w.status)}</div>
+          </div>
+          <div class="withdrawal-meta">
+            <div>
+              <small>🏦 Bank / E-Wallet</small>
+              <strong>${esc(w.bank_name)}</strong>
+            </div>
+            <div>
+              <small>💳 Nomor Rekening</small>
+              <strong class="mono">${esc(w.account_number)}</strong>
+            </div>
+            <div>
+              <small>👤 Atas Nama</small>
+              <strong>${esc(w.account_name)}</strong>
+            </div>
+            <div>
+              <small>💰 Saldo Reseller Saat Ini</small>
+              <strong>${money(w.profit_balance)}</strong>
+            </div>
+          </div>
+          ${w.proof_image ? `<div style="font-size:11px;"><b>Bukti Transfer:</b> <a href="${esc(mediaSrc(w.proof_image))}" target="_blank" style="color:var(--purple);font-weight:900">Lihat Gambar Struk</a></div>` : ''}
+          ${w.admin_note ? `<div style="font-size:10px;background:#fffde6;border:1px solid #ebdf8c;padding:6px 10px;border-radius:8px"><b>Catatan Admin:</b> ${esc(w.admin_note)}</div>` : ''}
+          ${w.status === 'pending' ? `
+            <div class="withdrawal-actions">
+              <button class="neo-btn green small" data-approve-wd="${w.id}">✅ Setujui & Transfer</button>
+              <button class="neo-btn red small" data-reject-wd="${w.id}">❌ Tolak Pengajuan</button>
+            </div>
+          ` : ''}
+        </article>
+      `;
+    }).join('');
+
+    $$('[data-approve-wd]').forEach(b => {
+      b.onclick = () => {
+        const item = items.find(x => String(x.id) === b.dataset.approveWd);
+        if (item) openWithdrawalApproveModal(item);
+      };
+    });
+    $$('[data-reject-wd]').forEach(b => {
+      b.onclick = () => {
+        const item = items.find(x => String(x.id) === b.dataset.rejectWd);
+        if (item) openWithdrawalRejectModal(item);
+      };
+    });
+  };
+
+  $('#withdrawalStatusFilter').onchange = filter;
+  filter();
+}
+
+// ---------------- TAB 4: MUTASI PROFIT (LEDGER) ----------------
+async function renderResellerLedgerList(host) {
+  const res = await api('/api/admin/reseller-profit-ledger?limit=300').catch(() => ({ items: [] }));
+  const items = res.items || [];
+
+  if (!items.length) {
+    host.innerHTML = '<div class="empty-product"><h3>Belum ada mutasi profit</h3><p>Setiap komisi pesanan reseller atau penarikan saldo akan dicatat di sini secara otomatis.</p></div>';
+    return;
+  }
+
+  host.innerHTML = `
+    <div class="ledger-table-wrap">
+      <table class="ledger-table">
+        <thead>
+          <tr>
+            <th>Waktu</th>
+            <th>Reseller</th>
+            <th>Tipe Mutasi</th>
+            <th>Jumlah</th>
+            <th>Saldo Setelahnya</th>
+            <th>Referensi</th>
+            <th>Keterangan</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(l => {
+            const isCredit = l.direction === 'credit';
+            const sign = isCredit ? '+' : '-';
+            const cls = isCredit ? 'ledger-credit' : 'ledger-debit';
+            return `
+              <tr>
+                <td>${date(l.created_at)}</td>
+                <td><b>${esc(l.reseller_name || `ID #${l.reseller_id}`)}</b></td>
+                <td>${isCredit ? '<span class="badge ok">Komisi Masuk</span>' : '<span class="badge bad">Penarikan</span>'}</td>
+                <td class="${cls}">${sign}${money(l.amount)}</td>
+                <td><b>${money(l.balance_after)}</b></td>
+                <td><code class="mono">${esc(l.order_ref || '-')}</code></td>
+                <td><small>${esc(l.reason || '-')}${l.bot_username ? ` · @${esc(l.bot_username)}` : ''}</small></td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ==========================================
+// RESELLER MODALS & FORMS
+// ==========================================
+
+function openResellerModal(item = {}) {
+  const edit = !!item.id;
+  const html = `
+    <div class="form-grid">
+      <label>Nama Reseller
+        <input name="name" required value="${esc(item.name || '')}" placeholder="Contoh: Budi Santoso">
+      </label>
+      <label>Telegram ID (Wajib untuk Notifikasi Komisi)
+        <input name="telegram_id" required value="${esc(item.telegram_id || '')}" placeholder="Contoh: 123456789">
+        <small>ID numerik akun Telegram reseller (dapat diperoleh via @userinfobot).</small>
+      </label>
+      <label>Username Telegram
+        <input name="username" value="${esc(item.username || '')}" placeholder="tanpa @ (contoh: budistore)">
+      </label>
+      <label>Nomor HP / WhatsApp
+        <input name="phone" value="${esc(item.phone || '')}" placeholder="08xxxxxxxxxx">
+      </label>
+      <label>Mode Markup Harga
+        <select name="markup_mode">
+          <option value="fixed" ${item.markup_mode !== 'percent' ? 'selected' : ''}>Fixed (Nominal Rp per item)</option>
+          <option value="percent" ${item.markup_mode === 'percent' ? 'selected' : ''}>Percent (Persen % dari harga dasar)</option>
+        </select>
+      </label>
+      <label>Nilai Markup
+        <input name="markup_value" type="number" min="0" value="${Number(item.markup_value || 0)}" required>
+        <small>Contoh: 5000 (jika fixed) atau 10 (jika 10%).</small>
+      </label>
+      <label>Status Kemitraan
+        <select name="status">
+          <option value="active" ${item.status !== 'inactive' ? 'selected' : ''}>Aktif</option>
+          <option value="inactive" ${item.status === 'inactive' ? 'selected' : ''}>Nonaktif</option>
+        </select>
+      </label>
+      <label class="full" style="font-weight:900;border-bottom:2px dashed var(--ink);padding-bottom:4px;margin-top:8px">
+        Informasi Rekening / Pencairan Dana Reseller
+      </label>
+      <label>Nama Bank / E-Wallet
+        <input name="bank_name" value="${esc(item.bank_name || '')}" placeholder="BCA / Mandiri / DANA / GoPay">
+      </label>
+      <label>Nomor Rekening
+        <input name="bank_account_number" value="${esc(item.bank_account_number || '')}" placeholder="1234567890">
+      </label>
+      <label>Atas Nama Rekening
+        <input name="bank_account_name" value="${esc(item.bank_account_name || '')}" placeholder="Nama Pemilik Rekening">
+      </label>
+      <label class="full">Catatan Internal
+        <textarea name="notes" rows="3" placeholder="Catatan khusus untuk reseller ini...">${esc(item.notes || '')}</textarea>
+      </label>
+    </div>
+  `;
+
+  modal(edit ? 'Edit Data Reseller' : 'Tambah Reseller Baru', html, async b => {
+    b.markup_value = Number(b.markup_value || 0);
+    b.telegram_id = String(b.telegram_id || '').trim();
+    b.username = String(b.username || '').replace(/^@/, '').trim();
+    await api(edit ? `/api/admin/resellers/${item.id}` : '/api/admin/resellers', {
+      method: edit ? 'PATCH' : 'POST',
+      body: b
+    });
+    toast(edit ? 'Data reseller diperbarui' : 'Reseller baru berhasil dibuat');
+    await loadResellers();
+  }, { submit: edit ? 'Simpan Perubahan' : '＋ Daftarkan Reseller' });
+}
+
+function openResellerBotModal(bot = {}, defaultResellerId = null) {
+  const edit = !!bot.id;
+  const resellers = state.cache.resellers || [];
+  const selectedResId = bot.reseller_id || defaultResellerId || (resellers[0]?.id || '');
+
+  const html = `
+    <div class="form-grid">
+      <label class="full">Reseller Pemilik Bot
+        <select name="reseller_id" id="botModalReseller" required>
+          ${resellers.map(r => `<option value="${r.id}" ${String(r.id) === String(selectedResId) ? 'selected' : ''}>${esc(r.name)} (@${esc(r.username || '-')})</option>`).join('')}
+        </select>
+      </label>
+      <label class="full">Bot Token (dari @BotFather)
+        <div style="display:flex;gap:8px;">
+          <input name="bot_token" id="botModalToken" required value="${esc(bot.bot_token || '')}" placeholder="123456789:ABCdefGHIjklMNOpqrSTUvwxYZ" style="flex:1">
+          <button type="button" id="btnVerifyToken" class="neo-btn blue small" style="white-space:nowrap">🔍 Verifikasi Token</button>
+        </div>
+        <small id="tokenVerifyStatus" style="font-weight:900;margin-top:5px;display:block"></small>
+      </label>
+      <label>Nama Bot
+        <input name="bot_name" id="botModalName" required value="${esc(bot.bot_name || '')}" placeholder="Nama Bot">
+      </label>
+      <label>Username Bot
+        <input name="bot_username" id="botModalUsername" required value="${esc(bot.bot_username || '')}" placeholder="usernamebot (tanpa @)">
+      </label>
+      <label>Nama Toko Bot (Tampil di Katalog)
+        <input name="store_name" id="botModalStoreName" value="${esc(bot.store_name || '')}" placeholder="Contoh: Toko Keren Store">
+      </label>
+      <label>Status Bot
+        <select name="status">
+          <option value="active" ${bot.status !== 'inactive' ? 'selected' : ''}>Aktif (Langsung Online)</option>
+          <option value="inactive" ${bot.status === 'inactive' ? 'selected' : ''}>Nonaktif (Offline)</option>
+        </select>
+      </label>
+    </div>
+  `;
+
+  modal(edit ? 'Edit Token Bot Reseller' : 'Pasang Bot Reseller Baru', html, async b => {
+    b.bot_username = String(b.bot_username || '').replace(/^@/, '').trim();
+    b.bot_token = String(b.bot_token || '').trim();
+    b.reseller_id = Number(b.reseller_id || selectedResId);
+    if (!b.store_name) b.store_name = b.bot_name;
+
+    await api(edit ? `/api/admin/reseller-bots/${bot.id}` : '/api/admin/reseller-bots', {
+      method: edit ? 'PATCH' : 'POST',
+      body: b
+    });
+    toast(edit ? 'Token bot diperbarui' : 'Bot reseller berhasil didaftarkan dan dijalankan');
+    await loadResellers();
+  }, { submit: edit ? 'Simpan Perubahan' : '＋ Jalankan Bot' });
+
+  const verifyBtn = $('#btnVerifyToken');
+  const tokenInput = $('#botModalToken');
+  const statusEl = $('#tokenVerifyStatus');
+  if (verifyBtn && tokenInput) {
+    verifyBtn.onclick = async () => {
+      const token = tokenInput.value.trim();
+      if (!token) return toast('Masukkan token terlebih dahulu', true);
+      try {
+        verifyBtn.disabled = true;
+        verifyBtn.textContent = 'Mengecek...';
+        statusEl.textContent = 'Menghubungkan ke Telegram...';
+        statusEl.style.color = '#555';
+        const r = await api('/api/admin/reseller-bots/verify-token', { method: 'POST', body: { bot_token: token } });
+        if (r.ok && r.bot) {
+          statusEl.textContent = `✅ Token Valid! @${r.bot.username} (${r.bot.first_name || 'Bot'})`;
+          statusEl.style.color = '#15803d';
+          if (!$('#botModalUsername').value) $('#botModalUsername').value = r.bot.username || '';
+          if (!$('#botModalName').value) $('#botModalName').value = r.bot.first_name || '';
+          if (!$('#botModalStoreName').value) $('#botModalStoreName').value = r.bot.first_name || '';
+          toast('Token bot valid!');
+        }
+      } catch (err) {
+        statusEl.textContent = `❌ ${err.message || 'Token tidak valid'}`;
+        statusEl.style.color = '#b91c1c';
+        toast(err.message, true);
+      } finally {
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = '🔍 Verifikasi Token';
+      }
+    };
+  }
+}
+
+function openResellerBotBrandingModal(bot) {
+  const html = `
+    <div class="form-grid">
+      <label>Nama Toko Bot
+        <input name="store_name" required value="${esc(bot.store_name || '')}" placeholder="Nama Toko">
+      </label>
+      <label>Tagline Toko
+        <input name="store_tagline" value="${esc(bot.store_tagline || '')}" placeholder="Digital Store & TopUp">
+      </label>
+      <label class="full">Foto Header / Banner Sambutan
+        <div style="display:flex;gap:8px;margin-bottom:6px">
+          <input name="start_photo_url" id="botBannerInput" value="${esc(bot.start_photo_url || '')}" placeholder="vps:// atau URL https://..." style="flex:1">
+          <button type="button" id="btnUploadBotBanner" class="neo-btn blue small" style="white-space:nowrap">Upload Banner</button>
+        </div>
+        <input type="file" id="botBannerFile" accept="image/*" style="display:none">
+        <small>Foto akan tampil di bagian atas menu /start bot.</small>
+      </label>
+      <label class="full">Pesan Teks /start Sambutan
+        <textarea name="start_message" rows="5" placeholder="Gunakan {store_name}, {first_name}, {username}">${esc(bot.start_message || '')}</textarea>
+        <small>Kosongkan untuk menggunakan format sambutan standar iLink.</small>
+      </label>
+      <label>Kontak Admin / Customer Service Toko
+        <input name="support_contact" value="${esc(bot.support_contact || '')}" placeholder="@AdminSupport / https://t.me/...">
+      </label>
+      <label>Link Channel Telegram Toko
+        <input name="channel_url" value="${esc(bot.channel_url || '')}" placeholder="https://t.me/channelku">
+      </label>
+      <label class="full">Link Grup Komunitas / Diskusi Toko
+        <input name="group_url" value="${esc(bot.group_url || '')}" placeholder="https://t.me/grupdiskusi">
+      </label>
+    </div>
+  `;
+
+  modal(`🎨 Branding Toko · @${bot.bot_username}`, html, async b => {
+    await api(`/api/admin/reseller-bots/${bot.id}`, { method: 'PATCH', body: b });
+    toast('Branding bot berhasil diperbarui');
+    await loadResellers();
+  }, { submit: 'Simpan Branding' });
+
+  const uploadBtn = $('#btnUploadBotBanner');
+  const fileInput = $('#botBannerFile');
+  const bannerInput = $('#botBannerInput');
+  if (uploadBtn && fileInput && bannerInput) {
+    uploadBtn.onclick = () => fileInput.click();
+    fileInput.onchange = async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      try {
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = 'Uploading...';
+        const r = await uploadMedia(file, 'banner');
+        bannerInput.value = r.item.key;
+        toast('Banner berhasil diupload ke VPS!');
+      } catch (e) {
+        toast(e.message, true);
+      } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = 'Upload Banner';
+      }
+    };
+  }
+}
+
+function openWithdrawalApproveModal(w) {
+  const html = `
+    <div style="background:#f4edff;border:2px solid var(--ink);border-radius:12px;padding:12px;margin-bottom:14px">
+      <b>Detail Transfer Penarikan:</b><br>
+      Nomor Ref: <code>${esc(w.withdrawal_ref)}</code><br>
+      Reseller: <b>${esc(w.reseller_name)}</b><br>
+      Jumlah Transfer: <b style="font-size:16px;color:#15803d">${money(w.amount)}</b><br>
+      Tujuan: <b>${esc(w.bank_name)}</b> - <code>${esc(w.account_number)}</code> a.n. <b>${esc(w.account_name)}</b>
+    </div>
+    <div class="form-grid">
+      <label class="full">Bukti Transfer (Upload atau URL Gambar)
+        <div style="display:flex;gap:8px;margin-bottom:6px">
+          <input name="proof_image" id="wdProofInput" placeholder="vps:// atau URL bukti transfer" style="flex:1">
+          <button type="button" id="btnUploadWdProof" class="neo-btn blue small" style="white-space:nowrap">Upload Struk</button>
+        </div>
+        <input type="file" id="wdProofFile" accept="image/*" style="display:none">
+      </label>
+      <label class="full">Catatan untuk Reseller
+        <textarea name="admin_note" rows="3" placeholder="Contoh: Transfer m-banking BCA berhasil. Terima kasih!"></textarea>
+      </label>
+    </div>
+    <p class="muted" style="font-size:10px;margin-top:8px">
+      Saat disetujui, saldo profit reseller otomatis terpotong dan notifikasi struk akan dikirim ke Telegram reseller.
+    </p>
+  `;
+
+  modal(`✅ Setujui Penarikan · ${w.withdrawal_ref}`, html, async b => {
+    await api(`/api/admin/reseller-withdrawals/${w.id}/approve`, {
+      method: 'POST',
+      body: {
+        proof_image: b.proof_image || '',
+        admin_note: b.admin_note || ''
+      }
+    });
+    toast('Penarikan saldo disetujui & notifikasi terkirim!');
+    await loadResellers();
+  }, { submit: '✅ Konfirmasi Telah Ditransfer' });
+
+  const uploadBtn = $('#btnUploadWdProof');
+  const fileInput = $('#wdProofFile');
+  const proofInput = $('#wdProofInput');
+  if (uploadBtn && fileInput && proofInput) {
+    uploadBtn.onclick = () => fileInput.click();
+    fileInput.onchange = async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      try {
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = 'Uploading...';
+        const r = await uploadMedia(file, 'proof');
+        proofInput.value = r.item.key;
+        toast('Struk berhasil diupload!');
+      } catch (e) {
+        toast(e.message, true);
+      } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = 'Upload Struk';
+      }
+    };
+  }
+}
+
+function openWithdrawalRejectModal(w) {
+  const html = `
+    <div style="background:#fff2f2;border:2px solid #b91c1c;border-radius:12px;padding:12px;margin-bottom:14px">
+      <b>Tolak Permintaan Penarikan:</b><br>
+      Nomor Ref: <code>${esc(w.withdrawal_ref)}</code><br>
+      Jumlah: <b>${money(w.amount)}</b> untuk <b>${esc(w.reseller_name)}</b>
+    </div>
+    <div class="form-grid">
+      <label class="full">Alasan Penolakan
+        <textarea name="admin_note" required rows="4" placeholder="Jelaskan alasan penolakan (misal: Rekening salah, nama bank tidak cocok, dsb)..."></textarea>
+      </label>
+    </div>
+    <p class="muted" style="font-size:10px;margin-top:8px">
+      Saldo profit reseller tidak akan berkurang dan alasan penolakan akan dikirimkan ke Telegram reseller.
+    </p>
+  `;
+
+  modal(`❌ Tolak Penarikan · ${w.withdrawal_ref}`, html, async b => {
+    await api(`/api/admin/reseller-withdrawals/${w.id}/reject`, {
+      method: 'POST',
+      body: { admin_note: b.admin_note || '' }
+    });
+    toast('Pengajuan penarikan ditolak');
+    await loadResellers();
+  }, { submit: '❌ Tolak Pengajuan' });
+}
+
+function openManualWithdrawalModal(defaultResellerId = null) {
+  const resellers = state.cache.resellers || [];
+  if (!resellers.length) return toast('Belum ada data reseller', true);
+  const selectedRes = resellers.find(r => String(r.id) === String(defaultResellerId)) || resellers[0];
+
+  const html = `
+    <div class="form-grid">
+      <label class="full">Pilih Reseller
+        <select name="reseller_id" id="manualWdReseller" required>
+          ${resellers.map(r => `<option value="${r.id}" ${String(r.id) === String(selectedRes.id) ? 'selected' : ''}>${esc(r.name)} · Saldo: ${money(r.profit_balance)}</option>`).join('')}
+        </select>
+      </label>
+      <label>Jumlah Penarikan (Rp)
+        <input name="amount" id="manualWdAmount" type="number" min="10000" step="1000" required placeholder="Minimal 10000">
+      </label>
+      <label>Nama Bank / E-Wallet
+        <input name="bank_name" id="manualWdBank" required value="${esc(selectedRes.bank_name || '')}" placeholder="BCA / DANA">
+      </label>
+      <label>Nomor Rekening
+        <input name="account_number" id="manualWdAccNo" required value="${esc(selectedRes.bank_account_number || '')}" placeholder="1234567890">
+      </label>
+      <label>Atas Nama Rekening
+        <input name="account_name" id="manualWdAccName" required value="${esc(selectedRes.bank_account_name || '')}" placeholder="Nama Penerima">
+      </label>
+      <label class="full">Catatan Tambahan
+        <textarea name="admin_note" rows="2" placeholder="Catatan internal..."></textarea>
+      </label>
+    </div>
+  `;
+
+  modal('＋ Buat Pengajuan Penarikan Saldo', html, async b => {
+    b.reseller_id = Number(b.reseller_id);
+    b.amount = Number(b.amount || 0);
+    await api('/api/admin/reseller-withdrawals', { method: 'POST', body: b });
+    toast('Pengajuan penarikan dibuat (status pending)');
+    await loadResellers();
+  }, { submit: 'Buat Pengajuan' });
+
+  const resSelect = $('#manualWdReseller');
+  if (resSelect) {
+    resSelect.onchange = () => {
+      const cur = resellers.find(r => String(r.id) === resSelect.value);
+      if (cur) {
+        if ($('#manualWdBank')) $('#manualWdBank').value = cur.bank_name || '';
+        if ($('#manualWdAccNo')) $('#manualWdAccNo').value = cur.bank_account_number || '';
+        if ($('#manualWdAccName')) $('#manualWdAccName').value = cur.bank_account_name || '';
+      }
+    };
+  }
+}
+
 async function remove(path,msg,reload){if(!confirm(msg))return;try{await api(path,{method:'DELETE'});toast('Berhasil dihapus');await reload()}catch(e){toast(e.message,true)}}
 (async()=>{if(!state.token)return showLogin();try{await initialize()}catch{logout(false)}})();

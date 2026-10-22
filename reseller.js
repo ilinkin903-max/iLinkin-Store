@@ -17,6 +17,7 @@ const titles = {
   dashboard: ['Dashboard', 'Ringkasan performa toko dan komisi profit Anda'],
   bot: ['Bot Toko', 'Kelola token bot, nama toko, banner, dan pengaturan layanan'],
   pricing: ['Katalog & Margin Varian', 'Sesuaikan keuntungan harga jual per produk dan per varian'],
+  broadcast: ['Broadcast Pelanggan', 'Kirim pesan massal promosi, info diskon, atau pengumuman ke pembeli bot Anda'],
   withdraw: ['Tarik Saldo', 'Pencairan saldo komisi profit ke rekening bank atau e-wallet'],
   orders: ['Pesanan Pembeli', 'Daftar riwayat transaksi pembeli yang masuk melalui bot Anda']
 };
@@ -130,11 +131,13 @@ async function api(path, options = {}) {
   }
   const ct = res.headers.get('content-type') || '';
   const data = ct.includes('json') ? await res.json() : { ok: res.ok, message: await res.text() };
-  if (res.status === 401) {
+  if (res.status === 401 || (res.status === 403 && (data.error === 'RESELLER_INACTIVE' || data.error === 'UNAUTHORIZED' || String(data.message || '').includes('tidak ditemukan') || String(data.message || '').includes('belum aktif')))) {
     sessionStorage.removeItem('ilink_reseller_token');
     localStorage.removeItem('ilink_reseller_token');
     state.token = '';
-    throw new Error('Sesi kedaluwarsa. Silakan buka kembali dari bot Telegram.');
+    if (res.status === 401) {
+      throw new Error('Sesi kedaluwarsa. Silakan buka kembali dari bot Telegram.');
+    }
   }
   if (!res.ok || data.ok === false) {
     throw new Error(data.message || data.error || `HTTP ${res.status}`);
@@ -212,6 +215,10 @@ function updateShellUI() {
 }
 
 async function navigate(view, silent = false) {
+  if (state.broadcastPollTimer) {
+    clearInterval(state.broadcastPollTimer);
+    state.broadcastPollTimer = null;
+  }
   state.view = view;
   setHeader(view);
   if (!silent) {
@@ -222,6 +229,7 @@ async function navigate(view, silent = false) {
       dashboard: loadDashboard,
       bot: loadBot,
       pricing: loadPricing,
+      broadcast: loadBroadcast,
       withdraw: loadWithdraw,
       orders: loadOrders
     }[view] || loadDashboard)();
@@ -1079,6 +1087,351 @@ function renderOrdersView(filterStatus = '', search = '') {
 }
 
 // ---------------------------------------------------------------------
+// VIEW 6: BROADCAST (Reseller Broadcast to Bot Customers)
+// ---------------------------------------------------------------------
+async function loadBroadcast() {
+  if (state.broadcastPollTimer) {
+    clearInterval(state.broadcastPollTimer);
+    state.broadcastPollTimer = null;
+  }
+
+  const data = await api('/api/reseller/broadcasts?limit=50').catch(() => ({ items: [], total_users: 0, active_job: null, bot_username: '' }));
+  const activeJob = data.active_job;
+  const totalUsers = data.total_users || 0;
+  const botUsername = data.bot_username || state.bot?.bot_username || '';
+
+  const renderActiveCard = (j) => {
+    if (!j || j.status === 'completed') return '';
+    const pct = j.total ? Math.min(100, Math.round(((j.sent + j.failed) / j.total) * 100)) : 0;
+    return `
+      <div class="broadcast-monitor-card" id="rbcMonitor">
+        <div class="broadcast-monitor-head">
+          <div>
+            <b>📡 Broadcast Sedang Dikirim...</b>
+            <small>Job: <code>${esc(j.id)}</code></small>
+          </div>
+          ${badge(j.status || 'running')}
+        </div>
+        <div class="broadcast-monitor-stats">
+          <div class="broadcast-monitor-stat"><small>Target</small><b>${j.total || 0}</b></div>
+          <div class="broadcast-monitor-stat ok"><small>Terkirim</small><b>${j.sent || 0}</b></div>
+          <div class="broadcast-monitor-stat bad"><small>Gagal</small><b>${j.failed || 0}</b></div>
+        </div>
+        <div class="broadcast-progress-bar"><div class="broadcast-progress-fill" style="width:${pct}%"></div></div>
+      </div>
+    `;
+  };
+
+  const renderLogCard = (x) => {
+    const btnInfo = x.button_text
+      ? `<div class="log-button-info">🔘 <b>${esc(x.button_text)}</b> ${x.button_action === 'url' ? `(${esc(x.button_url || '-')})` : '(Aksi: /start)'}</div>`
+      : '';
+    return `
+      <article class="broadcast-log-card">
+        <div>
+          <b>${esc(x.type === 'photo' ? '📷 Foto + Teks' : '📝 Teks')}</b>
+          <small>${date(x.created_at)}</small>
+        </div>
+        <p>${esc(x.message || '-').slice(0, 200)}</p>
+        ${btnInfo}
+        <div>
+          <span>Target <b>${x.total}</b></span>
+          <span style="color:#15803d;background:#ecfdf5">Terkirim <b>${x.sent}</b></span>
+          <span style="color:#b91c1c;background:#fef2f2">Gagal <b>${x.failed}</b></span>
+        </div>
+      </article>
+    `;
+  };
+
+  $('#content').innerHTML = `
+    <div class="broadcast-page">
+      <div class="section-title product-section-title">
+        <div>
+          <h2>📢 Broadcast Pelanggan Toko</h2>
+          <p>Kirim pesan massal, info produk baru, atau promo diskon ke semua pengguna bot Anda.</p>
+        </div>
+        <span>
+          <span class="badge ok">👥 ${totalUsers} Pelanggan Bot</span>
+        </span>
+      </div>
+
+      <div id="rbcMonitorWrap">${renderActiveCard(activeJob)}</div>
+
+      <section class="settings-section">
+        <div class="section-head">
+          <div>
+            <h3>✍️ Tulis Pesan Broadcast</h3>
+            <p>Pesan akan dikirim otomatis oleh bot toko Anda ${botUsername ? `(@${esc(botUsername)})` : ''} ke seluruh pengguna.</p>
+          </div>
+        </div>
+        <div class="broadcast-compose">
+          <form id="rbcForm" class="form-grid">
+            <label>Tipe Broadcast
+              <select name="type" id="rbcType">
+                <option value="text">Teks Saja</option>
+                <option value="photo">Foto + Teks Caption</option>
+              </select>
+            </label>
+
+            <label id="rbcMediaWrap" class="full hidden">Tautan Gambar / URL Foto
+              <input type="url" name="media_url" id="rbcMediaUrl" placeholder="https://... atau direct link foto" />
+              <small>Gunakan tautan gambar langsung (JPG, PNG, atau WEBP).</small>
+            </label>
+
+            <label class="full">Isi Pesan / Caption
+              <textarea name="message" id="rbcMessage" rows="6" placeholder="Ketik pesan broadcast Anda di sini..."></textarea>
+              <small>Mendukung format HTML: <code>&lt;b&gt;tebal&lt;/b&gt;</code>, <code>&lt;i&gt;miring&lt;/i&gt;</code>, <code>&lt;code&gt;kode&lt;/code&gt;</code>, <code>&lt;a href="..."&gt;link&lt;/a&gt;</code></small>
+            </label>
+
+            <div class="full broadcast-button-card">
+              <div class="broadcast-button-head">
+                <label class="inline-checkbox">
+                  <input type="checkbox" id="rbcBtnToggle" name="button_enabled" />
+                  <b>🔘 Sertakan Tombol Interaktif di Bawah Pesan</b>
+                </label>
+              </div>
+              <div id="rbcBtnFields" class="form-grid hidden" style="margin-top:10px">
+                <label>Aksi Tombol
+                  <select id="rbcBtnAction" name="button_type">
+                    <option value="start">🚀 Buka Menu Toko (/start)</option>
+                    <option value="url">🔗 Buka Tautan Link (URL)</option>
+                  </select>
+                </label>
+                <label>Label Tombol
+                  <input type="text" id="rbcBtnText" name="button_text" value="🚀 Mulai Belanja" placeholder="Contoh: Mulai Belanja, Cek Promo..." />
+                </label>
+                <label id="rbcBtnUrlWrap" class="full hidden">URL Tujuan
+                  <input type="url" id="rbcBtnUrl" name="button_url" placeholder="https://t.me/... atau https://..." />
+                </label>
+              </div>
+            </div>
+
+            <div class="full form-actions" style="display:flex;gap:10px;flex-wrap:wrap">
+              <button type="button" class="neo-btn blue" id="rbcTestBtn">🧪 Uji Coba (Kirim ke Saya)</button>
+              <button type="submit" class="neo-btn purple" id="rbcSubmitBtn">📢 Kirim ke ${totalUsers} Pelanggan</button>
+            </div>
+          </form>
+
+          <div>
+            <h4>Pratinjau Pesan Telegram</h4>
+            <div id="rbcPreview" class="broadcast-preview">
+              <div class="broadcast-preview-text" id="rbcPreviewText">Pesan broadcast akan tampil di sini.</div>
+              <div class="broadcast-preview-btn-wrap hidden" id="rbcPreviewBtnWrap">
+                <button type="button" class="telegram-preview-button" id="rbcPreviewBtn">🚀 Mulai Belanja</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <div class="section-head">
+          <div>
+            <h3>🧾 Riwayat Broadcast Bot Anda</h3>
+            <p>Daftar pengiriman pesan massal sebelumnya beserta status terkirim dan gagal.</p>
+          </div>
+          <button type="button" class="neo-btn white small" id="rbcRefreshLogs">↻ Refresh</button>
+        </div>
+        <div class="broadcast-log-list" id="rbcLogList">
+          ${(data.items || []).length ? data.items.map(renderLogCard).join('') : '<div class="empty compact">Belum ada riwayat broadcast.</div>'}
+        </div>
+      </section>
+    </div>
+  `;
+
+  // UI Interactive Handlers
+  const syncPreview = () => {
+    const msg = $('#rbcMessage')?.value || '';
+    if ($('#rbcPreviewText')) {
+      $('#rbcPreviewText').textContent = msg || 'Pesan broadcast akan tampil di sini.';
+    }
+    const btnOn = $('#rbcBtnToggle')?.checked;
+    $('#rbcPreviewBtnWrap')?.classList.toggle('hidden', !btnOn);
+    if (btnOn && $('#rbcPreviewBtn')) {
+      $('#rbcPreviewBtn').textContent = $('#rbcBtnText')?.value || '🚀 Tombol';
+    }
+  };
+
+  $('#rbcType').onchange = () => {
+    const isPhoto = $('#rbcType').value === 'photo';
+    $('#rbcMediaWrap').classList.toggle('hidden', !isPhoto);
+  };
+
+  $('#rbcMessage').oninput = syncPreview;
+  $('#rbcBtnText').oninput = syncPreview;
+
+  $('#rbcBtnToggle').onchange = () => {
+    const on = $('#rbcBtnToggle').checked;
+    $('#rbcBtnFields').classList.toggle('hidden', !on);
+    syncPreview();
+  };
+
+  $('#rbcBtnAction').onchange = () => {
+    const isUrl = $('#rbcBtnAction').value === 'url';
+    $('#rbcBtnUrlWrap').classList.toggle('hidden', !isUrl);
+    if (isUrl && !$('#rbcBtnText').value.trim()) $('#rbcBtnText').value = '🔗 Buka Link';
+    else if (!isUrl && !$('#rbcBtnText').value.trim()) $('#rbcBtnText').value = '🚀 Mulai Belanja';
+    syncPreview();
+  };
+
+  if ($('#rbcRefreshLogs')) $('#rbcRefreshLogs').onclick = loadBroadcast;
+
+  const startPollingJob = (jobId) => {
+    if (state.broadcastPollTimer) clearInterval(state.broadcastPollTimer);
+    state.broadcastPollTimer = setInterval(async () => {
+      try {
+        const st = await api(`/api/reseller/broadcast/status?id=${encodeURIComponent(jobId)}`);
+        const j = st.job;
+        if (!j) return;
+        const wrap = $('#rbcMonitorWrap');
+        if (wrap) wrap.innerHTML = renderActiveCard(j);
+        if (j.status === 'completed' || j.status === 'failed') {
+          clearInterval(state.broadcastPollTimer);
+          state.broadcastPollTimer = null;
+          toast(j.status === 'completed' ? `Broadcast selesai: ${j.sent || 0} terkirim, ${j.failed || 0} gagal` : `Broadcast gagal: ${j.error || 'Terjadi kesalahan'}`);
+          const refreshed = await api('/api/reseller/broadcasts?limit=50').catch(() => null);
+          if (refreshed && $('#rbcLogList')) {
+            $('#rbcLogList').innerHTML = (refreshed.items || []).length ? refreshed.items.map(renderLogCard).join('') : '<div class="empty compact">Belum ada riwayat broadcast.</div>';
+          }
+        }
+      } catch {
+        clearInterval(state.broadcastPollTimer);
+        state.broadcastPollTimer = null;
+      }
+    }, 1500);
+  };
+
+  if (activeJob && activeJob.status === 'running') {
+    startPollingJob(activeJob.id);
+  }
+
+  // Test button
+  $('#rbcTestBtn').onclick = async () => {
+    const msg = String($('#rbcMessage').value || '').trim();
+    if (!msg) {
+      toast('Tulis pesan broadcast terlebih dahulu.', true);
+      return;
+    }
+    const type = $('#rbcType').value;
+    const media_url = String($('#rbcMediaUrl')?.value || '').trim();
+    if (type === 'photo' && !media_url) {
+      toast('Tautan URL gambar wajib diisi untuk tipe foto.', true);
+      return;
+    }
+    const btnEnabled = $('#rbcBtnToggle').checked;
+    const btnType = $('#rbcBtnAction').value;
+    const btnText = ($('#rbcBtnText').value || '').trim();
+    const btnUrl = ($('#rbcBtnUrl').value || '').trim();
+
+    if (btnEnabled && !btnText) {
+      toast('Label tombol harus diisi.', true);
+      return;
+    }
+    if (btnEnabled && btnType === 'url' && !btnUrl) {
+      toast('URL tombol harus diisi.', true);
+      return;
+    }
+
+    const payload = {
+      type,
+      message: msg,
+      media_url,
+      button: {
+        enabled: btnEnabled,
+        type: btnType,
+        text: btnText,
+        url: btnUrl
+      }
+    };
+
+    const btn = $('#rbcTestBtn');
+    btn.disabled = true;
+    btn.textContent = 'Mengirim uji coba...';
+    try {
+      const res = await api('/api/reseller/broadcast/test', {
+        method: 'POST',
+        body: payload
+      });
+      toast(res.message || 'Pesan uji coba berhasil dikirim ke Telegram Anda!');
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🧪 Uji Coba (Kirim ke Saya)';
+    }
+  };
+
+  // Submit Broadcast to all customers
+  $('#rbcForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const msg = String($('#rbcMessage').value || '').trim();
+    if (!msg) {
+      toast('Tulis pesan broadcast terlebih dahulu.', true);
+      return;
+    }
+    const type = $('#rbcType').value;
+    const media_url = String($('#rbcMediaUrl')?.value || '').trim();
+    if (type === 'photo' && !media_url) {
+      toast('Tautan URL gambar wajib diisi untuk tipe foto.', true);
+      return;
+    }
+    const btnEnabled = $('#rbcBtnToggle').checked;
+    const btnType = $('#rbcBtnAction').value;
+    const btnText = ($('#rbcBtnText').value || '').trim();
+    const btnUrl = ($('#rbcBtnUrl').value || '').trim();
+
+    if (btnEnabled && !btnText) {
+      toast('Label tombol harus diisi.', true);
+      return;
+    }
+    if (btnEnabled && btnType === 'url' && !btnUrl) {
+      toast('URL tombol harus diisi.', true);
+      return;
+    }
+
+    if (totalUsers <= 0) {
+      toast('Belum ada pelanggan terdaftar di bot toko Anda.', true);
+      return;
+    }
+
+    if (!confirm(`Konfirmasi Kirim Broadcast?\n\nPesan ini akan dikirimkan kepada ${totalUsers} pelanggan bot toko Anda.`)) {
+      return;
+    }
+
+    const payload = {
+      type,
+      message: msg,
+      media_url,
+      button: {
+        enabled: btnEnabled,
+        type: btnType,
+        text: btnText,
+        url: btnUrl
+      }
+    };
+
+    const submitBtn = $('#rbcSubmitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Memulai broadcast...';
+    try {
+      const res = await api('/api/reseller/broadcast', {
+        method: 'POST',
+        body: payload
+      });
+      toast('Broadcast berhasil dimulai!');
+      if (res.job?.id) {
+        startPollingJob(res.job.id);
+      }
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = `📢 Kirim ke ${totalUsers} Pelanggan`;
+    }
+  };
+}
+
+// ---------------------------------------------------------------------
 // INITIALIZATION & TELEGRAM AUTH
 // ---------------------------------------------------------------------
 async function initialize() {
@@ -1092,23 +1445,27 @@ async function initialize() {
     } catch {}
   }
 
-  // Auto-authentication with Telegram initData
-  if (!state.token) {
-    let initData = tg?.initData || '';
-    let tgUser = tg?.initDataUnsafe?.user || null;
+  const p = new URLSearchParams(window.location.search);
+  const paramResellerId = p.get('id') || p.get('reseller_id');
+  const paramTgId = p.get('tg_id');
 
-    if (!initData && !tgUser) {
-      const p = new URLSearchParams(window.location.search);
-      const testId = p.get('id') || p.get('tg_id');
-      if (testId) {
-        tgUser = { id: testId, first_name: p.get('name') || 'Reseller Demo', username: p.get('username') || '' };
-      }
-    }
+  let initData = tg?.initData || '';
+  let tgUser = tg?.initDataUnsafe?.user || null;
 
+  if (!initData && !tgUser && (paramTgId || paramResellerId)) {
+    tgUser = {
+      id: paramTgId || paramResellerId,
+      first_name: p.get('name') || 'Mitra Reseller',
+      username: p.get('username') || ''
+    };
+  }
+
+  // If opened with Telegram credentials, ALWAYS authenticate to get fresh session & profile
+  if (initData || tgUser) {
     try {
       const res = await api('/api/reseller/auth', {
         method: 'POST',
-        body: { initData, telegram_user: tgUser }
+        body: { initData, telegram_user: tgUser, reseller_id: paramResellerId }
       });
       state.token = res.token;
       sessionStorage.setItem('ilink_reseller_token', res.token);
@@ -1118,8 +1475,13 @@ async function initialize() {
       state.runtime = res.runtime;
     } catch (err) {
       console.warn('[reseller:auth_init]', err.message);
+      sessionStorage.removeItem('ilink_reseller_token');
+      localStorage.removeItem('ilink_reseller_token');
+      state.token = '';
       throw err;
     }
+  } else if (!state.token) {
+    throw new Error('Data otentikasi Telegram tidak ditemukan. Silakan buka Dashboard dari bot Telegram Anda.');
   }
 
   updateShellUI();
@@ -1141,7 +1503,7 @@ async function initialize() {
     } else if (msg.includes('belum terdaftar') || msg.includes('bukan mitra')) {
       title = 'Belum Terdaftar Sebagai Reseller';
       icon = '🤝';
-      hint = 'Mini App ini khusus untuk mitra reseller toko. Silakan buka Bot Utama kami untuk mendaftar kemitraan reseller dengan mengirimkan Bot Token Anda.';
+      hint = 'Mini App ini khusus untuk mitra reseller toko. Silakan buka Bot Utama kami untuk mendaftar kemitraan reseller.';
     } else if (msg.includes('ditolak')) {
       title = 'Pendaftaran Belum Disetujui';
       icon = '❌';
@@ -1150,13 +1512,17 @@ async function initialize() {
       title = 'Akun Kemitraan Ditangguhkan';
       icon = '⛔';
       hint = 'Akun kemitraan reseller Anda saat ini ditangguhkan oleh Owner. Silakan hubungi Customer Service.';
+    } else if (msg.includes('tidak ditemukan atau belum aktif')) {
+      title = 'Akun Reseller Belum Aktif';
+      icon = '🤖';
+      hint = 'Akun bot reseller Anda belum terhubung atau belum aktif. Silakan buka bot utama untuk memasukkan token bot Telegram Anda dari @BotFather.';
     }
     $('#content').innerHTML = `
       <div class="empty-product" style="padding:40px 20px;text-align:center">
         <div style="font-size:48px;margin-bottom:14px">${icon}</div>
         <h3 style="font-size:18px;font-weight:800;margin-bottom:8px">${esc(title)}</h3>
         <p style="margin:0 auto 20px;max-width:380px;color:var(--muted);font-size:13px;line-height:1.5">${esc(hint)}</p>
-        <button type="button" class="neo-btn purple" onclick="window.location.reload()">🔄 Coba Lagi</button>
+        <button type="button" class="neo-btn purple" onclick="sessionStorage.removeItem('ilink_reseller_token');localStorage.removeItem('ilink_reseller_token');window.location.reload()">🔄 Coba Lagi</button>
       </div>
     `;
   }

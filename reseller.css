@@ -346,4 +346,26 @@
   box-shadow: 0 0 0 2px rgba(108, 44, 255, 0.2);
 }
 
+.back-modal-btn {
+  background: var(--ink, #111);
+  color: #fff;
+  border: 2px solid var(--ink, #111);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  vertical-align: middle;
+  transition: transform .1s;
+}
+.back-modal-btn:hover {
+  background: #333;
+  transform: translateX(-2px);
+}
+
+
 

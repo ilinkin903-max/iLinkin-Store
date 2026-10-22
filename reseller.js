@@ -131,7 +131,7 @@ function badge(status) {
 function modal(title, html, onSubmit, options = {}) {
   const m = $('#modal'), form = $('#modalForm'), alertBox = $('#modalAlert'), submitBtn = $('#modalSubmit');
   if (!m || !form) return;
-  $('#modalTitle').textContent = title;
+  $('#modalTitle').innerHTML = title;
   $('#modalBody').innerHTML = html;
   if (alertBox) { alertBox.className = 'modal-alert hidden'; alertBox.textContent = ''; }
   submitBtn.textContent = options.submit || 'Simpan';
@@ -145,8 +145,8 @@ function modal(title, html, onSubmit, options = {}) {
     try {
       const fd = new FormData(form);
       const data = Object.fromEntries(fd.entries());
-      await onSubmit(data);
-      m.close();
+      const res = await onSubmit(data);
+      if (res !== false) m.close();
     } catch (err) {
       if (alertBox) {
         alertBox.textContent = err.message || 'Terjadi kesalahan.';
@@ -160,9 +160,16 @@ function modal(title, html, onSubmit, options = {}) {
       submitBtn.textContent = options.submit || 'Simpan';
     }
   };
-  $('#modalClose').onclick = () => m.close();
-  $('#modalCancel').onclick = () => m.close();
-  m.showModal();
+  const handleCancel = () => {
+    if (typeof options.onCancel === 'function') {
+      options.onCancel();
+    } else {
+      m.close();
+    }
+  };
+  $('#modalClose').onclick = handleCancel;
+  $('#modalCancel').onclick = handleCancel;
+  if (!m.open) m.showModal();
 }
 
 async function api(path, options = {}) {
@@ -364,7 +371,8 @@ async function loadDashboard() {
 // ---------------------------------------------------------------------
 // VIEW 2: PENGATURAN (Toko & Bot)
 // ---------------------------------------------------------------------
-async function loadBot() {
+async function loadBot(preserveScroll = false) {
+  const scrollY = preserveScroll ? window.scrollY : 0;
   const data = await api('/api/reseller/me');
   state.reseller = data.reseller;
   state.bot = data.bot || {};
@@ -479,7 +487,7 @@ async function loadBot() {
       state.bot = res.bot;
       state.runtime = res.runtime;
       toast('Pengaturan bot berhasil disimpan & bot aktif!');
-      await loadBot();
+      await loadBot(true);
     } catch (err) {
       toast(err.message, true);
     } finally {
@@ -493,7 +501,7 @@ async function loadBot() {
       try {
         await api('/api/reseller/bot/action', { method: 'POST', body: { action: 'restart' } });
         toast('Bot berhasil di-restart!');
-        await loadBot();
+        await loadBot(true);
       } catch (err) { toast(err.message, true); }
     };
   }
@@ -503,7 +511,7 @@ async function loadBot() {
       try {
         await api('/api/reseller/bot/action', { method: 'POST', body: { action: 'stop' } });
         toast('Bot dihentikan.');
-        await loadBot();
+        await loadBot(true);
       } catch (err) { toast(err.message, true); }
     };
   }
@@ -513,16 +521,21 @@ async function loadBot() {
       try {
         await api('/api/reseller/bot/action', { method: 'POST', body: { action: 'start' } });
         toast('Bot dijalankan!');
-        await loadBot();
+        await loadBot(true);
       } catch (err) { toast(err.message, true); }
     };
+  }
+
+  if (preserveScroll) {
+    window.scrollTo({ top: scrollY, behavior: 'instant' });
   }
 }
 
 // ---------------------------------------------------------------------
 // VIEW 3: KATALOG PRODUK & ATUR MARGIN (Identik dengan Dashboard Owner)
 // ---------------------------------------------------------------------
-async function loadPricing() {
+async function loadPricing(preserveScroll = false, targetKey = null) {
+  const scrollY = preserveScroll ? window.scrollY : 0;
   const [res, freshRes] = await Promise.all([
     api('/api/reseller/products'),
     api('/api/reseller/fresh-products').catch(() => ({ items: [] }))
@@ -533,6 +546,16 @@ async function loadPricing() {
   updateSaveBar();
 
   renderProductCatalogView();
+
+  if (preserveScroll) {
+    window.scrollTo({ top: scrollY, behavior: 'instant' });
+    if (targetKey) {
+      setTimeout(() => {
+        const el = $(`[data-product-card="${targetKey}"], [data-fresh-card="${targetKey}"]`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    }
+  }
 }
 
 function updateSaveBar() {
@@ -552,10 +575,13 @@ function categories(rows) {
 }
 
 function renderProductCatalogView(searchFilter = '', statusFilter = 'all', categoryFilter = '') {
-  const q = (searchFilter || $('#productSearch')?.value || '').toLowerCase().trim();
-  const stFilter = statusFilter !== 'all' ? statusFilter : ($('#productStatus')?.value || 'all');
-  const catFilter = categoryFilter || ($('#productCategory')?.value || '');
   const activeTab = state.productTab || 'regular';
+  const existingGrid = $('#productGrid');
+  const renderedTab = $('#content')?.dataset?.activeProductTab;
+
+  const q = (searchFilter !== '' ? searchFilter : ($('#productSearch')?.value || '')).toLowerCase().trim();
+  const stFilter = statusFilter !== 'all' ? statusFilter : ($('#productStatus')?.value || 'all');
+  const catFilter = categoryFilter !== '' ? categoryFilter : ($('#productCategory')?.value || '');
 
   let toolbarHtml = '';
   let gridHtml = '';
@@ -615,6 +641,15 @@ function renderProductCatalogView(searchFilter = '', statusFilter = 'all', categ
       : '<div class="empty-product"><h3>Belum ada produk fresh</h3><p>Tidak ada produk fresh yang cocok dengan pencarian.</p></div>';
   }
 
+  // In-place update if shell and active tab already exist
+  if (existingGrid && renderedTab === activeTab) {
+    existingGrid.innerHTML = gridHtml;
+    bindCatalogActions();
+    return;
+  }
+
+  const contentEl = $('#content');
+  if (contentEl) contentEl.dataset.activeProductTab = activeTab;
   $('#content').innerHTML = `
     <div class="section-title product-section-title">
       <div>
@@ -643,7 +678,7 @@ function renderProductCatalogView(searchFilter = '', statusFilter = 'all', categ
   }
 
   // Filter events
-  const onFilter = () => renderProductCatalogView($('#productSearch')?.value, $('#productStatus')?.value, $('#productCategory')?.value);
+  const onFilter = () => renderProductCatalogView();
   if ($('#productSearch')) $('#productSearch').oninput = onFilter;
   if ($('#productCategory')) $('#productCategory').onchange = onFilter;
   if ($('#productStatus')) $('#productStatus').onchange = onFilter;
@@ -1059,7 +1094,7 @@ function openProductEditModal(p) {
     });
 
     toast(`Produk ${p.name} berhasil diperbarui!`);
-    await loadPricing();
+    await loadPricing(true, p.code);
   }, { submit: 'Simpan Perubahan' });
 
   // Reset helpers for single product
@@ -1257,7 +1292,7 @@ function openFreshProductModal(r) {
     });
 
     toast(`Produk Fresh ${r.name} berhasil diperbarui!`);
-    await loadPricing();
+    await loadPricing(true, r.product_key);
   }, { submit: 'Simpan Perubahan' });
 
   // Live price calculation in fresh modal
@@ -1388,14 +1423,15 @@ function showBulkMarkupModal() {
     });
 
     toast(`Markup massal berhasil diterapkan dan disimpan!`);
-    await loadPricing();
+    await loadPricing(true);
   }, { submit: 'Terapkan & Simpan' });
 }
 
 // ---------------------------------------------------------------------
 // VIEW 4: TARIK SALDO
 // ---------------------------------------------------------------------
-async function loadWithdraw() {
+async function loadWithdraw(preserveScroll = false) {
+  const scrollY = preserveScroll ? window.scrollY : 0;
   const me = await api('/api/reseller/me');
   state.reseller = me.reseller;
   state.withdrawals = await api('/api/reseller/withdrawals');
@@ -1481,6 +1517,10 @@ async function loadWithdraw() {
       modal('Bukti Transfer Owner', `<div style="text-align:center"><img src="${esc(src)}" style="max-width:100%;border-radius:10px;border:2px solid #000" alt="Bukti Transfer" /></div>`, null, { noSubmit: true });
     };
   });
+
+  if (preserveScroll) {
+    window.scrollTo({ top: scrollY, behavior: 'instant' });
+  }
 }
 
 function showWithdrawModal() {
@@ -1592,7 +1632,7 @@ function showWithdrawModal() {
 
     await api('/api/reseller/withdrawals', { method: 'POST', body: payload });
     toast('Pengajuan penarikan berhasil dikirim ke Owner!');
-    await loadWithdraw();
+    await loadWithdraw(true);
   }, { submit: 'Kirim Pengajuan' });
 
   // Event handlers inside modal
@@ -1663,16 +1703,20 @@ function showWithdrawModal() {
 // ---------------------------------------------------------------------
 // VIEW 5: PESANAN PEMBELI (Identical to Owner loadOrders())
 // ---------------------------------------------------------------------
-async function loadOrders() {
+async function loadOrders(preserveScroll = false) {
+  const scrollY = preserveScroll ? window.scrollY : 0;
   const res = await api('/api/reseller/orders');
   state.orders = res.items || [];
   updateShellUI();
 
   renderOrdersView();
+  if (preserveScroll) {
+    window.scrollTo({ top: scrollY, behavior: 'instant' });
+  }
 }
 
 function renderOrdersView(filterStatus = '', search = '') {
-  const q = (search || $('#orderSearch')?.value || '').toLowerCase().trim();
+  const q = (search !== '' ? search : ($('#orderSearch')?.value || '')).toLowerCase().trim();
   const st = filterStatus || ($('#orderStatus')?.value || '');
 
   const rows = state.orders.filter(o => {
@@ -1702,6 +1746,12 @@ function renderOrdersView(filterStatus = '', search = '') {
     </article>
   `).join('');
 
+  const listEl = $('#orderList');
+  if (listEl) {
+    listEl.innerHTML = rows.length ? ordersHtml : '<div class="empty-product">Belum ada transaksi pesanan yang sesuai filter.</div>';
+    return;
+  }
+
   $('#content').innerHTML = `
     <div class="section-title product-section-title">
       <div>
@@ -1724,13 +1774,13 @@ function renderOrdersView(filterStatus = '', search = '') {
       </select>
     </div>
 
-    <div class="order-list">
+    <div class="order-list" id="orderList">
       ${rows.length ? ordersHtml : '<div class="empty-product">Belum ada transaksi pesanan yang sesuai filter.</div>'}
     </div>
   `;
 
-  $('#orderSearch').oninput = () => renderOrdersView($('#orderStatus').value, $('#orderSearch').value);
-  $('#orderStatus').onchange = () => renderOrdersView($('#orderStatus').value, $('#orderSearch').value);
+  $('#orderSearch').oninput = () => renderOrdersView();
+  $('#orderStatus').onchange = () => renderOrdersView();
 }
 
 // ---------------------------------------------------------------------

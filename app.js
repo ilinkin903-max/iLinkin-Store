@@ -103,17 +103,57 @@ function categories(rows){return[...new Set(rows.map(x=>x.category).filter(Boole
   <div class="toolbar product-toolbar"><div class="searchbox"><input id="productSearch" placeholder="Cari produk..."></div><select id="productCategory"><option value="">Semua Kategori</option>${categories(state.cache.products)}</select><select id="productStatus"><option value="">Semua Status</option><option value="1">Aktif</option><option value="0">Nonaktif</option></select></div>
   <div id="productGrid" class="product-grid">${renderProductCards(state.cache.products)}</div>`;
   $('#addProduct').onclick=()=>openProduct();
-  const filter=()=>{const q=$('#productSearch').value.toLowerCase(),cat=$('#productCategory').value,st=$('#productStatus').value;const rows=state.cache.products.filter(p=>(!q||[p.name,p.code,p.category].some(x=>String(x||'').toLowerCase().includes(q)))&&(!cat||p.category===cat)&&(!st||String(p.active)===st));$('#productGrid').innerHTML=renderProductCards(rows);bindProductActions()};
+  const filter=()=>{const q=($('#productSearch')?.value||'').toLowerCase().trim(),cat=$('#productCategory')?.value||'',st=$('#productStatus')?.value||'';const rows=state.cache.products.filter(p=>(!q||[p.name,p.code,p.category,p.tag].some(x=>String(x||'').toLowerCase().includes(q)))&&(!cat||p.category===cat)&&(!st||String(p.active)===st));$('#productGrid').innerHTML=renderProductCards(rows);bindProductActions()};
   $('#productSearch').oninput=filter;$('#productCategory').onchange=filter;$('#productStatus').onchange=filter;bindProductActions();
 }
-function bindProductActions(){$$('[data-edit-product]').forEach(b=>b.onclick=()=>openProduct(findProduct(b.dataset.editProduct)));$$('[data-stock-product]').forEach(b=>b.onclick=()=>openStock(findProduct(b.dataset.stockProduct)));$$('[data-manage-product]').forEach(b=>b.onclick=()=>openManageProduct(findProduct(b.dataset.manageProduct)));$$('[data-sync-product-supplier-card]').forEach(b=>b.onclick=async()=>{const old=b.textContent;try{b.disabled=true;b.textContent='Menyinkronkan...';await api(`/api/admin/products/${b.dataset.syncProductSupplierCard}/supplier-sync`,{method:'POST',body:{}});toast('Stok dan harga supplier diperbarui');await reloadProducts()}catch(e){toast(e.message,true)}finally{b.disabled=false;b.textContent=old}});$$('[data-delete-product]').forEach(b=>b.onclick=()=>remove(`/api/admin/products/${b.dataset.deleteProduct}`,'Hapus produk beserta varian dan stoknya?',reloadProducts));$$('[data-toggle-product]').forEach(b=>b.onclick=async()=>{try{await api(`/api/admin/products/${b.dataset.toggleProduct}/toggle`,{method:'POST',body:{active:b.dataset.active!=='1'}});toast('Status produk diperbarui');reloadProducts()}catch(e){toast(e.message,true)}})}function findProduct(id){return(state.cache.products||[]).find(x=>String(x.id)===String(id))||{}}
-async function reloadProducts(){return navigate(state.view)}
-async function loadOrders(){
-  const [r,p]=await Promise.all([api('/api/admin/orders?limit=500'),api('/api/admin/products?limit=500')]);state.cache.orders=r.items||[];state.cache.products=p.items||[];
-  $('#content').innerHTML=`<div class="toolbar order-toolbar"><div class="searchbox"><input id="orderSearch" placeholder="Cari invoice, user, produk..."></div><select id="orderStatus"><option value="">Semua Status</option>${['pending_payment','paid','fresh_processing','fresh_attention','completed','waiting_delivery','supplier_pending','failed','canceled','expired'].map(s=>`<option>${s}</option>`).join('')}</select><button id="addOrder" class="neo-btn purple">＋ Pesanan Manual</button></div><div id="orderCards" class="order-list">${orderCards(state.cache.orders)}</div>`;
-  $('#orderSearch').oninput=filterOrders;$('#orderStatus').onchange=filterOrders;$('#addOrder').onclick=()=>openManualOrder();bindOrderActions();
+function bindProductActions(){$$('[data-edit-product]').forEach(b=>b.onclick=()=>openProduct(findProduct(b.dataset.editProduct)));$$('[data-stock-product]').forEach(b=>b.onclick=()=>openStock(findProduct(b.dataset.stockProduct)));$$('[data-manage-product]').forEach(b=>b.onclick=()=>openManageProduct(findProduct(b.dataset.manageProduct)));$$('[data-sync-product-supplier-card]').forEach(b=>b.onclick=async()=>{const old=b.textContent;try{b.disabled=true;b.textContent='Menyinkronkan...';await api(`/api/admin/products/${b.dataset.syncProductSupplierCard}/supplier-sync`,{method:'POST',body:{}});toast('Stok dan harga supplier diperbarui');await reloadProducts(b.dataset.syncProductSupplierCard)}catch(e){toast(e.message,true)}finally{b.disabled=false;b.textContent=old}});$$('[data-delete-product]').forEach(b=>b.onclick=()=>remove(`/api/admin/products/${b.dataset.deleteProduct}`,'Hapus produk beserta varian dan stoknya?',()=>reloadProducts()));$$('[data-toggle-product]').forEach(b=>b.onclick=async()=>{try{await api(`/api/admin/products/${b.dataset.toggleProduct}/toggle`,{method:'POST',body:{active:b.dataset.active!=='1'}});toast('Status produk diperbarui');await reloadProducts(b.dataset.toggleProduct)}catch(e){toast(e.message,true)}})}function findProduct(id){return(state.cache.products||[]).find(x=>String(x.id)===String(id))||{}}
+async function reloadProducts(targetProductId=null){
+  const grid=$('#productGrid');
+  if(!grid||state.view!=='products'){return navigate(state.view)}
+  const scrollY=window.scrollY;
+  const searchVal=$('#productSearch')?.value||'';
+  const catVal=$('#productCategory')?.value||'';
+  const statusVal=$('#productStatus')?.value||'';
+  const r=await api('/api/admin/products?limit=500');
+  state.cache.products=r.items||[];
+  const catSelect=$('#productCategory');
+  if(catSelect){const cur=catVal;catSelect.innerHTML=`<option value="">Semua Kategori</option>${categories(state.cache.products)}`;catSelect.value=cur;}
+  const q=searchVal.toLowerCase().trim();
+  const rows=state.cache.products.filter(p=>(!q||[p.name,p.code,p.category,p.tag].some(x=>String(x||'').toLowerCase().includes(q)))&&(!catVal||p.category===catVal)&&(!statusVal||String(p.active)===statusVal));
+  grid.innerHTML=renderProductCards(rows);
+  bindProductActions();
+  if(targetProductId){
+    const targetCard=$(`[data-product-card="${targetProductId}"]`);
+    if(targetCard)targetCard.scrollIntoView({behavior:'smooth',block:'nearest'});
+    else window.scrollTo({top:scrollY,behavior:'instant'});
+  }else{
+    window.scrollTo({top:scrollY,behavior:'instant'});
+  }
 }
-function orderCards(rows){return rows.length?rows.map(o=>`<article class="order-card">
+async function loadOrders(preserveScroll=false,targetOrderId=null){
+  const scrollY=preserveScroll?window.scrollY:0;
+  const currentSearch=$('#orderSearch')?.value||'';
+  const currentStatus=$('#orderStatus')?.value||'';
+  const existingCards=$('#orderCards');
+  const [r,p]=await Promise.all([api('/api/admin/orders?limit=500'),api('/api/admin/products?limit=500')]);
+  state.cache.orders=r.items||[];state.cache.products=p.items||[];
+  if(!existingCards){
+    $('#content').innerHTML=`<div class="toolbar order-toolbar"><div class="searchbox"><input id="orderSearch" placeholder="Cari invoice, user, produk..."></div><select id="orderStatus"><option value="">Semua Status</option>${['pending_payment','paid','fresh_processing','fresh_attention','completed','waiting_delivery','supplier_pending','failed','canceled','expired'].map(s=>`<option>${s}</option>`).join('')}</select><button id="addOrder" class="neo-btn purple">＋ Pesanan Manual</button></div><div id="orderCards" class="order-list">${orderCards(state.cache.orders)}</div>`;
+    $('#orderSearch').oninput=filterOrders;$('#orderStatus').onchange=filterOrders;$('#addOrder').onclick=()=>openManualOrder();
+  }else{
+    if(currentSearch&&$('#orderSearch'))$('#orderSearch').value=currentSearch;
+    if(currentStatus&&$('#orderStatus'))$('#orderStatus').value=currentStatus;
+  }
+  filterOrders();
+  if(preserveScroll){
+    window.scrollTo({top:scrollY,behavior:'instant'});
+    if(targetOrderId){
+      const el=$(`[data-detail-order="${targetOrderId}"],[data-edit-order="${targetOrderId}"]`);
+      if(el)el.closest('.order-card')?.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }
+  }
+}
+function orderCards(rows){return rows.length?rows.map(o=>`<article class="order-card" data-order-card="${o.id}">
   <div class="order-head"><div><small>Invoice</small><b class="mono">${esc(o.order_ref)}</b></div>${badge(o.status)}</div>
   <div class="order-grid">
     <div><small>Pembeli</small><strong>${esc(o.buyer_name||'-')}</strong><span>${esc(o.telegram_id||'-')}</span></div>
@@ -126,8 +166,8 @@ function orderCards(rows){return rows.length?rows.map(o=>`<article class="order-
   </div>
   <div class="order-actions"><button class="neo-btn blue small" data-detail-order="${o.id}">Detail</button>${o.status==='waiting_delivery'?`<button class="neo-btn green small" data-fulfill-order="${o.id}">Kirim Produk</button>`:''}<button class="neo-btn yellow small" data-edit-order="${o.id}">Edit</button><button class="neo-btn red small" data-delete-order="${o.id}">Hapus</button></div>
 </article>`).join(''):'<div class="empty-product">Belum ada pesanan.</div>'}
-function filterOrders(){const q=$('#orderSearch').value.toLowerCase(),st=$('#orderStatus').value;const rows=state.cache.orders.filter(o=>(!q||[o.order_ref,o.telegram_id,o.buyer_name,o.product_name,o.variant_name].some(x=>String(x||'').toLowerCase().includes(q)))&&(!st||o.status===st));$('#orderCards').innerHTML=orderCards(rows);bindOrderActions()}
-function bindOrderActions(){$$('[data-detail-order]').forEach(b=>b.onclick=()=>openOrderDetail(b.dataset.detailOrder));$$('[data-edit-order]').forEach(b=>b.onclick=()=>openOrderEdit(state.cache.orders.find(x=>String(x.id)===b.dataset.editOrder)));$$('[data-fulfill-order]').forEach(b=>b.onclick=()=>openFulfill(state.cache.orders.find(x=>String(x.id)===b.dataset.fulfillOrder)));$$('[data-delete-order]').forEach(b=>b.onclick=()=>remove(`/api/admin/orders/${b.dataset.deleteOrder}`,'Hapus pesanan?',loadOrders))}
+function filterOrders(){const q=($('#orderSearch')?.value||'').toLowerCase().trim(),st=$('#orderStatus')?.value||'';const rows=state.cache.orders.filter(o=>(!q||[o.order_ref,o.telegram_id,o.buyer_name,o.product_name,o.variant_name].some(x=>String(x||'').toLowerCase().includes(q)))&&(!st||o.status===st));$('#orderCards').innerHTML=orderCards(rows);bindOrderActions()}
+function bindOrderActions(){$$('[data-detail-order]').forEach(b=>b.onclick=()=>openOrderDetail(b.dataset.detailOrder));$$('[data-edit-order]').forEach(b=>b.onclick=()=>openOrderEdit(state.cache.orders.find(x=>String(x.id)===b.dataset.editOrder)));$$('[data-fulfill-order]').forEach(b=>b.onclick=()=>openFulfill(state.cache.orders.find(x=>String(x.id)===b.dataset.fulfillOrder)));$$('[data-delete-order]').forEach(b=>b.onclick=()=>remove(`/api/admin/orders/${b.dataset.deleteOrder}`,'Hapus pesanan?',()=>loadOrders(true)))}
 async function openOrderDetail(id){try{const r=await api(`/api/admin/orders/${id}/detail`),o=r.item||{},items=o.purchased_items||[];modal('Detail Pesanan · '+(o.order_ref||''),`<div class="detail-grid"><section class="detail-card"><h4>🧾 Pesanan</h4><dl><dt>Invoice</dt><dd class="mono">${esc(o.order_ref||'-')}</dd><dt>Status</dt><dd>${badge(o.status)}</dd><dt>Waktu</dt><dd>${date(o.created_at)}</dd><dt>Pembeli</dt><dd>${esc(o.buyer_name||'-')}<br><span class="mono">${esc(o.telegram_id||'-')}</span></dd></dl></section><section class="detail-card"><h4>📦 Produk Dibeli</h4><dl><dt>Produk</dt><dd>${esc(o.product_name||'-')}</dd><dt>Varian</dt><dd>${esc(o.variant_name||'Default')}</dd><dt>Qty</dt><dd>${Number(o.quantity||0)}</dd><dt>Harga</dt><dd>${money(o.unit_price)} / item</dd><dt>Total</dt><dd>${money(o.total_price)}</dd><dt>Profit</dt><dd>${money(o.profit_amount)}</dd></dl></section><section class="detail-card full"><h4>🔐 Produk / Stok yang Dikirim</h4>${items.length?`<div class="purchased-items">${items.map((x,i)=>`<div class="purchased-item"><span>#${i+1}</span><code>${esc(x.value)}</code>${badge(x.status)}</div>`).join('')}</div>`:o.delivery_text?`<pre class="delivery-box">${esc(o.delivery_text)}</pre>`:'<p class="muted">Belum ada data produk yang dikirim.</p>'}${o.note?`<div class="detail-note"><b>Catatan</b><p>${esc(o.note)}</p></div>`:''}</section></div>`,async()=>{}, {hideSubmit:true})}catch(e){toast(e.message,true)}}
 async function loadReports(){
   const d=new Date(),r=state.report||{};if(!r.date)r.date=d.toISOString().slice(0,10);if(!r.month)r.month=d.toISOString().slice(0,7);if(!r.year)r.year=String(d.getFullYear());state.report=r;
@@ -135,8 +175,8 @@ async function loadReports(){
   const renderPeriod=()=>{const t=$('#reportType').value;$('#reportPeriodWrap').innerHTML=t==='daily'?`Periode<input id="reportPeriod" type="date" value="${esc(r.date)}">`:t==='monthly'?`Periode<input id="reportPeriod" type="month" value="${esc(r.month)}">`:`Tahun<input id="reportPeriod" type="number" min="2020" max="2100" value="${esc(r.year)}">`};renderPeriod();$('#reportType').onchange=renderPeriod;$('#applyReport').onclick=async()=>{const type=$('#reportType').value,val=$('#reportPeriod').value;state.report.type=type;if(type==='daily')state.report.date=val;if(type==='monthly')state.report.month=val;if(type==='yearly')state.report.year=val;await fetchReport()};await fetchReport();
 }
 async function fetchReport(){const r=state.report,t=r.type||'monthly';let qs=`type=${encodeURIComponent(t)}`;let periodLabel='';if(t==='daily'){qs+=`&date=${encodeURIComponent(r.date)}`;periodLabel=new Date(r.date+'T00:00:00').toLocaleDateString('id-ID',{dateStyle:'long'})}else if(t==='monthly'){const [y,m]=(r.month||'').split('-');qs+=`&month=${encodeURIComponent(m||'')}&year=${encodeURIComponent(y||'')}`;periodLabel=new Date(Number(y),Number(m)-1,1).toLocaleDateString('id-ID',{month:'long',year:'numeric'})}else{qs+=`&year=${encodeURIComponent(r.year)}`;periodLabel='Tahun '+r.year}const x=(await api('/api/admin/reports?'+qs)).data||{},sum=x.summary||{},series=x.series||[],max=Math.max(1,...series.map(v=>Number(v.revenue||0)));$('#reportResult').innerHTML=`<div class="stats-row">${stat('🛒','purple','Pesanan',sum.total_orders||0,periodLabel)}${stat('📈','pink','Omzet',money(sum.revenue),'Periode terpilih')}${stat('💵','green','Profit',money(sum.profit),'Profit bersih')}${stat('⏳','yellow','Pending',sum.pending||0,'Belum selesai')}</div><div class="grid-2"><section class="report-card"><div class="card-heading"><div><h3>📊 ${t==='daily'?'Omzet per Jam':t==='monthly'?'Omzet Harian':'Omzet Bulanan'}</h3><p>${esc(periodLabel)}</p></div></div><div class="report-series">${series.length?series.map(v=>`<div class="series-row"><span>${esc(v.bucket)}</span><div class="series-track"><i style="width:${Math.max(2,Math.round(Number(v.revenue||0)/max*100))}%"></i></div><b>${money(v.revenue)}</b></div>`).join(''):'<div class="empty compact">Belum ada transaksi pada periode ini.</div>'}</div></section><section class="report-card"><div class="card-heading"><div><h3>🏆 Produk Terlaris</h3><p>${esc(periodLabel)}</p></div></div><div class="top-list">${(x.top_products||[]).length?(x.top_products||[]).map((p,i)=>`<div class="top-item"><span class="rank">${i+1}</span><div><b>${esc(p.product_name||'-')}</b><small>${p.qty||0} item · ${p.orders||0} order</small></div><strong>${money(p.revenue)}</strong></div>`).join(''):'<div class="empty compact">Belum ada data produk.</div>'}</div></section></div>`}
-async function loadCoupons(){const[c,r,p]=await Promise.all([api('/api/admin/coupons?limit=500'),api('/api/admin/redeem?limit=500'),api('/api/admin/products?limit=500')]);state.cache.coupons=c.items||[];state.cache.redeem=r.items||[];state.cache.products=p.items||[];renderCoupons()}function renderCoupons(){const isCoupon=state.couponTab==='coupon';$('#content').innerHTML=`<div class="section-title"><div class="tabs"><button class="tab-btn ${isCoupon?'active':''}" data-coupon-tab="coupon">🎟 Voucher / Promo</button><button class="tab-btn ${!isCoupon?'active':''}" data-coupon-tab="redeem">🎁 Redeem Code</button></div><span><button id="addCouponRedeem" class="neo-btn purple">＋ ${isCoupon?'Tambah Kupon':'Generate Redeem'}</button></span></div>${isCoupon?couponTable():redeemTable()}`;$$('[data-coupon-tab]').forEach(b=>b.onclick=()=>{state.couponTab=b.dataset.couponTab;renderCoupons()});$('#addCouponRedeem').onclick=()=>isCoupon?openCoupon():openRedeem();bindCouponActions()}
-function couponTable(){return`<div class="table-card"><div class="table-scroll"><table class="neo-table"><thead><tr><th>Kode</th><th>Nama</th><th>Diskon</th><th>Minimal</th><th>Pemakaian</th><th>Status</th><th>Expired</th><th>Aksi</th></tr></thead><tbody>${state.cache.coupons.length?state.cache.coupons.map(x=>`<tr><td class="mono"><b>${esc(x.code)}</b></td><td>${esc(x.name||'-')}</td><td>${x.discount_type==='percent'?x.discount_value+'%':money(x.discount_value)}</td><td>${money(x.min_purchase)}</td><td>${x.used_count}/${x.usage_limit||'∞'}</td><td>${badge(x.active?'active':'inactive')}</td><td>${date(x.expires_at)}</td><td><div class="actions"><button class="neo-btn yellow small" data-edit-coupon="${x.id}">Edit</button><button class="neo-btn red small" data-delete-coupon="${x.id}">Hapus</button></div></td></tr>`).join(''):'<tr><td colspan="8" class="empty">Belum ada kupon.</td></tr>'}</tbody></table></div></div>`}function redeemTable(){return`<div class="table-card"><div class="table-scroll"><table class="neo-table"><thead><tr><th>Kode</th><th>Tipe</th><th>Nilai</th><th>Status</th><th>Diklaim</th><th>Expired</th><th>Aksi</th></tr></thead><tbody>${state.cache.redeem.length?state.cache.redeem.map(x=>`<tr><td class="mono"><b>${esc(x.code)}</b></td><td>${esc(x.type)}</td><td>${x.type==='balance'?money(x.value):`${x.value} item`}</td><td>${badge(x.active&&!x.claimed_by?'active':'used')}</td><td>${esc(x.claimed_by||'-')}</td><td>${date(x.expires_at)}</td><td><div class="actions"><button class="neo-btn red small" data-delete-redeem="${x.id}">Hapus</button></div></td></tr>`).join(''):'<tr><td colspan="7" class="empty">Belum ada redeem.</td></tr>'}</tbody></table></div></div>`}function bindCouponActions(){$$('[data-edit-coupon]').forEach(b=>b.onclick=()=>openCoupon(state.cache.coupons.find(x=>String(x.id)===b.dataset.editCoupon)));$$('[data-delete-coupon]').forEach(b=>b.onclick=()=>remove(`/api/admin/coupons/${b.dataset.deleteCoupon}`,'Hapus kupon?',loadCoupons));$$('[data-delete-redeem]').forEach(b=>b.onclick=()=>remove(`/api/admin/redeem/${b.dataset.deleteRedeem}`,'Hapus kode redeem?',loadCoupons))}
+async function loadCoupons(preserveScroll=false){const scrollY=preserveScroll?window.scrollY:0;const[c,r,p]=await Promise.all([api('/api/admin/coupons?limit=500'),api('/api/admin/redeem?limit=500'),api('/api/admin/products?limit=500')]);state.cache.coupons=c.items||[];state.cache.redeem=r.items||[];state.cache.products=p.items||[];renderCoupons();if(preserveScroll)window.scrollTo({top:scrollY,behavior:'instant'});}function renderCoupons(){const isCoupon=state.couponTab==='coupon';$('#content').innerHTML=`<div class="section-title"><div class="tabs"><button class="tab-btn ${isCoupon?'active':''}" data-coupon-tab="coupon">🎟 Voucher / Promo</button><button class="tab-btn ${!isCoupon?'active':''}" data-coupon-tab="redeem">🎁 Redeem Code</button></div><span><button id="addCouponRedeem" class="neo-btn purple">＋ ${isCoupon?'Tambah Kupon':'Generate Redeem'}</button></span></div>${isCoupon?couponTable():redeemTable()}`;$$('[data-coupon-tab]').forEach(b=>b.onclick=()=>{state.couponTab=b.dataset.couponTab;renderCoupons()});$('#addCouponRedeem').onclick=()=>isCoupon?openCoupon():openRedeem();bindCouponActions()}
+function couponTable(){return`<div class="table-card"><div class="table-scroll"><table class="neo-table"><thead><tr><th>Kode</th><th>Nama</th><th>Diskon</th><th>Minimal</th><th>Pemakaian</th><th>Status</th><th>Expired</th><th>Aksi</th></tr></thead><tbody>${state.cache.coupons.length?state.cache.coupons.map(x=>`<tr><td class="mono"><b>${esc(x.code)}</b></td><td>${esc(x.name||'-')}</td><td>${x.discount_type==='percent'?x.discount_value+'%':money(x.discount_value)}</td><td>${money(x.min_purchase)}</td><td>${x.used_count}/${x.usage_limit||'∞'}</td><td>${badge(x.active?'active':'inactive')}</td><td>${date(x.expires_at)}</td><td><div class="actions"><button class="neo-btn yellow small" data-edit-coupon="${x.id}">Edit</button><button class="neo-btn red small" data-delete-coupon="${x.id}">Hapus</button></div></td></tr>`).join(''):'<tr><td colspan="8" class="empty">Belum ada kupon.</td></tr>'}</tbody></table></div></div>`}function redeemTable(){return`<div class="table-card"><div class="table-scroll"><table class="neo-table"><thead><tr><th>Kode</th><th>Tipe</th><th>Nilai</th><th>Status</th><th>Diklaim</th><th>Expired</th><th>Aksi</th></tr></thead><tbody>${state.cache.redeem.length?state.cache.redeem.map(x=>`<tr><td class="mono"><b>${esc(x.code)}</b></td><td>${esc(x.type)}</td><td>${x.type==='balance'?money(x.value):`${x.value} item`}</td><td>${badge(x.active&&!x.claimed_by?'active':'used')}</td><td>${esc(x.claimed_by||'-')}</td><td>${date(x.expires_at)}</td><td><div class="actions"><button class="neo-btn red small" data-delete-redeem="${x.id}">Hapus</button></div></td></tr>`).join(''):'<tr><td colspan="7" class="empty">Belum ada redeem.</td></tr>'}</tbody></table></div></div>`}function bindCouponActions(){$$('[data-edit-coupon]').forEach(b=>b.onclick=()=>openCoupon(state.cache.coupons.find(x=>String(x.id)===b.dataset.editCoupon)));$$('[data-delete-coupon]').forEach(b=>b.onclick=()=>remove(`/api/admin/coupons/${b.dataset.deleteCoupon}`,'Hapus kupon?',()=>loadCoupons(true)));$$('[data-delete-redeem]').forEach(b=>b.onclick=()=>remove(`/api/admin/redeem/${b.dataset.deleteRedeem}`,'Hapus kode redeem?',()=>loadCoupons(true)))}
 async function loadSettings(){
   const[s,sys,bk,hs]=await Promise.all([api('/api/admin/settings'),api('/api/admin/system'),api('/api/admin/backups'),api('/api/admin/historical-stats')]);
   state.cache.settings=s.settings||{};state.cache.system=sys;state.cache.backups=bk.items||[];state.cache.backupSettings=bk.settings||{};state.cache.historicalStats=hs||{};state.settingsTab='';
@@ -354,9 +394,14 @@ async function loadFresh(){
   await refreshJaspayHub(false);
 }
 
-async function refreshJaspayHub(force=false){
+async function refreshJaspayHub(force=false,targetKey=null){
   const host=$('#jaspayHub');if(!host)return;
-  host.innerHTML='<div class="empty compact">Memuat status API, stok lokal, katalog, dan daftar harga Fresh...</div>';
+  const grid=$('#freshProductGrid');
+  const isInitial=!grid;
+  const scrollY=window.scrollY;
+  const searchVal=$('#freshSearch')?.value||'';
+  const statusVal=$('#freshFilterStatus')?.value||'';
+  if(isInitial){host.innerHTML='<div class="empty compact">Memuat status API, stok lokal, katalog, dan daftar harga Fresh...</div>';}
   try{
     const[st,pr]=await Promise.all([
       api(`/api/admin/integrations/jaspay/status${force?'?force=1':''}`),
@@ -365,40 +410,41 @@ async function refreshJaspayHub(force=false){
     const x=st.data||{},q=x.queue||{},rows=pr.items||[];
     const maintenance=Boolean(st.maintenance||pr.maintenance);
     const globalEnabled=st.enabled===true;
-    const apiLatency=Math.max(Number(st.health?.last_latency_ms||0),Number(pr.health?.last_latency_ms||0));
     const manualReady=Math.max(0,Number(pr.manual_ready_stock_total||0));
     state.cache.jaspayProducts=rows;
 
     const statusLabel=maintenance?'Maintenance':(globalEnabled?'Aktif':'Nonaktif');
     const dotState=!maintenance&&globalEnabled?'online':'offline';
 
-    host.innerHTML=`
-      <div class="dashboard-kpis fresh-kpis">
-        ${stat('⚡', dotState==='online'?'green':'yellow', 'Status Fresh', statusLabel, maintenance?'Sedang perbaikan':(globalEnabled?'API Online':'Global OFF'))}
-        ${stat('👛', 'pink', 'Saldo API Jaspay', maintenance?'Perbaikan':(x.balance==null?'-':Number(x.balance||0).toLocaleString('en-US',{maximumFractionDigits:2})+' Credit'), 'Saldo akun supplier')}
-        ${stat('📦', 'green', 'Ready Stok Toko', manualReady+' Akun', 'Inventory milik toko')}
-        ${stat('⏳', 'purple', 'Antrean API', `${Number(q.in_use||0)}/${Number(q.max||0)}`, `Menunggu: ${Number(q.waiting||0)}`)}
-      </div>
+    if(isInitial){
+      host.innerHTML=`
+        <div class="dashboard-kpis fresh-kpis">
+          ${stat('⚡', dotState==='online'?'green':'yellow', 'Status Fresh', statusLabel, maintenance?'Sedang perbaikan':(globalEnabled?'API Online':'Global OFF'))}
+          ${stat('👛', 'pink', 'Saldo API Jaspay', maintenance?'Perbaikan':(x.balance==null?'-':Number(x.balance||0).toLocaleString('en-US',{maximumFractionDigits:2})+' Credit'), 'Saldo akun supplier')}
+          ${stat('📦', 'green', 'Ready Stok Toko', manualReady+' Akun', 'Inventory milik toko')}
+          ${stat('⏳', 'purple', 'Antrean API', `${Number(q.in_use||0)}/${Number(q.max||0)}`, `Menunggu: ${Number(q.waiting||0)}`)}
+        </div>
 
-      ${maintenance?`<div class="warning-note" style="margin-bottom:12px"><b>🔴 Maintenance API Generate</b><br>${esc(st.health?.message||pr.health?.message||st.error||pr.error||'Bot sedang di update/perbaikan.')}<br><small>Inventory Ready Stok lokal tidak mengambil stok dari endpoint Ready Stock Jaspay.</small></div>`:''}
+        ${maintenance?`<div class="warning-note" style="margin-bottom:12px"><b>🔴 Maintenance API Generate</b><br>${esc(st.health?.message||pr.health?.message||st.error||pr.error||'Bot sedang di update/perbaikan.')}<br><small>Inventory Ready Stok lokal tidak mengambil stok dari endpoint Ready Stock Jaspay.</small></div>`:''}
 
-      <div class="toolbar product-toolbar">
-        <div class="searchbox"><input id="freshSearch" placeholder="Cari nama atau key produk fresh..."></div>
-        <select id="freshFilterStatus">
-          <option value="">Semua Status</option>
-          <option value="active">Generate Aktif (ON)</option>
-          <option value="inactive">Generate Nonaktif (OFF)</option>
-          <option value="api_ready">API Ready</option>
-          <option value="has_stock">Ada Stok Ready Lokal</option>
-          <option value="no_stock">Stok Ready Kosong</option>
-        </select>
-        <span id="freshProductCount" class="muted" style="font-size:11px;font-weight:800;margin-left:auto">${rows.length} produk</span>
-      </div>
+        <div class="toolbar product-toolbar">
+          <div class="searchbox"><input id="freshSearch" placeholder="Cari nama atau key produk fresh..."></div>
+          <select id="freshFilterStatus">
+            <option value="">Semua Status</option>
+            <option value="active">Generate Aktif (ON)</option>
+            <option value="inactive">Generate Nonaktif (OFF)</option>
+            <option value="api_ready">API Ready</option>
+            <option value="has_stock">Ada Stok Ready Lokal</option>
+            <option value="no_stock">Stok Ready Kosong</option>
+          </select>
+          <span id="freshProductCount" class="muted" style="font-size:11px;font-weight:800;margin-left:auto">${rows.length} produk</span>
+        </div>
 
-      <div id="freshProductGrid" class="product-grid">
-        ${renderFreshProductCards(rows, globalEnabled, maintenance)}
-      </div>
-    `;
+        <div id="freshProductGrid" class="product-grid">
+          ${renderFreshProductCards(rows, globalEnabled, maintenance)}
+        </div>
+      `;
+    }
 
     const filter=()=>{
       const q=($('#freshSearch')?.value||'').toLowerCase().trim();
@@ -413,18 +459,34 @@ async function refreshJaspayHub(force=false){
         if(st==='no_stock')return Number(r.ready_stock_count||0)===0;
         return true;
       });
-      const grid=$('#freshProductGrid');
-      if(grid)grid.innerHTML=renderFreshProductCards(filtered,globalEnabled,maintenance);
+      const currentGrid=$('#freshProductGrid');
+      if(currentGrid)currentGrid.innerHTML=renderFreshProductCards(filtered,globalEnabled,maintenance);
       const counter=$('#freshProductCount');
       if(counter)counter.textContent=`${filtered.length} dari ${rows.length} produk`;
       bindFreshProductActions();
     };
 
-    if($('#freshSearch'))$('#freshSearch').oninput=filter;
-    if($('#freshFilterStatus'))$('#freshFilterStatus').onchange=filter;
+    if(isInitial){
+      if($('#freshSearch'))$('#freshSearch').oninput=filter;
+      if($('#freshFilterStatus'))$('#freshFilterStatus').onchange=filter;
+    }else{
+      if($('#freshSearch')&&searchVal)$('#freshSearch').value=searchVal;
+      if($('#freshFilterStatus')&&statusVal)$('#freshFilterStatus').value=statusVal;
+      filter();
+    }
     bindFreshProductActions();
+    if(!isInitial){
+      if(targetKey){
+        const targetEl=$(`[data-jaspay-edit="${targetKey}"],[data-jaspay-ready-stock="${targetKey}"]`);
+        if(targetEl)targetEl.closest('.product-card')?.scrollIntoView({behavior:'smooth',block:'nearest'});
+        else window.scrollTo({top:scrollY,behavior:'instant'});
+      }else{
+        window.scrollTo({top:scrollY,behavior:'instant'});
+      }
+    }
   }catch(e){
-    host.innerHTML=`<div class="warning-note"><b>Jaspay Fresh belum siap:</b> ${esc(e.message)}<br><small>Pastikan koneksi backend aktif. Ready Stok lokal tetap berada di database VPS.</small></div>`;
+    if(isInitial)host.innerHTML=`<div class="warning-note"><b>Jaspay Fresh belum siap:</b> ${esc(e.message)}<br><small>Pastikan koneksi backend aktif. Ready Stok lokal tetap berada di database VPS.</small></div>`;
+    else toast(e.message,true);
   }
 }
 
@@ -437,7 +499,7 @@ function bindFreshProductActions(){
       b.disabled=true;
       await api(`/api/admin/integrations/jaspay/products/${encodeURIComponent(key)}`,{method:'PATCH',body:{enabled:next}});
       toast(`Produk Fresh ${key} ${next?'diaktifkan':'dinonaktifkan'}`);
-      await refreshJaspayHub(false);
+      await refreshJaspayHub(false,key);
     }catch(e){toast(e.message,true);}finally{b.disabled=false;}
   });
 }
@@ -446,7 +508,7 @@ async function openJaspayReadyStock(key){
   try{
     const data=await api(`/api/admin/integrations/jaspay/ready-stock?product_key=${encodeURIComponent(key)}`),items=Array.isArray(data.items)?data.items:[],text=items.map(x=>String(x.value||'')).filter(Boolean).join('\n'),cfg=r.presentation?.ready_stock||{};
     modal('▦ Stok Ready · '+r.name,`<div class="ready-stock-editor"><div class="ready-stock-stats"><span>Available <b>${Number(data.available_count??data.count??0)}</b></span><span>Reserved <b>${Number(data.reserved_count||0)}</b></span><span>Terjual <b>${Number(data.sold_count||0)}</b></span></div><div class="info-note">Stok ini <b>milik toko sendiri</b>, bukan stok endpoint Jaspay. Satu baris = satu akun/data yang akan dikirim persis kepada pembeli. Harga mengikuti kombinasi harga Produk Fresh yang dipilih di menu <b>Atur</b>.</div><div class="form-grid"><label>Mode Update<select name="mode"><option value="replace" selected>Ganti seluruh stok available</option><option value="add">Tambahkan ke stok existing</option></select></label><label>Status Ready Stok<input disabled value="${cfg.enabled===true?'Aktif di halaman READY STOK':'Belum diaktifkan di menu Atur'}"></label><label class="full">Data Akun Ready Stok<textarea name="text" rows="15" spellcheck="false" placeholder="email|password|data lain, satu akun per baris">${esc(text)}</textarea><small>Baris Reserved tidak ikut terhapus saat mode Ganti, supaya order QRIS yang sedang menunggu tidak kehilangan stok.</small></label></div></div>`,async b=>{
-      const out=await api('/api/admin/integrations/jaspay/ready-stock',{method:'POST',body:{product_key:key,mode:b.mode||'replace',text:b.text||''}});toast(`Stok Ready disimpan · available ${Number(out.available_count??out.count??0)}`);refreshJaspayHub(false).catch(()=>null);
+      const out=await api('/api/admin/integrations/jaspay/ready-stock',{method:'POST',body:{product_key:key,mode:b.mode||'replace',text:b.text||''}});toast(`Stok Ready disimpan · available ${Number(out.available_count??out.count??0)}`);await refreshJaspayHub(false,key);
     },{submit:'Simpan Stok Ready'});
   }catch(e){toast(e.message,true)}
 }
@@ -488,7 +550,7 @@ function openJaspayProduct(key){
     const res=await api(`/api/admin/integrations/jaspay/products/${encodeURIComponent(r.product_key)}`,{method:'PATCH',body});
     if(res?.item){const idx=(state.cache.jaspayProducts||[]).findIndex(x=>String(x.product_key)===String(r.product_key));if(idx>=0)state.cache.jaspayProducts[idx]=res.item;}
     toast('Produk Fresh disimpan');
-    refreshJaspayHub(false).catch(err=>console.error('[jaspay-refresh]',err));
+    await refreshJaspayHub(false,r.product_key);
   },{submit:'Simpan Produk Fresh'});
 }
 
@@ -721,12 +783,27 @@ async function loadBroadcast(){
   };
 }
 async function saveBotSettings(e,boolKeys=[]){e.preventDefault();const x=Object.fromEntries(new FormData(e.target).entries());for(const k of boolKeys)x[k]=x[k]==='true';try{await api('/api/admin/settings',{method:'PATCH',body:x});toast('Pengaturan bot disimpan')}catch(err){toast(err.message,true)}}
-async function loadUsers(){
+async function loadUsers(preserveScroll=false){
+  const scrollY=preserveScroll?window.scrollY:0;
+  const currentSearch=$('#userSearch')?.value||'';
+  const currentStatus=$('#userStatus')?.value||'';
+  const existingCards=$('#userCards');
   const r=await api('/api/admin/users?limit=500');state.cache.users=Array.isArray(r.items)?r.items:[];
   const actCount=state.cache.users.filter(u=>u.status==='active').length;
   const blkCount=state.cache.users.filter(u=>u.status==='blocked').length;
-  $('#content').innerHTML=`<div class="toolbar user-toolbar"><div class="searchbox"><input id="userSearch" placeholder="Cari ID, username, nama..."></div><select id="userStatus"><option value="">Semua Status</option><option value="active">Aktif</option><option value="blocked">Blocked</option><option value="inactive">Inactive</option></select><button type="button" id="unblockAllUsers" class="neo-btn green small">⚡ Aktifkan Semua Blocked</button><div class="toolbar-count" id="userCount">${state.cache.users.length} user (${actCount} aktif, ${blkCount} blocked)</div></div><div id="userCards" class="user-list">${userCards(state.cache.users)}</div>`;
-  $('#userSearch').oninput=filterUsers;$('#userStatus').onchange=filterUsers;
+  if(!existingCards){
+    $('#content').innerHTML=`<div class="toolbar user-toolbar"><div class="searchbox"><input id="userSearch" placeholder="Cari ID, username, nama..."></div><select id="userStatus"><option value="">Semua Status</option><option value="active">Aktif</option><option value="blocked">Blocked</option><option value="inactive">Inactive</option></select><button type="button" id="unblockAllUsers" class="neo-btn green small">⚡ Aktifkan Semua Blocked</button><div class="toolbar-count" id="userCount">${state.cache.users.length} user (${actCount} aktif, ${blkCount} blocked)</div></div><div id="userCards" class="user-list">${userCards(state.cache.users)}</div>`;
+    $('#userSearch').oninput=filterUsers;$('#userStatus').onchange=filterUsers;
+    bindUserToolbarActions();
+  }else{
+    if(currentSearch&&$('#userSearch'))$('#userSearch').value=currentSearch;
+    if(currentStatus&&$('#userStatus'))$('#userStatus').value=currentStatus;
+    if($('#userCount'))$('#userCount').textContent=`${state.cache.users.length} user (${actCount} aktif, ${blkCount} blocked)`;
+  }
+  filterUsers();
+  if(preserveScroll)window.scrollTo({top:scrollY,behavior:'instant'});
+}
+function bindUserToolbarActions(){
   if($('#unblockAllUsers'))$('#unblockAllUsers').onclick=async()=>{
     if(!confirm('Aktifkan kembali semua user yang berstatus blocked menjadi active?'))return;
     const btn=$('#unblockAllUsers');btn.disabled=true;btn.textContent='Memproses...';
@@ -751,22 +828,25 @@ async function loadUsers(){
         }
       }
       toast(`${changes} user berhasil diaktifkan`);
-      await loadUsers();
+      await loadUsers(true);
     }catch(e){toast(e.message,true)}
     finally{if(btn){btn.disabled=false;btn.textContent='⚡ Aktifkan Semua Blocked';}}
   };
-  bindUserActions();
 }
 function userCards(rows){return rows.length?rows.map(u=>`<article class="user-card"><div class="user-avatar">${firstLetter(u.first_name||u.username||u.telegram_id)}</div><div class="user-main"><h3>${esc([u.first_name,u.last_name].filter(Boolean).join(' ')||u.username||u.telegram_id)}</h3><p>${u.username?'@'+esc(u.username)+' · ':''}<span class="mono">${esc(u.telegram_id)}</span></p><div class="user-meta"><span>Referral <b>${esc(u.referral_code||'-')}</b></span><span>Saldo Utama <b>${money(u.balance_main)}</b></span><span>Saldo Referral <b>${money(u.balance_referral)}</b></span><span>Total <b>${money(u.balance_total)}</b></span><span>Status ${badge(u.status)}</span><span>Aktif <b>${esc(date(u.last_seen_at))}</b></span></div></div><div class="user-actions">${u.status==='blocked'?`<button class="neo-btn green small" data-unblock-user="${esc(u.telegram_id)}">Aktifkan</button>`:''}<button class="neo-btn yellow small" data-wallet-user="${esc(u.telegram_id)}">Saldo</button><button class="neo-btn blue small" data-chat-user="${esc(u.telegram_id)}">Chat</button><button class="neo-btn red small" data-delete-user="${esc(u.telegram_id)}">Hapus</button></div></article>`).join(''):'<div class="empty-product">Belum ada user Telegram. User akan muncul setelah berinteraksi dengan bot.</div>'}
-function filterUsers(){const q=$('#userSearch').value.toLowerCase(),st=$('#userStatus').value;const rows=state.cache.users.filter(u=>(!q||[u.telegram_id,u.username,u.first_name,u.last_name,u.referral_code].some(x=>String(x||'').toLowerCase().includes(q)))&&(!st||u.status===st));$('#userCards').innerHTML=userCards(rows);const total=state.cache.users.length;if($('#userCount')){const act=state.cache.users.filter(u=>u.status==='active').length;const blk=state.cache.users.filter(u=>u.status==='blocked').length;$('#userCount').textContent=rows.length===total?`${total} user (${act} aktif, ${blk} blocked)`:`${rows.length} / ${total} user`;}bindUserActions()}
-function bindUserActions(){$$('[data-unblock-user]').forEach(b=>b.onclick=async()=>{try{await api(`/api/admin/users/${encodeURIComponent(b.dataset.unblockUser)}`,{method:'PATCH',body:{status:'active'}});toast('User diaktifkan');loadUsers()}catch(e){toast(e.message,true)}});$$('[data-wallet-user]').forEach(b=>b.onclick=()=>openWallet(state.cache.users.find(x=>String(x.telegram_id)===b.dataset.walletUser)));$$('[data-chat-user]').forEach(b=>b.onclick=()=>openSendMessage(b.dataset.chatUser));$$('[data-delete-user]').forEach(b=>b.onclick=()=>remove(`/api/admin/users/${encodeURIComponent(b.dataset.deleteUser)}`,'Hapus pengguna?',loadUsers))}
-function modal(title,html,onSubmit,{submit='Simpan',hideSubmit=false}={}){
-  $('#modalTitle').textContent=title;
+function filterUsers(){const q=($('#userSearch')?.value||'').toLowerCase().trim(),st=$('#userStatus')?.value||'';const rows=state.cache.users.filter(u=>(!q||[u.telegram_id,u.username,u.first_name,u.last_name,u.referral_code].some(x=>String(x||'').toLowerCase().includes(q)))&&(!st||u.status===st));$('#userCards').innerHTML=userCards(rows);const total=state.cache.users.length;if($('#userCount')){const act=state.cache.users.filter(u=>u.status==='active').length;const blk=state.cache.users.filter(u=>u.status==='blocked').length;$('#userCount').textContent=rows.length===total?`${total} user (${act} aktif, ${blk} blocked)`:`${rows.length} / ${total} user`;}bindUserActions()}
+function bindUserActions(){$$('[data-unblock-user]').forEach(b=>b.onclick=async()=>{try{await api(`/api/admin/users/${encodeURIComponent(b.dataset.unblockUser)}`,{method:'PATCH',body:{status:'active'}});toast('User diaktifkan');loadUsers(true)}catch(e){toast(e.message,true)}});$$('[data-wallet-user]').forEach(b=>b.onclick=()=>openWallet(state.cache.users.find(x=>String(x.telegram_id)===b.dataset.walletUser)));$$('[data-chat-user]').forEach(b=>b.onclick=()=>openSendMessage(b.dataset.chatUser));$$('[data-delete-user]').forEach(b=>b.onclick=()=>remove(`/api/admin/users/${encodeURIComponent(b.dataset.deleteUser)}`,'Hapus pengguna?',()=>loadUsers(true)))}
+function modal(title,html,onSubmit,{submit='Simpan',hideSubmit=false,onCancel=null}={}){
+  $('#modalTitle').innerHTML=title;
   $('#modalBody').innerHTML=html;
   $('#modalSubmit').textContent=submit;
   $('#modalSubmit').classList.toggle('hidden',hideSubmit);
   const alertEl=$('#modalAlert');
   if(alertEl){alertEl.textContent='';alertEl.classList.add('hidden');}
+  $('#modalClose').onclick=$('#modalCancel').onclick=()=>{
+    if(typeof onCancel==='function') onCancel();
+    else $('#modal').close();
+  };
   $('#modalForm').onsubmit=async e=>{
     e.preventDefault();
     if(hideSubmit)return;
@@ -776,8 +856,8 @@ function modal(title,html,onSubmit,{submit='Simpan',hideSubmit=false}={}){
       if(btn){btn.disabled=true;btn.textContent='Menyimpan...';}
       if(alertEl)alertEl.classList.add('hidden');
       const fd=new FormData(e.target);
-      await onSubmit(Object.fromEntries(fd.entries()));
-      $('#modal').close();
+      const res=await onSubmit(Object.fromEntries(fd.entries()));
+      if(res!==false && $('#modal').open)$('#modal').close();
     }catch(err){
       toast(err.message||'Gagal menyimpan',true);
       if(alertEl){
@@ -793,7 +873,6 @@ function modal(title,html,onSubmit,{submit='Simpan',hideSubmit=false}={}){
 }
 const modalEl=$('#modal');
 if(modalEl){
-  $('#modalClose').onclick=$('#modalCancel').onclick=()=>modalEl.close();
   modalEl.addEventListener('close',()=>{
     const t=$('#toast');
     if(t&&t.parentElement!==document.body)document.body.appendChild(t);
@@ -831,23 +910,85 @@ async function openSupplierImport(source,productId){
 function openProduct(item={}){
   const edit=!!item.id,hasVariants=Array.isArray(item.variants)&&item.variants.length>0;
   const defaultSettings=hasVariants?`<div class="full info-note variant-default-hidden-note"><b>Produk memakai varian.</b><br>Harga, modal, harga khusus reseller, harga bulk, mode pengiriman, dan stok Default disembunyikan. Atur seluruh nilai jual melalui masing-masing varian agar tidak ada dua sumber konfigurasi.</div>`:`<label>Harga Default<input name="price" type="number" min="0" value="${Number(item.price||0)}"></label><label>Modal Default<input name="cost" type="number" min="0" value="${Number(item.cost||0)}"></label><label>Harga Khusus Reseller<input name="reseller_price" type="number" min="0" value="${Number(item.reseller_price||0)}" placeholder="0 = ikuti harga jual"><small class="muted">Harga modal yang dibayar reseller ke owner (0 = ikuti harga jual)</small></label>${bulkEditorHtml('productBulk',item.bulk_prices||[])}<label>Mode Pengiriman<select name="delivery_mode"><option value="auto" ${item.delivery_mode!=='preorder'?'selected':''}>AUTO</option><option value="preorder" ${item.delivery_mode==='preorder'?'selected':''}>PRE-ORDER</option></select></label>`;
-  modal(edit?'Edit Produk':'Tambah Produk',`<div class="form-grid product-form"><label>Kode Produk<input name="code" required value="${esc(item.code||'')}"></label><label>Nama Produk<input name="name" required value="${esc(item.name||'')}"></label><label>Kategori<input name="category" value="${esc(item.category||'')}"></label><label>Subtitle<input name="subtitle" value="${esc(item.subtitle||'')}"></label><label>Tag<input name="tag" value="${esc(item.tag||'')}"></label><label class="full">Gambar Produk (disimpan di VPS)<div class="media-uploader"><input id="productImageFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><button type="button" id="uploadProductImage" class="neo-btn blue small">Upload Gambar</button><button type="button" id="clearProductImage" class="neo-btn white small">Hapus</button></div><input type="hidden" name="image_url" id="productImageValue" value="${esc(item.image_url||'')}"><div id="productImagePreview" class="media-preview">${item.image_url?`<img src="${esc(mediaSrc(item.image_url))}" alt="Preview">`:'Belum ada gambar.'}</div></label>${defaultSettings}<label>Status Toko<select name="active"><option value="true" ${item.active!==0?'selected':''}>Aktif</option><option value="false" ${item.active===0?'selected':''}>Nonaktif</option></select></label><label>Bisa Dijual Reseller<select name="reseller_allowed"><option value="true" ${item.reseller_allowed!==0?'selected':''}>Ya (Bisa di-reseller)</option><option value="false" ${item.reseller_allowed===0?'selected':''}>Tidak (Khusus Toko Owner)</option></select><small class="muted">Jika 'Tidak', produk tidak tampil di bot & miniapp reseller</small></label><label class="full">Deskripsi Produk<textarea name="description" rows="5">${esc(item.description||'')}</textarea></label><label class="full">Syarat & Ketentuan (SNK)<textarea name="terms" rows="5">${esc(item.terms||'')}</textarea></label></div>${variantEditorHtml(item)}`,async b=>{if(!hasVariants){['price','cost','reseller_price'].forEach(k=>b[k]=Number(b[k]||0));b.bulk_prices=bulkTiers(b.bulk_prices)}else{delete b.price;delete b.cost;delete b.reseller_price;delete b.bulk_prices;delete b.delivery_mode}b.active=b.active==='true';b.reseller_allowed=b.reseller_allowed==='true';await api(edit?`/api/admin/products/${item.id}`:'/api/admin/products',{method:edit?'PATCH':'POST',body:b});toast(edit?'Produk diperbarui':'Produk dibuat. Buka Edit untuk menambahkan varian.');await reloadProducts()});
+  modal(edit?'Edit Produk':'Tambah Produk',`<div class="form-grid product-form"><label>Kode Produk<input name="code" required value="${esc(item.code||'')}"></label><label>Nama Produk<input name="name" required value="${esc(item.name||'')}"></label><label>Kategori<input name="category" value="${esc(item.category||'')}"></label><label>Subtitle<input name="subtitle" value="${esc(item.subtitle||'')}"></label><label>Tag<input name="tag" value="${esc(item.tag||'')}"></label><label class="full">Gambar Produk (disimpan di VPS)<div class="media-uploader"><input id="productImageFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><button type="button" id="uploadProductImage" class="neo-btn blue small">Upload Gambar</button><button type="button" id="clearProductImage" class="neo-btn white small">Hapus</button></div><input type="hidden" name="image_url" id="productImageValue" value="${esc(item.image_url||'')}"><div id="productImagePreview" class="media-preview">${item.image_url?`<img src="${esc(mediaSrc(item.image_url))}" alt="Preview">`:'Belum ada gambar.'}</div></label>${defaultSettings}<label>Status Toko<select name="active"><option value="true" ${item.active!==0?'selected':''}>Aktif</option><option value="false" ${item.active===0?'selected':''}>Nonaktif</option></select></label><label>Bisa Dijual Reseller<select name="reseller_allowed"><option value="true" ${item.reseller_allowed!==0?'selected':''}>Ya (Bisa di-reseller)</option><option value="false" ${item.reseller_allowed===0?'selected':''}>Tidak (Khusus Toko Owner)</option></select><small class="muted">Jika 'Tidak', produk tidak tampil di bot & miniapp reseller</small></label><label class="full">Deskripsi Produk<textarea name="description" rows="5">${esc(item.description||'')}</textarea></label><label class="full">Syarat & Ketentuan (SNK)<textarea name="terms" rows="5">${esc(item.terms||'')}</textarea></label></div>${variantEditorHtml(item)}`,async b=>{
+    if(!hasVariants){['price','cost','reseller_price'].forEach(k=>b[k]=Number(b[k]||0));b.bulk_prices=bulkTiers(b.bulk_prices)}else{delete b.price;delete b.cost;delete b.reseller_price;delete b.bulk_prices;delete b.delivery_mode}
+    b.active=b.active==='true';b.reseller_allowed=b.reseller_allowed==='true';
+    const saved=await api(edit?`/api/admin/products/${item.id}`:'/api/admin/products',{method:edit?'PATCH':'POST',body:b});
+    toast(edit?'Produk diperbarui':'Produk dibuat. Buka Edit untuk menambahkan varian.');
+    const pid=edit?item.id:(saved?.item?.id||saved?.id);
+    await reloadProducts(pid);
+  });
   if(!hasVariants)bindBulkEditor('productBulk',item.bulk_prices||[]);
   const uploadProductImage=$('#uploadProductImage');if(uploadProductImage)uploadProductImage.onclick=async()=>{try{const file=$('#productImageFile').files?.[0];const r=await uploadMedia(file,'product');$('#productImageValue').value=r.item.key;$('#productImagePreview').innerHTML=`<img src="${esc(mediaSrc(r.item.key))}" alt="Preview"><small>${esc(r.item.filename||'Tersimpan di VPS')}</small>`;if(edit){await api(`/api/admin/products/${item.id}`,{method:'PATCH',body:{image_url:r.item.key}});item.image_url=r.item.key;const cached=findProduct(item.id);if(cached)cached.image_url=r.item.key;toast('Gambar tersimpan dan langsung dipasang ke produk')}else toast('Gambar tersimpan. Tekan Simpan untuk memasang ke produk baru.')}catch(e){toast(e.message,true)}};const clearProductImage=$('#clearProductImage');if(clearProductImage)clearProductImage.onclick=async()=>{try{$('#productImageValue').value='';$('#productImagePreview').textContent='Belum ada gambar.';if(edit){await api(`/api/admin/products/${item.id}`,{method:'PATCH',body:{image_url:''}});item.image_url='';const cached=findProduct(item.id);if(cached)cached.image_url='';toast('Gambar produk dihapus')}}catch(e){toast(e.message,true)}};
-  if(edit){const current=findProduct(item.id)||item;const productSync=$('#syncProductSupplier');if(productSync)productSync.onclick=async()=>{try{productSync.disabled=true;productSync.textContent='Menyinkronkan...';await api(`/api/admin/products/${item.id}/supplier-sync`,{method:'POST',body:{}});toast('Data supplier produk diperbarui');$('#modal').close();await reloadProducts()}catch(e){toast(e.message,true)}finally{productSync.disabled=false;productSync.textContent='↻ Sync Supplier'}};const add=$('#addVariant');if(add)add.onclick=()=>{$('#modal').close();openVariant(current)};$$('[data-edit-variant]').forEach(b=>b.onclick=()=>{$('#modal').close();openVariant(current,current.variants.find(v=>String(v.id)===b.dataset.editVariant))});$$('[data-sync-variant]').forEach(b=>b.onclick=async()=>{try{await api(`/api/admin/variants/${b.dataset.syncVariant}/supplier-sync`,{method:'POST',body:{}});toast('Data supplier varian diperbarui');$('#modal').close();await reloadProducts()}catch(e){toast(e.message,true)}});$$('[data-delete-variant]').forEach(b=>b.onclick=async()=>{if(!confirm('Hapus varian ini?'))return;try{await api(`/api/admin/variants/${b.dataset.deleteVariant}`,{method:'DELETE'});$('#modal').close();toast('Varian dihapus');await reloadProducts()}catch(e){toast(e.message,true)}})}
+  if(edit){
+    const current=findProduct(item.id)||item;
+    const productSync=$('#syncProductSupplier');
+    if(productSync)productSync.onclick=async()=>{
+      try{
+        productSync.disabled=true;productSync.textContent='Menyinkronkan...';
+        await api(`/api/admin/products/${item.id}/supplier-sync`,{method:'POST',body:{}});
+        toast('Data supplier produk diperbarui');
+        await reloadProducts(item.id);
+        openProduct(findProduct(item.id)||item);
+      }catch(e){toast(e.message,true)}
+      finally{productSync.disabled=false;productSync.textContent='↻ Sync Supplier'}
+    };
+    const add=$('#addVariant');
+    if(add)add.onclick=()=>openVariant(findProduct(item.id)||current);
+    $$('[data-edit-variant]').forEach(b=>b.onclick=()=>{
+      const curProd=findProduct(item.id)||current;
+      const targetVar=(curProd.variants||[]).find(v=>String(v.id)===b.dataset.editVariant);
+      openVariant(curProd,targetVar);
+    });
+    $$('[data-sync-variant]').forEach(b=>b.onclick=async()=>{
+      try{
+        await api(`/api/admin/variants/${b.dataset.syncVariant}/supplier-sync`,{method:'POST',body:{}});
+        toast('Data supplier varian diperbarui');
+        await reloadProducts(item.id);
+        openProduct(findProduct(item.id)||item);
+      }catch(e){toast(e.message,true)}
+    });
+    $$('[data-delete-variant]').forEach(b=>b.onclick=async()=>{
+      if(!confirm('Hapus varian ini?'))return;
+      try{
+        await api(`/api/admin/variants/${b.dataset.deleteVariant}`,{method:'DELETE'});
+        toast('Varian dihapus');
+        await reloadProducts(item.id);
+        openProduct(findProduct(item.id)||item);
+      }catch(e){toast(e.message,true)}
+    });
+  }
 }
 async function openManageProduct(p){
   const variants=Array.isArray(p.variants)?p.variants:[],localVariants=variants.filter(v=>!v.supplier_source),targets=variants.length?localVariants:[{id:'',name:'Stok Default'}];
   if(!targets.length)return toast('Produk ini memakai stok supplier. Kelola melalui Sync Supplier / Edit Varian.',true);
   const options=targets.map(v=>`<option value="${esc(v.id||'')}">${esc(v.name)}</option>`).join('');
-  modal('Kelola Stok · '+p.name,`<div class="stock-manager"><div class="stock-manager-controls"><label>Target Stok<select id="manageStockVariant">${options}</select></label><label>Status<select id="manageStockStatus"><option value="available">Ready</option><option value="sold">Terjual</option><option value="">Semua</option></select></label></div><div id="stockManagerSummary" class="stock-summary"></div><div id="stockManagerList" class="stock-manager-list"><div class="empty compact">Memuat stok...</div></div></div>`,async()=>{}, {hideSubmit:true});
+  modal('Kelola Stok · '+p.name,`<div class="stock-manager"><div class="stock-manager-controls"><label>Target Stok<select id="manageStockVariant">${options}</select></label><label>Status<select id="manageStockStatus"><option value="available">Ready</option><option value="sold">Terjual</option><option value="">Semua</option></select></label></div><div id="stockManagerSummary" class="stock-summary"></div><div id="stockManagerList" class="stock-manager-list"><div class="empty compact">Memuat stok...</div></div></div>`,async()=>{}, {hideSubmit:true,onCancel:()=>reloadProducts(p.id)});
   const load=async()=>{const vid=$('#manageStockVariant').value;const status=$('#manageStockStatus').value;try{const r=await api(`/api/admin/products/${p.id}/stock?variant_id=${encodeURIComponent(vid)}&status=${encodeURIComponent(status)}&limit=2000`);$('#stockManagerSummary').innerHTML=`<b>${r.items.length}</b> item ditampilkan · <b>${r.count}</b> stok ready`;$('#stockManagerList').innerHTML=r.items.length?r.items.map((x,i)=>`<div class="stock-item-card"><div class="stock-item-head"><span>#${i+1} · ID ${x.id}</span>${badge(x.status)}</div><textarea data-stock-value="${x.id}" ${x.status!=='available'?'disabled':''}>${esc(x.value)}</textarea><div class="stock-item-meta"><span>${esc(date(x.created_at))}</span>${x.order_ref?`<span>Order ${esc(x.order_ref)}</span>`:''}</div>${x.status==='available'?`<div class="actions"><button type="button" class="neo-btn blue small" data-save-stock="${x.id}">Simpan Edit</button><button type="button" class="neo-btn red small" data-delete-stock="${x.id}">Hapus</button></div>`:''}</div>`).join(''):'<div class="empty compact">Tidak ada stok pada target ini.</div>';
-    $$('[data-save-stock]').forEach(b=>b.onclick=async()=>{try{const val=$(`[data-stock-value="${b.dataset.saveStock}"]`).value;await api(`/api/admin/stock/${b.dataset.saveStock}`,{method:'PATCH',body:{value:val}});toast('Stok diperbarui');await load()}catch(e){toast(e.message,true)}});$$('[data-delete-stock]').forEach(b=>b.onclick=async()=>{if(!confirm('Hapus stok ini?'))return;try{await api(`/api/admin/stock/${b.dataset.deleteStock}`,{method:'DELETE'});toast('Stok dihapus');await load()}catch(e){toast(e.message,true)}})}catch(e){$('#stockManagerList').innerHTML=`<div class="empty compact">${esc(e.message)}</div>`}};
+    $$('[data-save-stock]').forEach(b=>b.onclick=async()=>{try{const val=$(`[data-stock-value="${b.dataset.saveStock}"]`).value;await api(`/api/admin/stock/${b.dataset.saveStock}`,{method:'PATCH',body:{value:val}});toast('Stok diperbarui');await load();await reloadProducts(p.id)}catch(e){toast(e.message,true)}});$$('[data-delete-stock]').forEach(b=>b.onclick=async()=>{if(!confirm('Hapus stok ini?'))return;try{await api(`/api/admin/stock/${b.dataset.deleteStock}`,{method:'DELETE'});toast('Stok dihapus');await load();await reloadProducts(p.id)}catch(e){toast(e.message,true)}})}catch(e){$('#stockManagerList').innerHTML=`<div class="empty compact">${esc(e.message)}</div>`}};
   $('#manageStockVariant').onchange=load;$('#manageStockStatus').onchange=load;await load();
 }
 function openVariant(p,v={}){
   const edit=!!v.id;
-  modal((edit?'Edit':'Tambah')+' Varian · '+p.name,`<div class="form-grid"><label>Nama Varian<input name="name" required value="${esc(v.name||'')}"></label><label>Key / SKU<input name="variant_key" value="${esc(v.variant_key||'')}"></label><label>Harga Jual<input name="price" type="number" min="0" value="${Number(v.price??p.price??0)}"></label><label>Modal iLink<input name="cost" type="number" min="0" value="${Number(v.cost??p.cost??0)}"></label><label>Harga Khusus Reseller<input name="reseller_price" type="number" min="0" value="${Number(v.reseller_price||0)}" placeholder="0 = ikuti harga jual"><small class="muted">Harga modal yang dibayar reseller ke owner (0 = ikuti harga jual)</small></label>${bulkEditorHtml('variantBulk',v.bulk_prices||[])}<label>Mode<select name="delivery_mode"><option value="auto" ${v.delivery_mode!=='preorder'?'selected':''}>AUTO</option><option value="preorder" ${v.delivery_mode==='preorder'?'selected':''}>PRE-ORDER</option></select></label><label>Status Toko<select name="active"><option value="true" ${v.active!==0?'selected':''}>Aktif</option><option value="false" ${v.active===0?'selected':''}>Nonaktif</option></select></label><label>Bisa Dijual Reseller<select name="reseller_allowed"><option value="true" ${v.reseller_allowed!==0?'selected':''}>Ya (Bisa di-reseller)</option><option value="false" ${v.reseller_allowed===0?'selected':''}>Tidak (Khusus Toko Owner)</option></select><small class="muted">Jika 'Tidak', varian ini tidak tampil di bot & miniapp reseller</small></label><label>Supplier Source<select name="supplier_source" id="variantSupplierSource"><option value="" ${!v.supplier_source?'selected':''}>Stok Lokal</option><option value="prodseller" ${v.supplier_source==='prodseller'?'selected':''}>ProdSeller</option><option value="aiversehub" ${v.supplier_source==='aiversehub'?'selected':''}>AIVerseHub</option></select></label><label>Produk Supplier<select name="supplier_product_id" id="variantSupplierProduct"><option value="${esc(v.supplier_product_id||'')}">${v.supplier_product_id?esc(v.supplier_product_id):'Pilih supplier terlebih dahulu'}</option></select></label><input type="hidden" name="supplier_price" id="variantSupplierPrice" value="${Number(v.supplier_price||0)}"><input type="hidden" name="supplier_public_price" id="variantSupplierPublicPrice" value="${Number(v.supplier_public_price||0)}"><input type="hidden" name="supplier_stock" id="variantSupplierStock" value="${v.supplier_stock==null?'':Number(v.supplier_stock)}"><input type="hidden" name="supplier_synced_at" id="variantSupplierSynced" value="${esc(v.supplier_synced_at||'')}"><div class="full supplier-link-info" id="variantSupplierInfo">${v.supplier_source?`Terhubung: <b>${esc(v.supplier_source)}</b> · ID <code>${esc(v.supplier_product_id||'-')}</code>`:'Varian menggunakan stok lokal.'}</div><label class="full">Deskripsi Varian<textarea name="description" rows="5">${esc(v.description||'')}</textarea></label><label class="full">SNK Varian<textarea name="terms" rows="5">${esc(v.terms||'')}</textarea></label></div>`,async b=>{['price','cost','reseller_price','supplier_price','supplier_public_price'].forEach(k=>b[k]=Number(b[k]||0));b.bulk_prices=bulkTiers(b.bulk_prices);b.supplier_stock=b.supplier_stock===''?null:Number(b.supplier_stock);b.active=b.active==='true';b.reseller_allowed=b.reseller_allowed==='true';await api(edit?`/api/admin/variants/${v.id}`:`/api/admin/products/${p.id}/variants`,{method:edit?'PATCH':'POST',body:b});toast('Varian disimpan');await reloadProducts()});
+  const parentId=p.id;
+  const titleHtml=`<button type="button" class="back-modal-btn" id="backToProductModal" title="Kembali ke Produk">←</button> ${(edit?'Edit':'Tambah')+' Varian · '+esc(p.name)}`;
+  modal(titleHtml,`<div class="form-grid"><label>Nama Varian<input name="name" required value="${esc(v.name||'')}"></label><label>Key / SKU<input name="variant_key" value="${esc(v.variant_key||'')}"></label><label>Harga Jual<input name="price" type="number" min="0" value="${Number(v.price??p.price??0)}"></label><label>Modal iLink<input name="cost" type="number" min="0" value="${Number(v.cost??p.cost??0)}"></label><label>Harga Khusus Reseller<input name="reseller_price" type="number" min="0" value="${Number(v.reseller_price||0)}" placeholder="0 = ikuti harga jual"><small class="muted">Harga modal yang dibayar reseller ke owner (0 = ikuti harga jual)</small></label>${bulkEditorHtml('variantBulk',v.bulk_prices||[])}<label>Mode<select name="delivery_mode"><option value="auto" ${v.delivery_mode!=='preorder'?'selected':''}>AUTO</option><option value="preorder" ${v.delivery_mode==='preorder'?'selected':''}>PRE-ORDER</option></select></label><label>Status Toko<select name="active"><option value="true" ${v.active!==0?'selected':''}>Aktif</option><option value="false" ${v.active===0?'selected':''}>Nonaktif</option></select></label><label>Bisa Dijual Reseller<select name="reseller_allowed"><option value="true" ${v.reseller_allowed!==0?'selected':''}>Ya (Bisa di-reseller)</option><option value="false" ${v.reseller_allowed===0?'selected':''}>Tidak (Khusus Toko Owner)</option></select><small class="muted">Jika 'Tidak', varian ini tidak tampil di bot & miniapp reseller</small></label><label>Supplier Source<select name="supplier_source" id="variantSupplierSource"><option value="" ${!v.supplier_source?'selected':''}>Stok Lokal</option><option value="prodseller" ${v.supplier_source==='prodseller'?'selected':''}>ProdSeller</option><option value="aiversehub" ${v.supplier_source==='aiversehub'?'selected':''}>AIVerseHub</option></select></label><label>Produk Supplier<select name="supplier_product_id" id="variantSupplierProduct"><option value="${esc(v.supplier_product_id||'')}">${v.supplier_product_id?esc(v.supplier_product_id):'Pilih supplier terlebih dahulu'}</option></select></label><input type="hidden" name="supplier_price" id="variantSupplierPrice" value="${Number(v.supplier_price||0)}"><input type="hidden" name="supplier_public_price" id="variantSupplierPublicPrice" value="${Number(v.supplier_public_price||0)}"><input type="hidden" name="supplier_stock" id="variantSupplierStock" value="${v.supplier_stock==null?'':Number(v.supplier_stock)}"><input type="hidden" name="supplier_synced_at" id="variantSupplierSynced" value="${esc(v.supplier_synced_at||'')}"><div class="full supplier-link-info" id="variantSupplierInfo">${v.supplier_source?`Terhubung: <b>${esc(v.supplier_source)}</b> · ID <code>${esc(v.supplier_product_id||'-')}</code>`:'Varian menggunakan stok lokal.'}</div><label class="full">Deskripsi Varian<textarea name="description" rows="5">${esc(v.description||'')}</textarea></label><label class="full">SNK Varian<textarea name="terms" rows="5">${esc(v.terms||'')}</textarea></label></div>`,async b=>{
+    ['price','cost','reseller_price','supplier_price','supplier_public_price'].forEach(k=>b[k]=Number(b[k]||0));
+    b.bulk_prices=bulkTiers(b.bulk_prices);
+    b.supplier_stock=b.supplier_stock===''?null:Number(b.supplier_stock);
+    b.active=b.active==='true';
+    b.reseller_allowed=b.reseller_allowed==='true';
+    await api(edit?`/api/admin/variants/${v.id}`:`/api/admin/products/${parentId}/variants`,{method:edit?'PATCH':'POST',body:b});
+    toast(edit?'Varian berhasil diperbarui':'Varian baru ditambahkan');
+    await reloadProducts(parentId);
+    openProduct(findProduct(parentId)||p);
+    return false;
+  },{
+    submit:edit?'Simpan Varian':'＋ Tambah Varian',
+    onCancel:()=>openProduct(findProduct(parentId)||p)
+  });
+  const backBtn=$('#backToProductModal');
+  if(backBtn)backBtn.onclick=()=>openProduct(findProduct(parentId)||p);
   bindBulkEditor('variantBulk',v.bulk_prices||[]);
   const sourceEl=$('#variantSupplierSource'),productEl=$('#variantSupplierProduct'),info=$('#variantSupplierInfo');
   const fill=async(force=false)=>{const source=sourceEl.value;if(!source){productEl.innerHTML='<option value="">Stok Lokal</option>';$('#variantSupplierPrice').value=0;$('#variantSupplierPublicPrice').value=0;$('#variantSupplierStock').value='';$('#variantSupplierSynced').value='';info.textContent='Varian menggunakan stok lokal.';return;}info.textContent='Memuat katalog supplier...';try{const rows=await loadSupplierCatalog(source,force),selected=v.supplier_source===source?v.supplier_product_id:productEl.value;productEl.innerHTML='<option value="">-- Pilih Produk Supplier --</option>'+rows.map(x=>`<option value="${esc(x.id)}" ${String(x.id)===String(selected)?'selected':''}>${esc(x.name)} · ${esc(x.id)} · ${esc(supplierPrice(x))} · stok ${x.stock==null?'?':x.stock}</option>`).join('');show();}catch(e){productEl.innerHTML=`<option value="${esc(v.supplier_product_id||'')}">${esc(v.supplier_product_id||'Gagal memuat katalog')}</option>`;info.textContent=e.message;}};
@@ -859,18 +1000,22 @@ function openStock(p){
   if(!targets.length)return toast('Tidak ada stok lokal yang dapat ditambah. Gunakan Sync Supplier / Edit Varian.',true);
   const variantOpts=targets.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} · ${t.stock} ready</option>`).join('');
   const cards=targets.map(t=>`<div class="stock-target-card"><span>📦</span><div><b>${esc(t.name)}</b><small>${t.stock} stok ready</small></div></div>`).join('');
-  modal('Tambah Stok · '+p.name,`<div class="stock-add-layout"><div class="stock-target-grid">${cards}</div><div class="form-grid"><label class="full">Target Stok<select name="variant_id" id="addStockVariant">${variantOpts}</select></label><label class="full">Data Stok<textarea name="text" id="addStockText" rows="13" placeholder="Satu akun / kode / data produk per baris"></textarea></label><div class="full stock-input-summary"><span>Item yang akan ditambahkan</span><b id="addStockCount">0</b></div></div><div class="info-note">${variants.length?'Produk ini memakai varian, sehingga stok Default tidak digunakan. ':''}Stok supplier dikelola melalui sinkronisasi supplier dan tidak ditambahkan manual. Baris kosong otomatis diabaikan.</div></div>`,async b=>{const lines=String(b.text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(!lines.length)throw new Error('Masukkan minimal 1 data stok.');await api(`/api/admin/products/${p.id}/stock`,{method:'POST',body:{variant_id:b.variant_id?Number(b.variant_id):null,mode:'add',items:lines}});toast(`${lines.length} stok ditambahkan`);await reloadProducts()},{submit:'＋ Tambah Stok'});
+  modal('Tambah Stok · '+p.name,`<div class="stock-add-layout"><div class="stock-target-grid">${cards}</div><div class="form-grid"><label class="full">Target Stok<select name="variant_id" id="addStockVariant">${variantOpts}</select></label><label class="full">Data Stok<textarea name="text" id="addStockText" rows="13" placeholder="Satu akun / kode / data produk per baris"></textarea></label><div class="full stock-input-summary"><span>Item yang akan ditambahkan</span><b id="addStockCount">0</b></div></div><div class="info-note">${variants.length?'Produk ini memakai varian, sehingga stok Default tidak digunakan. ':''}Stok supplier dikelola melalui sinkronisasi supplier dan tidak ditambahkan manual. Baris kosong otomatis diabaikan.</div></div>`,async b=>{const lines=String(b.text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(!lines.length)throw new Error('Masukkan minimal 1 data stok.');await api(`/api/admin/products/${p.id}/stock`,{method:'POST',body:{variant_id:b.variant_id?Number(b.variant_id):null,mode:'add',items:lines}});toast(`${lines.length} stok ditambahkan`);await reloadProducts(p.id)},{submit:'＋ Tambah Stok'});
   const ta=$('#addStockText'),count=$('#addStockCount');const recount=()=>{if(count)count.textContent=String(ta?String(ta.value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).length:0)};if(ta)ta.oninput=recount;recount();
 }
-function openOrderEdit(o){modal('Edit Pesanan · '+o.order_ref,`<div class="form-grid"><label>Status<select name="status">${['pending_payment','paid','fresh_processing','fresh_attention','completed','waiting_delivery','supplier_pending','failed','canceled','expired'].map(s=>`<option ${o.status===s?'selected':''}>${s}</option>`).join('')}</select></label><label>Modal Aktual<input name="cost_amount" type="number" value="${Number(o.cost_amount||0)}"></label><label class="full">Catatan<textarea name="note">${esc(o.note||'')}</textarea></label></div>${o.status==='completed'?'<p class="warning-note">Mengubah completed menjadi canceled hanya mengubah status order lokal. Produk/akun yang sudah terkirim tidak otomatis dikembalikan ke stok dan pembayaran tidak otomatis direfund.</p>':''}`,async b=>{b.cost_amount=Number(b.cost_amount||0);await api(`/api/admin/orders/${o.id}`,{method:'PATCH',body:b});toast('Pesanan diperbarui');loadOrders()})}function openFulfill(o){modal('Kirim PRE-ORDER · '+o.order_ref,`<p>Produk: <b>${esc(o.product_name)}</b>${o.variant_name?' · '+esc(o.variant_name):''}</p><label class="field">Produk / akun untuk pembeli<textarea name="delivery_text" required rows="10" placeholder="Email | Password | Link | Kode lisensi"></textarea></label>`,async b=>{await api(`/api/admin/orders/${o.id}/fulfill`,{method:'POST',body:b});toast('Produk dikirim ke pembeli');loadOrders()},{submit:'Kirim Produk'})}function openManualOrder(){const products=(state.cache.products||[]).filter(p=>p.active&&(!(p.variants||[]).length||(p.variants||[]).some(v=>v.active)));if(!products.length)return toast('Belum ada produk aktif di katalog.',true);modal('Pesanan Manual',`<div class="form-grid"><label>Telegram ID<input name="telegram_id"></label><label>Nama Pembeli<input name="buyer_name"></label><label>Produk<select name="product_id" id="manualProduct">${products.map(p=>`<option value="${p.id}">${esc(p.name)} · ${esc(p.code)}</option>`).join('')}</select></label><label>Varian<select name="variant_id" id="manualVariant"></select></label><label>Qty<input name="quantity" id="manualQty" type="number" min="1" value="1"></label><label>Harga / item<input name="unit_price" id="manualUnitPrice" type="number" min="0"></label><label>Total<input name="total_price" id="manualTotal" type="number" min="0"></label><label>Modal Total<input name="cost_amount" id="manualCost" type="number" min="0"></label><label>Metode Bayar<input name="payment_method" value="manual"></label><label>Status<select name="status"><option value="completed">completed</option><option value="paid">paid</option><option value="waiting_delivery">waiting_delivery</option><option value="pending_payment">pending_payment</option><option value="canceled">canceled</option></select></label><label class="full">Catatan<textarea name="note"></textarea></label></div>`,async b=>{['product_id','variant_id','quantity','unit_price','total_price','cost_amount'].forEach(k=>b[k]=b[k]?Number(b[k]):(k==='variant_id'?null:0));await api('/api/admin/orders/manual',{method:'POST',body:b});toast('Pesanan manual dibuat dari katalog');loadOrders()});const productEl=$('#manualProduct'),variantEl=$('#manualVariant'),qtyEl=$('#manualQty'),unitEl=$('#manualUnitPrice'),totalEl=$('#manualTotal'),costEl=$('#manualCost');const refresh=()=>{const p=products.find(x=>String(x.id)===productEl.value)||products[0],current=variantEl.value,vars=(p.variants||[]).filter(v=>v.active);const opts=vars.length?vars.map(v=>`<option value="${v.id}">${esc(v.name)} · ${money(v.price)}</option>`):[`<option value="">Default · ${money(p.price)}</option>`];variantEl.innerHTML=opts.join('');if(current&&vars.some(v=>String(v.id)===current))variantEl.value=current;else if(vars.length)variantEl.value=String(vars[0].id);calc();};const calc=()=>{const p=products.find(x=>String(x.id)===productEl.value)||products[0],v=(p.variants||[]).find(x=>String(x.id)===variantEl.value),qty=Math.max(1,Number(qtyEl.value||1)),price=bulkUnitPrice(Number(v?.price??p.price??0),v?.bulk_prices??p.bulk_prices,qty),cost=Number(v?.cost??p.cost??0);unitEl.value=price;totalEl.value=price*qty;costEl.value=cost*qty;};productEl.onchange=refresh;variantEl.onchange=calc;qtyEl.oninput=calc;refresh();}
-function openWallet(u){if(!u)return;modal('Atur Saldo · '+(u.first_name||u.username||u.telegram_id),`<div class="form-grid"><label>Saldo Utama<input name="balance_main" type="number" min="0" value="${Number(u.balance_main||0)}"></label><label>Saldo Referral<input name="balance_referral" type="number" min="0" value="${Number(u.balance_referral||0)}"></label><label class="full">Telegram ID<input value="${esc(u.telegram_id)}" disabled></label></div>`,async b=>{b.balance_main=Number(b.balance_main||0);b.balance_referral=Number(b.balance_referral||0);await api(`/api/admin/users/${encodeURIComponent(u.telegram_id)}/wallet`,{method:'POST',body:b});toast('Saldo diperbarui');navigate(state.view)})}function openSendMessage(id){modal('Kirim Pesan Telegram',`<label class="field">Telegram ID<input value="${esc(id)}" disabled></label><label class="field" style="margin-top:10px">Pesan<textarea name="message" required rows="8"></textarea></label>`,async b=>{await api('/api/admin/bot/send',{method:'POST',body:{chat_id:id,message:b.message}});toast('Pesan dikirim')},{submit:'Kirim'})}
-function openCoupon(x={}){const edit=!!x.id;modal(edit?'Edit Kupon':'Tambah Kupon',`<div class="form-grid"><label>Kode<input name="code" required value="${esc(x.code||'')}"></label><label>Nama Promo<input name="name" value="${esc(x.name||'')}"></label><label>Tipe<select name="discount_type"><option value="fixed" ${x.discount_type!=='percent'?'selected':''}>Nominal</option><option value="percent" ${x.discount_type==='percent'?'selected':''}>Persen</option></select></label><label>Diskon<input name="discount_value" type="number" min="0" value="${Number(x.discount_value||0)}"></label><label>Maks Diskon<input name="max_discount" type="number" min="0" value="${Number(x.max_discount||0)}"></label><label>Minimal Belanja<input name="min_purchase" type="number" min="0" value="${Number(x.min_purchase||0)}"></label><label>Limit Pemakaian<input name="usage_limit" type="number" min="0" value="${Number(x.usage_limit||0)}"></label><label>Status<select name="active"><option value="true" ${x.active!==0?'selected':''}>Aktif</option><option value="false" ${x.active===0?'selected':''}>Nonaktif</option></select></label><label>Mulai<input name="starts_at" type="datetime-local" value=""></label><label>Expired<input name="expires_at" type="datetime-local" value=""></label></div>`,async b=>{['discount_value','max_discount','min_purchase','usage_limit'].forEach(k=>b[k]=Number(b[k]||0));b.active=b.active==='true';if(b.starts_at)b.starts_at=new Date(b.starts_at).toISOString();if(b.expires_at)b.expires_at=new Date(b.expires_at).toISOString();await api(edit?`/api/admin/coupons/${x.id}`:'/api/admin/coupons',{method:edit?'PATCH':'POST',body:b});toast('Kupon disimpan');loadCoupons()})}
-function openRedeem(){const products=state.cache.products||[];modal('Generate Redeem Code',`<div class="form-grid"><label>Jumlah Kode<input name="count" type="number" min="1" max="200" value="1"></label><label>Tipe<select name="type" id="redeemType"><option value="balance">Saldo</option><option value="product">Produk</option></select></label><label>Nilai / Qty<input name="value" type="number" min="0" value="10000"></label><label>Produk<select name="product_id"><option value="">-</option>${products.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label><label>Expired<input name="expires_at" type="datetime-local"></label><label>Kode Custom (jumlah 1)<input name="code"></label></div>`,async b=>{b.count=Number(b.count||1);b.value=Number(b.value||0);b.product_id=b.product_id?Number(b.product_id):null;if(b.expires_at)b.expires_at=new Date(b.expires_at).toISOString();const r=await api('/api/admin/redeem',{method:'POST',body:b});toast(`${r.items.length} kode dibuat`);loadCoupons()})}
+function openOrderEdit(o){modal('Edit Pesanan · '+o.order_ref,`<div class="form-grid"><label>Status<select name="status">${['pending_payment','paid','fresh_processing','fresh_attention','completed','waiting_delivery','supplier_pending','failed','canceled','expired'].map(s=>`<option ${o.status===s?'selected':''}>${s}</option>`).join('')}</select></label><label>Modal Aktual<input name="cost_amount" type="number" value="${Number(o.cost_amount||0)}"></label><label class="full">Catatan<textarea name="note">${esc(o.note||'')}</textarea></label></div>${o.status==='completed'?'<p class="warning-note">Mengubah completed menjadi canceled hanya mengubah status order lokal. Produk/akun yang sudah terkirim tidak otomatis dikembalikan ke stok dan pembayaran tidak otomatis direfund.</p>':''}`,async b=>{b.cost_amount=Number(b.cost_amount||0);await api(`/api/admin/orders/${o.id}`,{method:'PATCH',body:b});toast('Pesanan diperbarui');loadOrders(true,o.id)})}
+function openFulfill(o){modal('Kirim PRE-ORDER · '+o.order_ref,`<p>Produk: <b>${esc(o.product_name)}</b>${o.variant_name?' · '+esc(o.variant_name):''}</p><label class="field">Produk / akun untuk pembeli<textarea name="delivery_text" required rows="10" placeholder="Email | Password | Link | Kode lisensi"></textarea></label>`,async b=>{await api(`/api/admin/orders/${o.id}/fulfill`,{method:'POST',body:b});toast('Produk dikirim ke pembeli');loadOrders(true,o.id)},{submit:'Kirim Produk'})}
+function openManualOrder(){const products=(state.cache.products||[]).filter(p=>p.active&&(!(p.variants||[]).length||(p.variants||[]).some(v=>v.active)));if(!products.length)return toast('Belum ada produk aktif di katalog.',true);modal('Pesanan Manual',`<div class="form-grid"><label>Telegram ID<input name="telegram_id"></label><label>Nama Pembeli<input name="buyer_name"></label><label>Produk<select name="product_id" id="manualProduct">${products.map(p=>`<option value="${p.id}">${esc(p.name)} · ${esc(p.code)}</option>`).join('')}</select></label><label>Varian<select name="variant_id" id="manualVariant"></select></label><label>Qty<input name="quantity" id="manualQty" type="number" min="1" value="1"></label><label>Harga / item<input name="unit_price" id="manualUnitPrice" type="number" min="0"></label><label>Total<input name="total_price" id="manualTotal" type="number" min="0"></label><label>Modal Total<input name="cost_amount" id="manualCost" type="number" min="0"></label><label>Metode Bayar<input name="payment_method" value="manual"></label><label>Status<select name="status"><option value="completed">completed</option><option value="paid">paid</option><option value="waiting_delivery">waiting_delivery</option><option value="pending_payment">pending_payment</option><option value="canceled">canceled</option></select></label><label class="full">Catatan<textarea name="note"></textarea></label></div>`,async b=>{['product_id','variant_id','quantity','unit_price','total_price','cost_amount'].forEach(k=>b[k]=b[k]?Number(b[k]):(k==='variant_id'?null:0));await api('/api/admin/orders/manual',{method:'POST',body:b});toast('Pesanan manual dibuat dari katalog');loadOrders(true)});const productEl=$('#manualProduct'),variantEl=$('#manualVariant'),qtyEl=$('#manualQty'),unitEl=$('#manualUnitPrice'),totalEl=$('#manualTotal'),costEl=$('#manualCost');const refresh=()=>{const p=products.find(x=>String(x.id)===productEl.value)||products[0],current=variantEl.value,vars=(p.variants||[]).filter(v=>v.active);const opts=vars.length?vars.map(v=>`<option value="${v.id}">${esc(v.name)} · ${money(v.price)}</option>`):[`<option value="">Default · ${money(p.price)}</option>`];variantEl.innerHTML=opts.join('');if(current&&vars.some(v=>String(v.id)===current))variantEl.value=current;else if(vars.length)variantEl.value=String(vars[0].id);calc();};const calc=()=>{const p=products.find(x=>String(x.id)===productEl.value)||products[0],v=(p.variants||[]).find(x=>String(x.id)===variantEl.value),qty=Math.max(1,Number(qtyEl.value||1)),price=bulkUnitPrice(Number(v?.price??p.price??0),v?.bulk_prices??p.bulk_prices,qty),cost=Number(v?.cost??p.cost??0);unitEl.value=price;totalEl.value=price*qty;costEl.value=cost*qty;};productEl.onchange=refresh;variantEl.onchange=calc;qtyEl.oninput=calc;refresh();}
+function openWallet(u){if(!u)return;modal('Atur Saldo · '+(u.first_name||u.username||u.telegram_id),`<div class="form-grid"><label>Saldo Utama<input name="balance_main" type="number" min="0" value="${Number(u.balance_main||0)}"></label><label>Saldo Referral<input name="balance_referral" type="number" min="0" value="${Number(u.balance_referral||0)}"></label><label class="full">Telegram ID<input value="${esc(u.telegram_id)}" disabled></label></div>`,async b=>{b.balance_main=Number(b.balance_main||0);b.balance_referral=Number(b.balance_referral||0);await api(`/api/admin/users/${encodeURIComponent(u.telegram_id)}/wallet`,{method:'POST',body:b});toast('Saldo diperbarui');loadUsers(true)})}
+function openSendMessage(id){modal('Kirim Pesan Telegram',`<label class="field">Telegram ID<input value="${esc(id)}" disabled></label><label class="field" style="margin-top:10px">Pesan<textarea name="message" required rows="8"></textarea></label>`,async b=>{await api('/api/admin/bot/send',{method:'POST',body:{chat_id:id,message:b.message}});toast('Pesan dikirim')},{submit:'Kirim'})}
+function openCoupon(x={}){const edit=!!x.id;modal(edit?'Edit Kupon':'Tambah Kupon',`<div class="form-grid"><label>Kode<input name="code" required value="${esc(x.code||'')}"></label><label>Nama Promo<input name="name" value="${esc(x.name||'')}"></label><label>Tipe<select name="discount_type"><option value="fixed" ${x.discount_type!=='percent'?'selected':''}>Nominal</option><option value="percent" ${x.discount_type==='percent'?'selected':''}>Persen</option></select></label><label>Diskon<input name="discount_value" type="number" min="0" value="${Number(x.discount_value||0)}"></label><label>Maks Diskon<input name="max_discount" type="number" min="0" value="${Number(x.max_discount||0)}"></label><label>Minimal Belanja<input name="min_purchase" type="number" min="0" value="${Number(x.min_purchase||0)}"></label><label>Limit Pemakaian<input name="usage_limit" type="number" min="0" value="${Number(x.usage_limit||0)}"></label><label>Status<select name="active"><option value="true" ${x.active!==0?'selected':''}>Aktif</option><option value="false" ${x.active===0?'selected':''}>Nonaktif</option></select></label><label>Mulai<input name="starts_at" type="datetime-local" value=""></label><label>Expired<input name="expires_at" type="datetime-local" value=""></label></div>`,async b=>{['discount_value','max_discount','min_purchase','usage_limit'].forEach(k=>b[k]=Number(b[k]||0));b.active=b.active==='true';if(b.starts_at)b.starts_at=new Date(b.starts_at).toISOString();if(b.expires_at)b.expires_at=new Date(b.expires_at).toISOString();await api(edit?`/api/admin/coupons/${x.id}`:'/api/admin/coupons',{method:edit?'PATCH':'POST',body:b});toast('Kupon disimpan');loadCoupons(true)})}
+function openRedeem(){const products=state.cache.products||[];modal('Generate Redeem Code',`<div class="form-grid"><label>Jumlah Kode<input name="count" type="number" min="1" max="200" value="1"></label><label>Tipe<select name="type" id="redeemType"><option value="balance">Saldo</option><option value="product">Produk</option></select></label><label>Nilai / Qty<input name="value" type="number" min="0" value="10000"></label><label>Produk<select name="product_id"><option value="">-</option>${products.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label><label>Expired<input name="expires_at" type="datetime-local"></label><label>Kode Custom (jumlah 1)<input name="code"></label></div>`,async b=>{b.count=Number(b.count||1);b.value=Number(b.value||0);b.product_id=b.product_id?Number(b.product_id):null;if(b.expires_at)b.expires_at=new Date(b.expires_at).toISOString();const r=await api('/api/admin/redeem',{method:'POST',body:b});toast(`${r.items.length} kode dibuat`);loadCoupons(true)})}
 // ==========================================
 // RESELLER & MULTI-TENANT BOT SYSTEM (v2.6.10)
 // ==========================================
 
-async function loadResellers() {
+async function loadResellers(preserveScroll = false) {
+  const scrollY = preserveScroll ? window.scrollY : 0;
   state.resellerTab = state.resellerTab || 'resellers';
   const overviewRes = await api('/api/admin/resellers/overview').catch(() => ({ stats: {} }));
   const stats = overviewRes.stats || {};
@@ -885,7 +1030,7 @@ async function loadResellers() {
   }
 
   const kpis = `
-    <div class="dashboard-kpis">
+    <div class="dashboard-kpis" id="resellerKpis">
       ${stat('👥', 'purple', 'Total Reseller', `${stats.total_resellers || 0}`, `${stats.active_resellers || 0} akun aktif`)}
       ${stat('⏳', pendingRes > 0 ? 'yellow' : 'blue', 'Persetujuan Reseller', `${pendingRes} Pengajuan`, pendingRes > 0 ? 'Menunggu verifikasi owner' : 'Semua pendaftaran diproses')}
       ${stat('🤖', 'blue', 'Bot Toko Reseller', `${stats.total_bots || 0}`, `${stats.active_bots || 0} bot online`)}
@@ -893,6 +1038,14 @@ async function loadResellers() {
       ${stat('💸', 'yellow', 'Pending Penarikan', `${pendingWd} Pengajuan`, `${money(stats.pending_withdrawals_amount)} siap dicairkan`)}
     </div>
   `;
+
+  if (preserveScroll && $('#resellerTabBody')) {
+    const kpiEl = $('#resellerKpis');
+    if (kpiEl) kpiEl.outerHTML = kpis;
+    await renderResellerTabContent();
+    window.scrollTo({ top: scrollY, behavior: 'instant' });
+    return;
+  }
 
   const tabs = `
     <div class="subnav" id="resellerSubnav" style="margin-bottom:16px;">
@@ -954,6 +1107,9 @@ async function renderResellersList(host) {
   const regFee = Math.max(0, Number(s.reseller_registration_fee || 0));
   const regEnabled = s.reseller_registration_enabled !== false;
 
+  const oldSearch = $('#resellerSearch')?.value || '';
+  const oldStatus = $('#resellerStatusFilter')?.value || '';
+
   host.innerHTML = `
     <div class="reseller-fee-card">
       <div class="reseller-fee-info">
@@ -970,15 +1126,15 @@ async function renderResellersList(host) {
     </div>
 
     <div class="toolbar product-toolbar" style="margin-bottom:14px;">
-      <div class="searchbox"><input id="resellerSearch" placeholder="Cari nama, username, telegram ID..."></div>
+      <div class="searchbox"><input id="resellerSearch" placeholder="Cari nama, username, telegram ID..." value="${esc(oldSearch)}"></div>
       <select id="resellerStatusFilter">
-        <option value="">Semua Status</option>
-        <option value="pending_approval">⏳ Menunggu Persetujuan</option>
-        <option value="awaiting_payment">💳 Menunggu Pembayaran</option>
-        <option value="awaiting_token">🤖 Menunggu Bot Token</option>
-        <option value="active">🟢 Aktif</option>
-        <option value="suspended">⚠️ Ditangguhkan</option>
-        <option value="rejected">❌ Ditolak</option>
+        <option value="" ${oldStatus === '' ? 'selected' : ''}>Semua Status</option>
+        <option value="pending_approval" ${oldStatus === 'pending_approval' ? 'selected' : ''}>⏳ Menunggu Persetujuan</option>
+        <option value="awaiting_payment" ${oldStatus === 'awaiting_payment' ? 'selected' : ''}>💳 Menunggu Pembayaran</option>
+        <option value="awaiting_token" ${oldStatus === 'awaiting_token' ? 'selected' : ''}>🤖 Menunggu Bot Token</option>
+        <option value="active" ${oldStatus === 'active' ? 'selected' : ''}>🟢 Aktif</option>
+        <option value="suspended" ${oldStatus === 'suspended' ? 'selected' : ''}>⚠️ Ditangguhkan</option>
+        <option value="rejected" ${oldStatus === 'rejected' ? 'selected' : ''}>❌ Ditolak</option>
       </select>
       <button id="addResellerBtn" class="neo-btn purple">＋ Tambah Reseller</button>
     </div>
@@ -1017,7 +1173,7 @@ async function renderResellersList(host) {
         };
       }
       toast('Pengaturan pendaftaran reseller berhasil disimpan!');
-      await loadResellers();
+      await loadResellers(true);
     }, { submit: 'Simpan Pengaturan' });
   };
 
@@ -1101,7 +1257,7 @@ async function renderResellersList(host) {
         try {
           await api(`/api/admin/resellers/${id}/approve`, { method: 'POST' });
           toast('Reseller disetujui & bot toko berhasil dijalankan!');
-          await loadResellers();
+          await loadResellers(true);
         } catch (e) {
           toast(e.message, true);
         }
@@ -1124,7 +1280,7 @@ async function renderResellersList(host) {
             body: { reason: data.reason || 'Ditolak oleh Owner' }
           });
           toast('Pendaftaran reseller ditolak & notifikasi dikirim ke user.');
-          await loadResellers();
+          await loadResellers(true);
         }, { submit: 'Tolak Permohonan' });
       };
     });
@@ -1152,7 +1308,7 @@ async function renderResellersList(host) {
         try {
           await api(`/api/admin/resellers/${b.dataset.deleteReseller}`, { method: 'DELETE' });
           toast('Reseller berhasil dihapus');
-          await loadResellers();
+          await loadResellers(true);
         } catch (e) {
           toast(e.message, true);
         }
@@ -1176,19 +1332,23 @@ async function renderResellerBotsList(host) {
   state.cache.resellerBots = bots;
   state.cache.resellers = resellers;
 
-  const resellerOptions = resellers.map(r => `<option value="${r.id}" ${state.resellerFilter === String(r.id) ? 'selected' : ''}>${esc(r.name)} (@${esc(r.username || '-')})</option>`).join('');
+  const oldBotSearch = $('#botSearch')?.value || '';
+  const oldBotReseller = $('#botResellerFilter')?.value || state.resellerFilter || '';
+  const oldBotStatus = $('#botStatusFilter')?.value || '';
+
+  const resellerOptions = resellers.map(r => `<option value="${r.id}" ${String(oldBotReseller) === String(r.id) ? 'selected' : ''}>${esc(r.name)} (@${esc(r.username || '-')})</option>`).join('');
 
   host.innerHTML = `
     <div class="toolbar product-toolbar" style="margin-bottom:14px;">
-      <div class="searchbox"><input id="botSearch" placeholder="Cari nama bot, username @..."></div>
+      <div class="searchbox"><input id="botSearch" placeholder="Cari nama bot, username @..." value="${esc(oldBotSearch)}"></div>
       <select id="botResellerFilter">
-        <option value="">Semua Reseller</option>
+        <option value="" ${!oldBotReseller ? 'selected' : ''}>Semua Reseller</option>
         ${resellerOptions}
       </select>
       <select id="botStatusFilter">
-        <option value="">Semua Status</option>
-        <option value="active">Aktif (Online)</option>
-        <option value="inactive">Nonaktif (Stopped)</option>
+        <option value="" ${oldBotStatus === '' ? 'selected' : ''}>Semua Status</option>
+        <option value="active" ${oldBotStatus === 'active' ? 'selected' : ''}>Aktif (Online)</option>
+        <option value="inactive" ${oldBotStatus === 'inactive' ? 'selected' : ''}>Nonaktif (Stopped)</option>
       </select>
       <button id="addBotBtn" class="neo-btn purple">＋ Pasang Bot Baru</button>
     </div>
@@ -1353,13 +1513,15 @@ async function renderResellerWithdrawalsList(host) {
   const res = await api('/api/admin/reseller-withdrawals?limit=300').catch(() => ({ items: [] }));
   const items = res.items || [];
 
+  const oldWdStatus = $('#withdrawalStatusFilter')?.value || 'pending';
+
   host.innerHTML = `
     <div class="toolbar product-toolbar" style="margin-bottom:14px;">
       <select id="withdrawalStatusFilter">
-        <option value="">Semua Status</option>
-        <option value="pending" selected>Menunggu Approval (Pending)</option>
-        <option value="approved">Disetujui (Approved)</option>
-        <option value="rejected">Ditolak (Rejected)</option>
+        <option value="" ${oldWdStatus === '' ? 'selected' : ''}>Semua Status</option>
+        <option value="pending" ${oldWdStatus === 'pending' ? 'selected' : ''}>Menunggu Approval (Pending)</option>
+        <option value="approved" ${oldWdStatus === 'approved' ? 'selected' : ''}>Disetujui (Approved)</option>
+        <option value="rejected" ${oldWdStatus === 'rejected' ? 'selected' : ''}>Ditolak (Rejected)</option>
       </select>
       <button id="addManualWdBtn" class="neo-btn purple">＋ Buat Pengajuan Manual</button>
     </div>
@@ -1552,7 +1714,7 @@ function openResellerModal(item = {}) {
       body: b
     });
     toast(edit ? 'Data reseller diperbarui' : 'Reseller baru berhasil dibuat');
-    await loadResellers();
+    await loadResellers(true);
   }, { submit: edit ? 'Simpan Perubahan' : '＋ Daftarkan Reseller' });
 }
 
@@ -1604,7 +1766,7 @@ function openResellerBotModal(bot = {}, defaultResellerId = null) {
       body: b
     });
     toast(edit ? 'Token bot diperbarui' : 'Bot reseller berhasil didaftarkan dan dijalankan');
-    await loadResellers();
+    await loadResellers(true);
   }, { submit: edit ? 'Simpan Perubahan' : '＋ Jalankan Bot' });
 
   const verifyBtn = $('#btnVerifyToken');
@@ -1676,7 +1838,7 @@ function openResellerBotBrandingModal(bot) {
   modal(`🎨 Branding Toko · @${bot.bot_username}`, html, async b => {
     await api(`/api/admin/reseller-bots/${bot.id}`, { method: 'PATCH', body: b });
     toast('Branding bot berhasil diperbarui');
-    await loadResellers();
+    await loadResellers(true);
   }, { submit: 'Simpan Branding' });
 
   const uploadBtn = $('#btnUploadBotBanner');
@@ -1738,7 +1900,7 @@ function openWithdrawalApproveModal(w) {
       }
     });
     toast('Penarikan saldo disetujui & notifikasi terkirim!');
-    await loadResellers();
+    await loadResellers(true);
   }, { submit: '✅ Konfirmasi Telah Ditransfer' });
 
   const uploadBtn = $('#btnUploadWdProof');
@@ -1788,7 +1950,7 @@ function openWithdrawalRejectModal(w) {
       body: { admin_note: b.admin_note || '' }
     });
     toast('Pengajuan penarikan ditolak');
-    await loadResellers();
+    await loadResellers(true);
   }, { submit: '❌ Tolak Pengajuan' });
 }
 
@@ -1827,7 +1989,7 @@ function openManualWithdrawalModal(defaultResellerId = null) {
     b.amount = Number(b.amount || 0);
     await api('/api/admin/reseller-withdrawals', { method: 'POST', body: b });
     toast('Pengajuan penarikan dibuat (status pending)');
-    await loadResellers();
+    await loadResellers(true);
   }, { submit: 'Buat Pengajuan' });
 
   const resSelect = $('#manualWdReseller');

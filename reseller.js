@@ -12,19 +12,25 @@ const state = {
   freshProducts: [],
   pendingPricing: {},
   orders: [],
+  users: [],
   withdrawals: [],
   report: {}
 };
 
 const titles = {
   dashboard: ['Dashboard', 'Ringkasan performa toko dan komisi profit Anda'],
-  bot: ['Pengaturan', 'Kelola token bot, nama toko, banner, dan pengaturan layanan'],
   pricing: ['Produk', 'Katalog produk dan pengaturan margin keuntungan bot toko Anda'],
-  orders: ['Pesanan Pembeli', 'Daftar riwayat transaksi pembeli yang masuk melalui bot Anda'],
+  orders: ['Pesanan', 'Daftar riwayat transaksi pembeli yang masuk melalui bot Anda'],
   reports: ['Laporan', 'Omzet, profit, dan performa penjualan bot toko Anda'],
+  broadcast: ['Broadcast Pelanggan', 'Kirim pesan massal promosi, info diskon, atau pengumuman ke pembeli bot Anda'],
+  users: ['User', 'Data pelanggan bot Telegram, saldo, dan aktivitas'],
   withdraw: ['Tarik Saldo', 'Pencairan saldo komisi profit ke rekening bank atau e-wallet'],
-  broadcast: ['Broadcast Pelanggan', 'Kirim pesan massal promosi, info diskon, atau pengumuman ke pembeli bot Anda']
+  bot: ['Pengaturan', 'Kelola token bot, nama toko, banner, dan pengaturan layanan']
 };
+
+function firstLetter(v) {
+  return esc(String(v || '?').trim().charAt(0).toUpperCase() || '?');
+}
 
 function esc(v = '') {
   return String(v ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
@@ -241,6 +247,17 @@ async function api(path, options = {}) {
   return data;
 }
 
+async function remove(url, confirmText, callback) {
+  if (confirmText && !confirm(confirmText)) return;
+  try {
+    await api(url, { method: 'DELETE' });
+    toast('Berhasil dihapus');
+    if (typeof callback === 'function') await callback();
+  } catch (err) {
+    toast(err.message || 'Gagal menghapus', true);
+  }
+}
+
 // Sidebar Drawer Control (Exact parity with Owner Miniapp)
 function closeSidebar() {
   $('#sidebar')?.classList.remove('open');
@@ -323,12 +340,13 @@ async function navigate(view, silent = false) {
   try {
     await ({
       dashboard: loadDashboard,
-      bot: loadBot,
       pricing: loadPricing,
       orders: loadOrders,
       reports: loadReports,
+      broadcast: loadBroadcast,
+      users: loadUsers,
       withdraw: loadWithdraw,
-      broadcast: loadBroadcast
+      bot: loadBot
     }[view] || loadDashboard)();
     $('#lastUpdated').textContent = 'Terakhir diperbarui: ' + new Date().toLocaleTimeString('id-ID');
   } catch (e) {
@@ -387,6 +405,18 @@ async function loadDashboard() {
     `;
   }).join('');
 
+  const topProducts = Array.isArray(data.top_products) && data.top_products.length ? data.top_products : [];
+  const topProductsHtml = topProducts.length ? topProducts.map((p, i) => `
+    <div class="top-item">
+      <span class="rank">${i + 1}</span>
+      <div style="min-width:0;flex:1">
+        <b style="display:block;font-size:13px;overflow-wrap:anywhere">${esc(p.product_name || '-')}${p.variant_name ? ` <span style="font-weight:normal;color:var(--muted)">(${esc(p.variant_name)})</span>` : ''}</b>
+        <small style="color:var(--muted);font-size:11px">${p.qty || 0} terjual · ${p.orders || 0} order · profit ${money(p.profit || 0)}</small>
+      </div>
+      <strong style="font-size:13px;white-space:nowrap">${money(p.revenue)}</strong>
+    </div>
+  `).join('') : '<div class="empty compact">Belum ada data produk terjual di bot toko Anda.</div>';
+
   $('#content').innerHTML = `
     <div class="dashboard-kpis">
       ${stat('💵', 'green', 'Saldo Komisi Profit', money(r.profit_balance ?? stats.profit_balance), 'Siap dicairkan')}
@@ -403,6 +433,18 @@ async function loadDashboard() {
       </div>
       <div class="seven-chart">
         ${chartBars}
+      </div>
+    </section>
+
+    <section class="report-card top-products-card reseller-top-products-card" style="margin-top:16px">
+      <div class="card-heading">
+        <div>
+          <h3>🔥 Produk Terlaris di Bot Anda</h3>
+          <p>Daftar produk dengan penjualan terbanyak yang dipesan pelanggan di bot toko Anda</p>
+        </div>
+      </div>
+      <div class="top-list">
+        ${topProductsHtml}
       </div>
     </section>
   `;
@@ -1795,7 +1837,7 @@ function renderOrdersView(filterStatus = '', search = '') {
   $('#content').innerHTML = `
     <div class="section-title product-section-title">
       <div>
-        <h2>🛒 Riwayat Pesanan Pembeli</h2>
+        <h2>🛒 Riwayat Pesanan</h2>
         <p>Seluruh pesanan otomatis dilayani dan komisi profit langsung masuk ke saldo Anda.</p>
       </div>
       <span>
@@ -2293,6 +2335,171 @@ async function loadBroadcast() {
       submitBtn.textContent = `📢 Kirim ke ${totalUsers} Pelanggan`;
     }
   };
+}
+
+// ---------------------------------------------------------------------
+// VIEW: USER (PELANGGAN BOT RESELLER)
+// ---------------------------------------------------------------------
+function userCards(rows) {
+  return rows.length ? rows.map(u => `
+    <article class="user-card">
+      <div class="user-avatar">${firstLetter(u.first_name || u.username || u.telegram_id)}</div>
+      <div class="user-main">
+        <h3>${esc([u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || u.telegram_id)}</h3>
+        <p>${u.username ? '@' + esc(u.username) + ' · ' : ''}<span class="mono">${esc(u.telegram_id)}</span></p>
+        <div class="user-meta">
+          <span>Saldo <b>${money(u.balance_main ?? u.balance ?? 0)}</b></span>
+          <span>Status ${badge(u.status)}</span>
+          <span>Terakhir Aktif <b>${esc(date(u.last_seen_at))}</b></span>
+          <span>Bergabung <b>${esc(date(u.first_seen_at))}</b></span>
+        </div>
+      </div>
+      <div class="user-actions">
+        ${u.status === 'blocked' ? `<button class="neo-btn green small" data-unblock-user="${esc(u.telegram_id)}">Aktifkan</button>` : ''}
+        <button class="neo-btn yellow small" data-wallet-user="${esc(u.telegram_id)}">Saldo</button>
+        <button class="neo-btn blue small" data-chat-user="${esc(u.telegram_id)}">Chat</button>
+        <button class="neo-btn red small" data-delete-user="${esc(u.telegram_id)}">Hapus</button>
+      </div>
+    </article>
+  `).join('') : '<div class="empty-product">Belum ada user Telegram. Pelanggan akan muncul otomatis setelah berinteraksi dengan bot toko Anda.</div>';
+}
+
+function filterUsers() {
+  const q = ($('#userSearch')?.value || '').toLowerCase().trim();
+  const st = $('#userStatus')?.value || '';
+  const rows = (state.users || []).filter(u =>
+    (!q || [u.telegram_id, u.username, u.first_name, u.last_name].some(x => String(x || '').toLowerCase().includes(q))) &&
+    (!st || u.status === st)
+  );
+  const cardsEl = $('#userCards');
+  if (cardsEl) cardsEl.innerHTML = userCards(rows);
+  const total = (state.users || []).length;
+  if ($('#userCount')) {
+    const act = (state.users || []).filter(u => u.status === 'active').length;
+    const blk = (state.users || []).filter(u => u.status === 'blocked').length;
+    $('#userCount').textContent = rows.length === total ? `${total} user (${act} aktif, ${blk} blocked)` : `${rows.length} / ${total} user`;
+  }
+  bindUserActions();
+}
+
+function bindUserToolbarActions() {
+  if ($('#unblockAllUsers')) {
+    $('#unblockAllUsers').onclick = async () => {
+      if (!confirm('Aktifkan kembali semua user yang berstatus blocked menjadi active di bot Anda?')) return;
+      const btn = $('#unblockAllUsers');
+      btn.disabled = true;
+      btn.textContent = 'Memproses...';
+      try {
+        const res = await api('/api/reseller/users/activate-all', { method: 'POST', body: {} });
+        toast(`${res.changes || 0} user berhasil diaktifkan`);
+        await loadUsers(true);
+      } catch (e) {
+        toast(e.message, true);
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '⚡ Aktifkan Semua Blocked'; }
+      }
+    };
+  }
+}
+
+function bindUserActions() {
+  $$('[data-unblock-user]').forEach(b => b.onclick = async () => {
+    try {
+      await api(`/api/reseller/users/${encodeURIComponent(b.dataset.unblockUser)}`, { method: 'PATCH', body: { status: 'active' } });
+      toast('User diaktifkan');
+      loadUsers(true);
+    } catch (e) {
+      toast(e.message, true);
+    }
+  });
+
+  $$('[data-wallet-user]').forEach(b => b.onclick = () => {
+    const u = (state.users || []).find(x => String(x.telegram_id) === b.dataset.walletUser);
+    openWallet(u);
+  });
+
+  $$('[data-chat-user]').forEach(b => b.onclick = () => openSendMessage(b.dataset.chatUser));
+
+  $$('[data-delete-user]').forEach(b => b.onclick = () => remove(`/api/reseller/users/${encodeURIComponent(b.dataset.deleteUser)}`, 'Hapus pengguna ini dari database bot Anda?', () => loadUsers(true)));
+}
+
+function openWallet(u) {
+  if (!u) return;
+  modal('Atur Saldo · ' + (u.first_name || u.username || u.telegram_id), `
+    <div class="form-grid">
+      <label class="full">Saldo Pengguna
+        <input name="balance_main" type="number" min="0" value="${Number(u.balance_main ?? u.balance ?? 0)}" required />
+      </label>
+      <label class="full">Telegram ID
+        <input value="${esc(u.telegram_id)}" disabled />
+      </label>
+    </div>
+  `, async b => {
+    b.balance_main = Number(b.balance_main || 0);
+    await api(`/api/reseller/users/${encodeURIComponent(u.telegram_id)}/wallet`, { method: 'POST', body: b });
+    toast('Saldo pengguna diperbarui');
+    loadUsers(true);
+  });
+}
+
+function openSendMessage(id) {
+  modal('Kirim Pesan ke User via Bot Anda', `
+    <label class="field" style="display:grid;gap:6px;margin-bottom:12px">Telegram ID
+      <input value="${esc(id)}" disabled />
+    </label>
+    <label class="field" style="display:grid;gap:6px">Pesan
+      <textarea name="message" required rows="6" placeholder="Ketik pesan yang akan dikirimkan langsung dari bot toko Anda ke user ini..."></textarea>
+    </label>
+  `, async b => {
+    await api(`/api/reseller/users/${encodeURIComponent(id)}/message`, { method: 'POST', body: { message: b.message } });
+    toast('Pesan berhasil terkirim via bot toko');
+  }, { submit: 'Kirim Pesan' });
+}
+
+async function loadUsers(preserveScroll = false) {
+  const scrollY = preserveScroll ? window.scrollY : 0;
+  const currentSearch = $('#userSearch')?.value || '';
+  const currentStatus = $('#userStatus')?.value || '';
+  const existingCards = $('#userCards');
+  const r = await api('/api/reseller/users?limit=50000');
+  state.users = Array.isArray(r.items) ? r.items : [];
+  const actCount = state.users.filter(u => u.status === 'active').length;
+  const blkCount = state.users.filter(u => u.status === 'blocked').length;
+
+  if (!existingCards) {
+    $('#content').innerHTML = `
+      <div class="section-title product-section-title">
+        <div>
+          <h2>👥 Manajemen User Pelanggan</h2>
+          <p>Daftar seluruh pengguna yang berinteraksi atau berbelanja di bot toko Telegram Anda.</p>
+        </div>
+        <span>
+          <span class="badge ok">Total ${state.users.length} User</span>
+        </span>
+      </div>
+
+      <div class="toolbar user-toolbar">
+        <div class="searchbox"><input id="userSearch" placeholder="Cari ID, username, nama..." /></div>
+        <select id="userStatus">
+          <option value="">Semua Status</option>
+          <option value="active">Aktif</option>
+          <option value="blocked">Blocked</option>
+        </select>
+        <button type="button" id="unblockAllUsers" class="neo-btn green small">⚡ Aktifkan Semua Blocked</button>
+        <div class="toolbar-count" id="userCount">${state.users.length} user (${actCount} aktif, ${blkCount} blocked)</div>
+      </div>
+      <div id="userCards" class="user-list">${userCards(state.users)}</div>
+    `;
+    $('#userSearch').oninput = filterUsers;
+    $('#userStatus').onchange = filterUsers;
+    bindUserToolbarActions();
+  } else {
+    if (currentSearch && $('#userSearch')) $('#userSearch').value = currentSearch;
+    if (currentStatus && $('#userStatus')) $('#userStatus').value = currentStatus;
+    if ($('#userCount')) $('#userCount').textContent = `${state.users.length} user (${actCount} aktif, ${blkCount} blocked)`;
+  }
+  filterUsers();
+  if (preserveScroll) window.scrollTo({ top: scrollY, behavior: 'instant' });
 }
 
 // ---------------------------------------------------------------------

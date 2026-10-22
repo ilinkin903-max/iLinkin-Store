@@ -352,12 +352,6 @@ async function loadDashboard() {
       <div class="card-heading">
         <div>
           <h3>📊 Grafik 7 Hari Terakhir</h3>
-          <p>Performa omset penjualan bot toko Anda selama 7 hari terakhir</p>
-        </div>
-        <div class="chart-summary-pills">
-          <span class="chart-pill purple">Omset: <b>${money(total7Revenue)}</b></span>
-          <span class="chart-pill green">Profit: <b>+${money(total7Profit)}</b></span>
-          <span class="chart-pill blue">Pesanan: <b>${total7Orders}</b></span>
         </div>
       </div>
       <div class="seven-chart">
@@ -632,9 +626,9 @@ function renderProductCatalogView(searchFilter = '', statusFilter = 'all', categ
       </span>
     </div>
 
-    <div class="tabs" style="margin-bottom:16px">
-      <button class="tab-btn ${activeTab === 'regular' ? 'active' : ''}" data-product-tab="regular">📦 Produk Reguler (${state.products.length})</button>
-      <button class="tab-btn ${activeTab === 'fresh' ? 'active' : ''}" data-product-tab="fresh">⚡ Produk Fresh (${state.freshProducts.length})</button>
+    <div class="tabs product-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+      <button class="tab-btn ${activeTab === 'regular' ? 'active' : ''}" data-product-tab="regular" style="width:100%;text-align:center;padding:10px 8px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;">📦 Daftar Produk (${state.products.length})</button>
+      <button class="tab-btn ${activeTab === 'fresh' ? 'active' : ''}" data-product-tab="fresh" style="width:100%;text-align:center;padding:10px 8px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;">⚡ Produk Fresh (${state.freshProducts.length})</button>
     </div>
 
     ${toolbarHtml}

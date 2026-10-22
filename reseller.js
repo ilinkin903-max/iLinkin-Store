@@ -137,8 +137,13 @@ function modal(title, html, onSubmit, options = {}) {
   submitBtn.textContent = options.submit || 'Simpan';
   submitBtn.disabled = false;
   submitBtn.classList.toggle('hidden', options.noSubmit === true);
+  const cancelBtn = $('#modalCancel');
+  if (cancelBtn) {
+    cancelBtn.textContent = options.cancelText || (options.noSubmit === true ? 'Tutup' : 'Batal');
+  }
   form.onsubmit = async (e) => {
     e.preventDefault();
+    if (options.noSubmit === true) return;
     if (!onSubmit) return m.close();
     submitBtn.disabled = true;
     submitBtn.textContent = 'Menyimpan...';
@@ -146,7 +151,7 @@ function modal(title, html, onSubmit, options = {}) {
       const fd = new FormData(form);
       const data = Object.fromEntries(fd.entries());
       const res = await onSubmit(data);
-      if (res !== false) m.close();
+      if (res !== false && m.open) m.close();
     } catch (err) {
       if (alertBox) {
         alertBox.textContent = err.message || 'Terjadi kesalahan.';
@@ -160,16 +165,51 @@ function modal(title, html, onSubmit, options = {}) {
       submitBtn.textContent = options.submit || 'Simpan';
     }
   };
-  const handleCancel = () => {
+  const handleCancel = async (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    let shouldClose = true;
     if (typeof options.onCancel === 'function') {
-      options.onCancel();
-    } else {
+      try {
+        const res = await options.onCancel();
+        if (res === false) shouldClose = false;
+      } catch (err) {
+        console.error('Modal onCancel error:', err);
+      }
+    }
+    if (shouldClose && m.open) {
       m.close();
     }
   };
   $('#modalClose').onclick = handleCancel;
-  $('#modalCancel').onclick = handleCancel;
+  if (cancelBtn) cancelBtn.onclick = handleCancel;
+  m.oncancel = async (e) => {
+    if (typeof options.onCancel === 'function') {
+      try {
+        const res = await options.onCancel();
+        if (res === false && typeof e.preventDefault === 'function') {
+          e.preventDefault();
+        }
+      } catch (err) {
+        console.error('Modal oncancel error:', err);
+      }
+    }
+  };
   if (!m.open) m.showModal();
+}
+
+const modalEl = $('#modal');
+if (modalEl) {
+  modalEl.addEventListener('close', () => {
+    const t = $('#toast');
+    if (t && t.parentElement !== document.body) document.body.appendChild(t);
+    const alertBox = $('#modalAlert');
+    if (alertBox) { alertBox.className = 'modal-alert hidden'; alertBox.textContent = ''; }
+  });
+  modalEl.addEventListener('click', (e) => {
+    if (e.target === modalEl) {
+      $('#modalCancel')?.click();
+    }
+  });
 }
 
 async function api(path, options = {}) {

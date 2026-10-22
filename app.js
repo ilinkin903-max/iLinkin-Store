@@ -836,17 +836,51 @@ function bindUserToolbarActions(){
 function userCards(rows){return rows.length?rows.map(u=>`<article class="user-card"><div class="user-avatar">${firstLetter(u.first_name||u.username||u.telegram_id)}</div><div class="user-main"><h3>${esc([u.first_name,u.last_name].filter(Boolean).join(' ')||u.username||u.telegram_id)}</h3><p>${u.username?'@'+esc(u.username)+' · ':''}<span class="mono">${esc(u.telegram_id)}</span></p><div class="user-meta"><span>Referral <b>${esc(u.referral_code||'-')}</b></span><span>Saldo Utama <b>${money(u.balance_main)}</b></span><span>Saldo Referral <b>${money(u.balance_referral)}</b></span><span>Total <b>${money(u.balance_total)}</b></span><span>Status ${badge(u.status)}</span><span>Aktif <b>${esc(date(u.last_seen_at))}</b></span></div></div><div class="user-actions">${u.status==='blocked'?`<button class="neo-btn green small" data-unblock-user="${esc(u.telegram_id)}">Aktifkan</button>`:''}<button class="neo-btn yellow small" data-wallet-user="${esc(u.telegram_id)}">Saldo</button><button class="neo-btn blue small" data-chat-user="${esc(u.telegram_id)}">Chat</button><button class="neo-btn red small" data-delete-user="${esc(u.telegram_id)}">Hapus</button></div></article>`).join(''):'<div class="empty-product">Belum ada user Telegram. User akan muncul setelah berinteraksi dengan bot.</div>'}
 function filterUsers(){const q=($('#userSearch')?.value||'').toLowerCase().trim(),st=$('#userStatus')?.value||'';const rows=state.cache.users.filter(u=>(!q||[u.telegram_id,u.username,u.first_name,u.last_name,u.referral_code].some(x=>String(x||'').toLowerCase().includes(q)))&&(!st||u.status===st));$('#userCards').innerHTML=userCards(rows);const total=state.cache.users.length;if($('#userCount')){const act=state.cache.users.filter(u=>u.status==='active').length;const blk=state.cache.users.filter(u=>u.status==='blocked').length;$('#userCount').textContent=rows.length===total?`${total} user (${act} aktif, ${blk} blocked)`:`${rows.length} / ${total} user`;}bindUserActions()}
 function bindUserActions(){$$('[data-unblock-user]').forEach(b=>b.onclick=async()=>{try{await api(`/api/admin/users/${encodeURIComponent(b.dataset.unblockUser)}`,{method:'PATCH',body:{status:'active'}});toast('User diaktifkan');loadUsers(true)}catch(e){toast(e.message,true)}});$$('[data-wallet-user]').forEach(b=>b.onclick=()=>openWallet(state.cache.users.find(x=>String(x.telegram_id)===b.dataset.walletUser)));$$('[data-chat-user]').forEach(b=>b.onclick=()=>openSendMessage(b.dataset.chatUser));$$('[data-delete-user]').forEach(b=>b.onclick=()=>remove(`/api/admin/users/${encodeURIComponent(b.dataset.deleteUser)}`,'Hapus pengguna?',()=>loadUsers(true)))}
-function modal(title,html,onSubmit,{submit='Simpan',hideSubmit=false,onCancel=null}={}){
+function modal(title,html,onSubmit,{submit='Simpan',hideSubmit=false,onCancel=null,cancelText=''}={}){
+  const m=$('#modal');
+  if(!m)return;
   $('#modalTitle').innerHTML=title;
   $('#modalBody').innerHTML=html;
   $('#modalSubmit').textContent=submit;
   $('#modalSubmit').classList.toggle('hidden',hideSubmit);
+  const cancelBtn=$('#modalCancel');
+  if(cancelBtn){
+    cancelBtn.textContent=cancelText||(hideSubmit?'Tutup':'Batal');
+  }
   const alertEl=$('#modalAlert');
   if(alertEl){alertEl.textContent='';alertEl.classList.add('hidden');}
-  $('#modalClose').onclick=$('#modalCancel').onclick=()=>{
-    if(typeof onCancel==='function') onCancel();
-    else $('#modal').close();
+
+  const handleClose=async(e)=>{
+    if(e&&typeof e.preventDefault==='function')e.preventDefault();
+    let shouldClose=true;
+    if(typeof onCancel==='function'){
+      try{
+        const res=await onCancel();
+        if(res===false)shouldClose=false;
+      }catch(err){
+        console.error('Modal onCancel error:',err);
+      }
+    }
+    if(shouldClose&&m.open){
+      m.close();
+    }
   };
+
+  $('#modalClose').onclick=handleClose;
+  if(cancelBtn)cancelBtn.onclick=handleClose;
+  m.oncancel=async(e)=>{
+    if(typeof onCancel==='function'){
+      try{
+        const res=await onCancel();
+        if(res===false&&typeof e.preventDefault==='function'){
+          e.preventDefault();
+        }
+      }catch(err){
+        console.error('Modal oncancel error:',err);
+      }
+    }
+  };
+
   $('#modalForm').onsubmit=async e=>{
     e.preventDefault();
     if(hideSubmit)return;
@@ -857,7 +891,7 @@ function modal(title,html,onSubmit,{submit='Simpan',hideSubmit=false,onCancel=nu
       if(alertEl)alertEl.classList.add('hidden');
       const fd=new FormData(e.target);
       const res=await onSubmit(Object.fromEntries(fd.entries()));
-      if(res!==false && $('#modal').open)$('#modal').close();
+      if(res!==false&&m.open)m.close();
     }catch(err){
       toast(err.message||'Gagal menyimpan',true);
       if(alertEl){
@@ -869,7 +903,7 @@ function modal(title,html,onSubmit,{submit='Simpan',hideSubmit=false,onCancel=nu
       if(btn){btn.disabled=false;btn.textContent=oldText;}
     }
   };
-  if(!$('#modal').open)$('#modal').showModal();
+  if(!m.open)m.showModal();
 }
 const modalEl=$('#modal');
 if(modalEl){
@@ -878,6 +912,11 @@ if(modalEl){
     if(t&&t.parentElement!==document.body)document.body.appendChild(t);
     const alertEl=$('#modalAlert');
     if(alertEl){alertEl.textContent='';alertEl.classList.add('hidden');}
+  });
+  modalEl.addEventListener('click',e=>{
+    if(e.target===modalEl){
+      $('#modalCancel')?.click();
+    }
   });
 }
 function variantEditorHtml(item){
@@ -963,7 +1002,7 @@ async function openManageProduct(p){
   const variants=Array.isArray(p.variants)?p.variants:[],localVariants=variants.filter(v=>!v.supplier_source),targets=variants.length?localVariants:[{id:'',name:'Stok Default'}];
   if(!targets.length)return toast('Produk ini memakai stok supplier. Kelola melalui Sync Supplier / Edit Varian.',true);
   const options=targets.map(v=>`<option value="${esc(v.id||'')}">${esc(v.name)}</option>`).join('');
-  modal('Kelola Stok · '+p.name,`<div class="stock-manager"><div class="stock-manager-controls"><label>Target Stok<select id="manageStockVariant">${options}</select></label><label>Status<select id="manageStockStatus"><option value="available">Ready</option><option value="sold">Terjual</option><option value="">Semua</option></select></label></div><div id="stockManagerSummary" class="stock-summary"></div><div id="stockManagerList" class="stock-manager-list"><div class="empty compact">Memuat stok...</div></div></div>`,async()=>{}, {hideSubmit:true,onCancel:()=>reloadProducts(p.id)});
+  modal('Kelola Stok · '+p.name,`<div class="stock-manager"><div class="stock-manager-controls"><label>Target Stok<select id="manageStockVariant">${options}</select></label><label>Status<select id="manageStockStatus"><option value="available">Ready</option><option value="sold">Terjual</option><option value="">Semua</option></select></label></div><div id="stockManagerSummary" class="stock-summary"></div><div id="stockManagerList" class="stock-manager-list"><div class="empty compact">Memuat stok...</div></div></div>`,async()=>{}, {hideSubmit:true,cancelText:'Tutup',onCancel:()=>reloadProducts(p.id)});
   const load=async()=>{const vid=$('#manageStockVariant').value;const status=$('#manageStockStatus').value;try{const r=await api(`/api/admin/products/${p.id}/stock?variant_id=${encodeURIComponent(vid)}&status=${encodeURIComponent(status)}&limit=2000`);$('#stockManagerSummary').innerHTML=`<b>${r.items.length}</b> item ditampilkan · <b>${r.count}</b> stok ready`;$('#stockManagerList').innerHTML=r.items.length?r.items.map((x,i)=>`<div class="stock-item-card"><div class="stock-item-head"><span>#${i+1} · ID ${x.id}</span>${badge(x.status)}</div><textarea data-stock-value="${x.id}" ${x.status!=='available'?'disabled':''}>${esc(x.value)}</textarea><div class="stock-item-meta"><span>${esc(date(x.created_at))}</span>${x.order_ref?`<span>Order ${esc(x.order_ref)}</span>`:''}</div>${x.status==='available'?`<div class="actions"><button type="button" class="neo-btn blue small" data-save-stock="${x.id}">Simpan Edit</button><button type="button" class="neo-btn red small" data-delete-stock="${x.id}">Hapus</button></div>`:''}</div>`).join(''):'<div class="empty compact">Tidak ada stok pada target ini.</div>';
     $$('[data-save-stock]').forEach(b=>b.onclick=async()=>{try{const val=$(`[data-stock-value="${b.dataset.saveStock}"]`).value;await api(`/api/admin/stock/${b.dataset.saveStock}`,{method:'PATCH',body:{value:val}});toast('Stok diperbarui');await load();await reloadProducts(p.id)}catch(e){toast(e.message,true)}});$$('[data-delete-stock]').forEach(b=>b.onclick=async()=>{if(!confirm('Hapus stok ini?'))return;try{await api(`/api/admin/stock/${b.dataset.deleteStock}`,{method:'DELETE'});toast('Stok dihapus');await load();await reloadProducts(p.id)}catch(e){toast(e.message,true)}})}catch(e){$('#stockManagerList').innerHTML=`<div class="empty compact">${esc(e.message)}</div>`}};
   $('#manageStockVariant').onchange=load;$('#manageStockStatus').onchange=load;await load();
@@ -985,7 +1024,7 @@ function openVariant(p,v={}){
     return false;
   },{
     submit:edit?'Simpan Varian':'＋ Tambah Varian',
-    onCancel:()=>openProduct(findProduct(parentId)||p)
+    onCancel:()=>{ openProduct(findProduct(parentId)||p); return false; }
   });
   const backBtn=$('#backToProductModal');
   if(backBtn)backBtn.onclick=()=>openProduct(findProduct(parentId)||p);

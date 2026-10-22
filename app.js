@@ -788,7 +788,7 @@ async function loadUsers(preserveScroll=false){
   const currentSearch=$('#userSearch')?.value||'';
   const currentStatus=$('#userStatus')?.value||'';
   const existingCards=$('#userCards');
-  const r=await api('/api/admin/users?limit=500');state.cache.users=Array.isArray(r.items)?r.items:[];
+  const r=await api('/api/admin/users?limit=50000');state.cache.users=Array.isArray(r.items)?r.items:[];
   const actCount=state.cache.users.filter(u=>u.status==='active').length;
   const blkCount=state.cache.users.filter(u=>u.status==='blocked').length;
   if(!existingCards){

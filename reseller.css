@@ -317,3 +317,20 @@
   }
 }
 
+/* Modal Variant & Fresh Product Editor Enhancements */
+.variant-edit-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.modal-var-margin, .modal-fresh-margin {
+  font-family: inherit;
+  outline: none;
+}
+.modal-var-margin:focus, .modal-fresh-margin:focus {
+  border-color: var(--primary, #6c2cff) !important;
+  box-shadow: 0 0 0 2px rgba(108, 44, 255, 0.25);
+}
+.modal-var-sell, .modal-fresh-sell {
+  color: #705300;
+  letter-spacing: -0.2px;
+}
+

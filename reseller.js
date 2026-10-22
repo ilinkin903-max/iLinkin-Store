@@ -4,10 +4,12 @@ const $$ = (s) => [...document.querySelectorAll(s)];
 const state = {
   token: sessionStorage.getItem('ilink_reseller_token') || localStorage.getItem('ilink_reseller_token') || '',
   view: 'dashboard',
+  productTab: 'regular',
   reseller: null,
   bot: null,
   runtime: null,
   products: [],
+  freshProducts: [],
   pendingPricing: {},
   orders: [],
   withdrawals: []
@@ -49,6 +51,51 @@ function date(v) {
 
 function stat(icon, color, label, value, small) {
   return `<div class="stat-card"><div class="stat-icon ${color}">${icon}</div><div><small>${esc(label)}</small><strong>${esc(value)}</strong><em>${esc(small)}</em></div></div>`;
+}
+
+function mediaSrc(value) {
+  const raw = String(value || '').trim();
+  if (raw.startsWith('vps://')) return `/api/media?name=${encodeURIComponent(raw.slice(6))}&v=268`;
+  return raw;
+}
+
+function freshProductEmoji(key = '') {
+  const k = String(key || '').toLowerCase();
+  if (k.includes('zoom')) return '📹';
+  if (k.includes('canva')) return '🎨';
+  if (k.includes('picsart')) return '🖌️';
+  if (k.includes('meitu')) return '📸';
+  if (k.includes('wink')) return '✨';
+  if (k.includes('outlook') || k.includes('hotmail')) return '✉️';
+  if (k.includes('apple') || k.includes('music')) return '🎵';
+  if (k.includes('vpn') || k.includes('express')) return '🛡️';
+  if (k.includes('hma')) return '🔒';
+  if (k.includes('scribd')) return '📚';
+  if (k.includes('remini')) return '🪄';
+  if (k.includes('adspower')) return '🌐';
+  return '⚡';
+}
+
+function productStockState(p = {}) {
+  const all = Array.isArray(p.variants) ? p.variants : [];
+  const vars = all.filter(v => v.active);
+  if (all.length) {
+    if (vars.some(v => v.delivery_mode !== 'preorder' && Number(v.stock || 0) > 0)) return 'ready';
+    if (vars.some(v => v.delivery_mode === 'preorder')) return 'preorder';
+    return 'empty';
+  }
+  if (p.delivery_mode === 'preorder' && Number(p.stock || 0) < 1) return 'preorder';
+  return Number(p.sale_stock ?? p.stock ?? 0) > 0 ? 'ready' : 'empty';
+}
+
+function stockStateLabel(state, stock = 0) {
+  return state === 'ready' ? `READY · ${Number(stock || 0)}` : state === 'preorder' ? 'PRE-ORDER' : 'HABIS';
+}
+
+function variantChip(v = {}) {
+  const st = v.delivery_mode === 'preorder' ? 'preorder' : Number(v.stock || 0) > 0 ? 'ready' : 'empty';
+  const label = st === 'ready' ? `Ready ${Number(v.stock || 0)}` : st === 'preorder' ? 'PO' : 'Habis';
+  return `<span class="variant-chip stock-${st}" title="${esc(v.name)} · ${label}">${esc(v.name)} · ${label}</span>`;
 }
 
 function toast(msg, bad = false) {
@@ -476,15 +523,19 @@ async function loadBot() {
 }
 
 // ---------------------------------------------------------------------
-// VIEW 3: KATALOG PRODUK & ATUR MARGIN VARIAN (Identical to Owner loadProducts())
+// VIEW 3: KATALOG PRODUK & ATUR MARGIN (Identik dengan Dashboard Owner)
 // ---------------------------------------------------------------------
 async function loadPricing() {
-  const res = await api('/api/reseller/products');
+  const [res, freshRes] = await Promise.all([
+    api('/api/reseller/products'),
+    api('/api/reseller/fresh-products').catch(() => ({ items: [] }))
+  ]);
   state.products = res.items || [];
+  state.freshProducts = freshRes.items || [];
   state.pendingPricing = {};
   updateSaveBar();
 
-  renderPricingView();
+  renderProductCatalogView();
 }
 
 function updateSaveBar() {
@@ -503,369 +554,740 @@ function categories(rows) {
   return [...new Set(rows.map(x => x.category).filter(Boolean))].sort().map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
 }
 
-function renderPricingView(searchFilter = '', statusFilter = 'all', categoryFilter = '') {
+function renderProductCatalogView(searchFilter = '', statusFilter = 'all', categoryFilter = '') {
   const q = (searchFilter || $('#productSearch')?.value || '').toLowerCase().trim();
   const stFilter = statusFilter !== 'all' ? statusFilter : ($('#productStatus')?.value || 'all');
   const catFilter = categoryFilter || ($('#productCategory')?.value || '');
+  const activeTab = state.productTab || 'regular';
 
-  const filtered = state.products.filter(p => {
-    const matchSearch = !q || [p.name, p.code, p.category].some(x => String(x || '').toLowerCase().includes(q)) || (p.variants || []).some(v => v.name.toLowerCase().includes(q));
-    const matchCat = !catFilter || p.category === catFilter;
-    const pEnabled = state.pendingPricing[p.code]?.enabled !== undefined ? state.pendingPricing[p.code].enabled : p.enabled;
-    if (!matchSearch || !matchCat) return false;
-    if (stFilter === 'enabled') return pEnabled;
-    if (stFilter === 'disabled') return !pEnabled;
-    return true;
-  });
+  let toolbarHtml = '';
+  let gridHtml = '';
+
+  if (activeTab === 'regular') {
+    const filtered = state.products.filter(p => {
+      const matchSearch = !q || [p.name, p.code, p.category, p.tag].some(x => String(x || '').toLowerCase().includes(q)) || (p.variants || []).some(v => v.name.toLowerCase().includes(q));
+      const matchCat = !catFilter || p.category === catFilter;
+      const isEnabled = state.pendingPricing[p.code]?.enabled !== undefined ? state.pendingPricing[p.code].enabled : p.enabled;
+      if (!matchSearch || !matchCat) return false;
+      if (stFilter === 'enabled' || stFilter === '1') return isEnabled;
+      if (stFilter === 'disabled' || stFilter === '0') return !isEnabled;
+      return true;
+    });
+
+    toolbarHtml = `
+      <div class="toolbar product-toolbar">
+        <div class="searchbox"><input id="productSearch" placeholder="Cari nama produk, kode, atau varian..." value="${esc(q)}" /></div>
+        <select id="productCategory">
+          <option value="">Semua Kategori</option>
+          ${categories(state.products)}
+        </select>
+        <select id="productStatus">
+          <option value="all" ${stFilter === 'all' ? 'selected' : ''}>Semua Status</option>
+          <option value="enabled" ${stFilter === 'enabled' || stFilter === '1' ? 'selected' : ''}>Hanya Aktif</option>
+          <option value="disabled" ${stFilter === 'disabled' || stFilter === '0' ? 'selected' : ''}>Hanya Nonaktif</option>
+        </select>
+      </div>
+    `;
+
+    gridHtml = filtered.length
+      ? filtered.map((p, idx) => renderRegularProductCard(p, idx)).join('')
+      : '<div class="empty-product"><h3>Belum ada produk reguler</h3><p>Tidak ada produk yang cocok dengan pencarian.</p></div>';
+  } else {
+    const filtered = state.freshProducts.filter(r => {
+      const matchSearch = !q || [r.name, r.product_key].some(x => String(x || '').toLowerCase().includes(q));
+      const isEnabled = state.pendingPricing[`FRESH:${r.product_key}`]?.enabled !== undefined ? state.pendingPricing[`FRESH:${r.product_key}`].enabled : r.enabled;
+      if (!matchSearch) return false;
+      if (stFilter === 'enabled' || stFilter === '1') return isEnabled;
+      if (stFilter === 'disabled' || stFilter === '0') return !isEnabled;
+      return true;
+    });
+
+    toolbarHtml = `
+      <div class="toolbar product-toolbar">
+        <div class="searchbox"><input id="productSearch" placeholder="Cari nama atau key produk fresh..." value="${esc(q)}" /></div>
+        <select id="productStatus">
+          <option value="all" ${stFilter === 'all' ? 'selected' : ''}>Semua Status</option>
+          <option value="enabled" ${stFilter === 'enabled' || stFilter === '1' ? 'selected' : ''}>Hanya Aktif</option>
+          <option value="disabled" ${stFilter === 'disabled' || stFilter === '0' ? 'selected' : ''}>Hanya Nonaktif</option>
+        </select>
+      </div>
+    `;
+
+    gridHtml = filtered.length
+      ? filtered.map((r, idx) => renderFreshProductCard(r, idx)).join('')
+      : '<div class="empty-product"><h3>Belum ada produk fresh</h3><p>Tidak ada produk fresh yang cocok dengan pencarian.</p></div>';
+  }
 
   $('#content').innerHTML = `
     <div class="section-title product-section-title">
       <div>
         <h2>📦 Katalog Produk</h2>
-        <p>Katalog produk dan pengaturan margin keuntungan bot toko Anda.</p>
+        <p>Kelola produk reguler & produk fresh, sesuaikan deskripsi, SNK, dan margin keuntungan bot Anda.</p>
       </div>
       <span>
         <button id="btnOpenBulkModal" class="neo-btn purple">⚡ Markup Massal</button>
       </span>
     </div>
 
-    <div class="toolbar product-toolbar">
-      <div class="searchbox"><input id="productSearch" placeholder="Cari nama produk atau varian..." value="${esc(q)}" /></div>
-      <select id="productCategory">
-        <option value="">Semua Kategori</option>
-        ${categories(state.products)}
-      </select>
-      <select id="productStatus">
-        <option value="all" ${stFilter === 'all' ? 'selected' : ''}>Semua Status</option>
-        <option value="enabled" ${stFilter === 'enabled' ? 'selected' : ''}>Hanya Aktif</option>
-        <option value="disabled" ${stFilter === 'disabled' ? 'selected' : ''}>Hanya Nonaktif</option>
-      </select>
+    <div class="tabs" style="margin-bottom:16px">
+      <button class="tab-btn ${activeTab === 'regular' ? 'active' : ''}" data-product-tab="regular">📦 Produk Reguler (${state.products.length})</button>
+      <button class="tab-btn ${activeTab === 'fresh' ? 'active' : ''}" data-product-tab="fresh">⚡ Produk Fresh (${state.freshProducts.length})</button>
     </div>
+
+    ${toolbarHtml}
 
     <div id="productGrid" class="product-grid">
-      ${filtered.length ? filtered.map((p, idx) => renderProductCard(p, idx)).join('') : '<div class="empty-product"><h3>Belum ada produk</h3><p>Tidak ada produk yang cocok dengan pencarian.</p></div>'}
+      ${gridHtml}
     </div>
   `;
 
-  if (catFilter) $('#productCategory').value = catFilter;
+  if (activeTab === 'regular' && catFilter && $('#productCategory')) {
+    $('#productCategory').value = catFilter;
+  }
 
   // Filter events
-  const onFilter = () => renderPricingView($('#productSearch').value, $('#productStatus').value, $('#productCategory').value);
-  $('#productSearch').oninput = onFilter;
-  $('#productCategory').onchange = onFilter;
-  $('#productStatus').onchange = onFilter;
-  $('#btnOpenBulkModal').onclick = showBulkMarkupModal;
+  const onFilter = () => renderProductCatalogView($('#productSearch')?.value, $('#productStatus')?.value, $('#productCategory')?.value);
+  if ($('#productSearch')) $('#productSearch').oninput = onFilter;
+  if ($('#productCategory')) $('#productCategory').onchange = onFilter;
+  if ($('#productStatus')) $('#productStatus').onchange = onFilter;
+  if ($('#btnOpenBulkModal')) $('#btnOpenBulkModal').onclick = showBulkMarkupModal;
 
-  bindPricingCardEvents();
+  // Sub-tabs
+  $$('[data-product-tab]').forEach(btn => {
+    btn.onclick = () => {
+      state.productTab = btn.dataset.productTab;
+      renderProductCatalogView();
+    };
+  });
+
+  bindCatalogActions();
 }
 
-function renderProductCard(p, idx = 0) {
-  const pendingP = state.pendingPricing[p.code] || {};
-  const isPEnabled = pendingP.enabled !== undefined ? pendingP.enabled : p.enabled;
-  const currentPMargin = pendingP.margin !== undefined ? pendingP.margin : p.current_margin;
-  const pBaseCost = p.base_cost;
-  const pSellPrice = pBaseCost + Number(currentPMargin || 0);
-
-  const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
+function renderRegularProductCard(p, idx = 0) {
+  const vars = (p.variants || []).filter(v => v.active);
+  const chips = vars.slice(0, 3).map(variantChip).join('') + (vars.length > 3 ? `<span class="variant-chip muted">+${vars.length - 3} VARIAN</span>` : '');
+  const allVariants = Array.isArray(p.variants) ? p.variants : [];
+  
+  const price = allVariants.length && !vars.length ? 'Tidak ada varian aktif' : p.price_min === p.price_max ? money(p.price_min) : `${money(p.price_min)} - ${money(p.price_max)}`;
+  const ownerPrice = allVariants.length && !vars.length ? '-' : p.owner_price_min === p.owner_price_max ? money(p.owner_price_min) : `${money(p.owner_price_min)} - ${money(p.owner_price_max)}`;
+  
   const icon = ['📦', '⚡', '📱', '🎮', '💎'][idx % 5];
+  const thumb = `<span class="thumb-fallback">${icon}</span>${p.image_url ? `<img src="${esc(mediaSrc(p.image_url))}" alt="${esc(p.name)}" loading="lazy" onerror="this.remove()">` : ''}`;
+  const stockState = productStockState(p);
+  const stockNumber = Number(p.sale_stock ?? p.stock ?? 0);
+  const stockText = stockStateLabel(stockState, stockNumber);
+  const variantSummary = allVariants.length ? (chips || '<span class="variant-chip muted">Tidak ada varian aktif</span>') : `<span class="variant-chip stock-${stockState}">DEFAULT · ${stockText}</span>`;
 
-  const variantsListHtml = hasVariants ? `
-    <div class="variant-editor" style="margin-top:14px">
-      <div class="variant-editor-head">
-        <div>
-          <h3>Varian Produk (${p.variants.length})</h3>
-          <p>Atur margin keuntungan & aktifkan/nonaktifkan varian individual untuk bot Anda.</p>
-        </div>
-        <button type="button" class="neo-btn white small btn-sync-variants" data-code="${esc(p.code)}">⚡ Samakan Semua</button>
-      </div>
-      <div class="variant-edit-list">
-        ${p.variants.map(v => {
-          const vKey = `${p.code}:v${v.id}`;
-          const pendingV = state.pendingPricing[vKey] || {};
-          const isVEnabled = pendingV.enabled !== undefined ? pendingV.enabled : v.enabled;
-          const currentVMargin = pendingV.margin !== undefined ? pendingV.margin : v.current_margin;
-          const vBaseCost = v.base_cost;
-          const vSellPrice = vBaseCost + Number(currentVMargin || 0);
-          const stockLabel = v.delivery_mode === 'preorder' ? 'PO' : Number(v.stock || 0) > 0 ? `Ready ${v.stock}` : 'Habis';
-
-          return `
-            <div class="variant-edit-card" data-key="${esc(vKey)}" style="${isVEnabled ? '' : 'opacity:0.6;background:#f5f5f5'}">
-              <div>
-                <div style="display:flex;align-items:center;gap:8px">
-                  <b>${esc(v.name)}</b>
-                  <span class="stock-state-pill ${Number(v.stock || 0) > 0 ? 'ready' : 'empty'}" style="font-size:10px">${stockLabel}</span>
-                </div>
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">
-                  <div style="background:#fff;border:1px solid #ccc;border-radius:6px;padding:4px 8px">
-                    <small style="display:block;font-size:10px;color:var(--muted)">Modal Owner</small>
-                    <b style="font-size:12px">${money(vBaseCost)}</b>
-                  </div>
-                  <div style="background:#edffdc;border:1px solid #82d847;border-radius:6px;padding:4px 8px">
-                    <small style="display:block;font-size:10px;color:#1a5e00">Margin Profit (+)</small>
-                    <input type="number" class="input-variant-margin" data-key="${esc(vKey)}" data-base="${vBaseCost}" value="${currentVMargin}" min="0" step="500" style="width:100%;font-size:12px;font-weight:700;padding:2px;border:1px solid #000;border-radius:4px" />
-                  </div>
-                  <div style="background:#fffbd4;border:1px solid #ffd91a;border-radius:6px;padding:4px 8px">
-                    <small style="display:block;font-size:10px;color:#705300">Harga Jual</small>
-                    <b class="label-sell-price" style="font-size:12px">${money(vSellPrice)}</b>
-                  </div>
-                </div>
-              </div>
-              <div style="display:flex;align-items:center">
-                <button type="button" class="toggle toggle-variant-btn ${isVEnabled ? '' : 'off'}" data-key="${esc(vKey)}" data-enabled="${isVEnabled ? 1 : 0}">
-                  ${isVEnabled ? 'ON' : 'OFF'}
-                </button>
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    </div>
-  ` : `
-    <div class="product-info" style="margin-top:10px">
-      <div class="info-box">
-        <small>Modal Owner</small>
-        <strong>${money(pBaseCost)}</strong>
-        <em>Harga dasar</em>
-      </div>
-      <div class="info-box price">
-        <small>Harga Jual Pembeli</small>
-        <strong class="label-sell-price">${money(pSellPrice)}</strong>
-        <em>Profit +${money(currentPMargin)}</em>
-      </div>
-    </div>
-    <div style="margin-top:10px">
-      <label style="font-size:12px;font-weight:700">Margin Profit Toko Anda (Rp):
-        <input type="number" class="input-product-margin" data-code="${esc(p.code)}" data-base="${pBaseCost}" value="${currentPMargin}" min="0" step="500" style="margin-top:4px;width:100%" />
-      </label>
-    </div>
-  `;
+  const isEnabled = state.pendingPricing[p.code]?.enabled !== undefined ? state.pendingPricing[p.code].enabled : p.enabled;
 
   return `
-    <article class="product-card ${isPEnabled ? '' : 'stock-empty'}" data-product-card="${esc(p.code)}">
+    <article class="product-card stock-${stockState} ${isEnabled ? '' : 'stock-empty'}" data-product-card="${esc(p.code)}">
       <span class="product-index">${String(idx + 1).padStart(2, '0')}</span>
-      <div class="product-thumb">
-        <span class="thumb-fallback">${icon}</span>
-        ${p.image_url ? `<img src="${esc(p.image_url)}" alt="${esc(p.name)}" loading="lazy" onerror="this.remove()">` : ''}
-      </div>
+      <div class="product-thumb">${thumb}</div>
       <div class="product-body">
         <div class="product-head">
           <div class="product-title">
             <h3>${esc(p.name)}</h3>
-            <p>Kode: <code>${esc(p.code)}</code> · ${esc(p.category || 'Produk Digital')}</p>
+            <p>${esc(p.subtitle || p.category || 'Produk Digital')}</p>
+            ${p.tag ? `<span class="tag-chip"># ${esc(String(p.tag).replace(/^#/, '').toUpperCase())}</span>` : ''}
           </div>
           <div class="product-head-actions">
-            <span class="stock-state-pill ${isPEnabled ? 'ready' : 'empty'}">${isPEnabled ? 'AKTIF' : 'OFF'}</span>
-            <button class="toggle toggle-product-btn ${isPEnabled ? '' : 'off'}" data-code="${esc(p.code)}" data-enabled="${isPEnabled ? 1 : 0}">
-              ${isPEnabled ? 'ON' : 'OFF'}
+            <span class="stock-state-pill ${stockState}">${stockText}</span>
+            <button class="toggle ${isEnabled ? '' : 'off'}" data-toggle-product="${esc(p.code)}" data-active="${isEnabled ? 1 : 0}">
+              ${isEnabled ? 'ON' : 'OFF'}
             </button>
           </div>
         </div>
-
-        ${variantsListHtml}
+        <div class="product-info">
+          <div class="info-box stock-box ${stockState}">
+            <small>📦 Stok</small>
+            <strong>${stockState === 'preorder' ? 'PO' : stockNumber}</strong>
+            <em>${stockState === 'ready' ? 'Ready stok' : stockState === 'preorder' ? 'Pre-order' : 'Stok habis'}</em>
+          </div>
+          <div class="info-box price">
+            <small>🏷 Harga Jual</small>
+            <strong>${price}</strong>
+            <em>Modal Owner: ${ownerPrice}</em>
+          </div>
+        </div>
+        <div class="variant-row">${variantSummary}</div>
+        <div class="product-actions">
+          <button class="neo-btn blue small" data-edit-product="${esc(p.code)}">✎ EDIT</button>
+        </div>
       </div>
     </article>
   `;
 }
 
-function bindPricingCardEvents() {
-  $$('.input-product-margin').forEach(input => {
-    input.oninput = (e) => {
-      const code = e.target.dataset.code;
-      const base = Number(e.target.dataset.base || 0);
-      const val = Math.max(0, Number(e.target.value) || 0);
-      const card = e.target.closest('.product-card');
+function renderFreshProductCard(r, idx = 0) {
+  const p = r.presentation || {};
+  const isEnabled = state.pendingPricing[`FRESH:${r.product_key}`]?.enabled !== undefined ? state.pendingPricing[`FRESH:${r.product_key}`].enabled : r.enabled;
+  const readyCount = Math.max(0, Number(r.ready_stock_count || 0));
+  const cardState = readyCount > 0 ? 'ready' : (isEnabled ? 'preorder' : 'empty');
+  const cardStatePill = readyCount > 0 ? `Ready ${readyCount}` : (isEnabled ? 'GEN ON' : (!r.available ? 'API OFF' : 'NONAKTIF'));
 
-      state.pendingPricing[code] = {
-        ...(state.pendingPricing[code] || {}),
-        margin: val,
-        sell_price: base + val
-      };
+  const emoji = p.emoji || freshProductEmoji(r.product_key);
+  const thumb = `<span class="thumb-fallback">${emoji}</span>${p.image_url ? `<img src="${esc(mediaSrc(p.image_url))}" alt="${esc(r.name || r.product_key)}" loading="lazy" onerror="this.remove()">` : ''}`;
 
-      const sellLabel = card.querySelector('.label-sell-price');
-      if (sellLabel) sellLabel.textContent = money(base + val);
-      updateSaveBar();
-    };
-  });
+  const sellRange = r.reseller_price_min === r.reseller_price_max ? money(r.reseller_price_min) : `${money(r.reseller_price_min)} – ${money(r.reseller_price_max)}`;
+  const ownerRange = r.owner_price_min === r.owner_price_max ? money(r.owner_price_min) : `${money(r.owner_price_min)} – ${money(r.owner_price_max)}`;
 
-  $$('.input-variant-margin').forEach(input => {
-    input.oninput = (e) => {
-      const key = e.target.dataset.key;
-      const base = Number(e.target.dataset.base || 0);
-      const val = Math.max(0, Number(e.target.value) || 0);
-      const card = e.target.closest('.variant-edit-card');
+  const priceRows = Array.isArray(r.price_options) ? r.price_options : [];
+  const modes = Array.isArray(r.options?.mode?.pilihan) ? r.options.mode.pilihan.map(String) : [];
 
-      state.pendingPricing[key] = {
-        ...(state.pendingPricing[key] || {}),
-        margin: val,
-        sell_price: base + val
-      };
+  const chips = [];
+  if (modes.length) {
+    chips.push(...modes.slice(0, 3).map(m => `<span class="variant-chip">${esc(p.mode_labels?.[m] || m)}</span>`));
+    if (modes.length > 3) chips.push(`<span class="variant-chip muted">+${modes.length - 3} Mode</span>`);
+  }
+  if (priceRows.length > 1) {
+    chips.push(`<span class="variant-chip stock-ready">${priceRows.length} Opsi Harga</span>`);
+  }
+  if (readyCount > 0) {
+    chips.push(`<span class="variant-chip stock-ready">Ready Toko: ${readyCount}</span>`);
+  }
 
-      const sellLabel = card.querySelector('.label-sell-price');
-      if (sellLabel) sellLabel.textContent = money(base + val);
-      updateSaveBar();
-    };
-  });
+  return `
+    <article class="product-card stock-${cardState} ${isEnabled ? '' : 'stock-empty'}" data-fresh-card="${esc(r.product_key)}">
+      <span class="product-index">${String(idx + 1).padStart(2, '0')}</span>
+      <div class="product-thumb">${thumb}</div>
+      <div class="product-body">
+        <div class="product-head">
+          <div class="product-title">
+            <h3>${esc(r.name || r.product_key)}</h3>
+            <p>Key: <code>${esc(r.product_key)}</code> · ${priceRows.length || 1} Opsi Harga</p>
+            <span class="tag-chip"># FRESH BOT</span>
+          </div>
+          <div class="product-head-actions">
+            <span class="stock-state-pill ${cardState}">${cardStatePill}</span>
+            <button class="toggle ${isEnabled ? '' : 'off'}" data-toggle-fresh="${esc(r.product_key)}" data-active="${isEnabled ? 1 : 0}">
+              ${isEnabled ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        </div>
+        <div class="product-info">
+          <div class="info-box stock-box ${cardState}">
+            <small>📦 Stok</small>
+            <strong>${readyCount > 0 ? readyCount : 'GEN'}</strong>
+            <em>${readyCount > 0 ? 'Ready toko' : 'Generate API'}</em>
+          </div>
+          <div class="info-box price">
+            <small>🏷 Harga Jual</small>
+            <strong>${sellRange}</strong>
+            <em>Modal Owner: ${ownerRange}</em>
+          </div>
+        </div>
+        <div class="variant-row">${chips.length ? chips.join('') : '<span class="variant-chip muted">Auto Generate</span>'}</div>
+        <div class="product-actions">
+          <button class="neo-btn blue small" data-edit-fresh="${esc(r.product_key)}">✎ EDIT</button>
+        </div>
+      </div>
+    </article>
+  `;
+}
 
-  $$('.toggle-product-btn').forEach(btn => {
-    btn.onclick = (e) => {
-      const code = e.target.dataset.code;
-      const cur = Number(e.target.dataset.enabled) === 1;
+function bindCatalogActions() {
+  // Toggle regular product active/inactive
+  $$('[data-toggle-product]').forEach(btn => {
+    btn.onclick = async () => {
+      const code = btn.dataset.toggleProduct;
+      const cur = btn.dataset.active === '1';
       const next = !cur;
-      e.target.dataset.enabled = next ? 1 : 0;
-      e.target.textContent = next ? 'ON' : 'OFF';
-      e.target.classList.toggle('off', !next);
-      const card = e.target.closest('.product-card');
-      card.classList.toggle('stock-empty', !next);
-      const pill = card.querySelector('.product-head-actions .stock-state-pill');
-      if (pill) {
-        pill.className = `stock-state-pill ${next ? 'ready' : 'empty'}`;
-        pill.textContent = next ? 'AKTIF' : 'OFF';
+      btn.dataset.active = next ? '1' : '0';
+      btn.textContent = next ? 'ON' : 'OFF';
+      btn.classList.toggle('off', !next);
+      const card = btn.closest('.product-card');
+      card?.classList.toggle('stock-empty', !next);
+
+      try {
+        await api('/api/reseller/products/pricing', {
+          method: 'POST',
+          body: {
+            key: code,
+            override: { enabled: next }
+          }
+        });
+        const p = state.products.find(x => x.code === code);
+        if (p) p.enabled = next;
+        toast(`Status produk ${code} diubah ke ${next ? 'Aktif' : 'Nonaktif'}`);
+      } catch (err) {
+        toast(err.message, true);
+        renderProductCatalogView();
       }
-
-      state.pendingPricing[code] = {
-        ...(state.pendingPricing[code] || {}),
-        enabled: next
-      };
-      updateSaveBar();
     };
   });
 
-  $$('.toggle-variant-btn').forEach(btn => {
-    btn.onclick = (e) => {
-      const key = e.target.dataset.key;
-      const cur = Number(e.target.dataset.enabled) === 1;
+  // Toggle fresh product active/inactive
+  $$('[data-toggle-fresh]').forEach(btn => {
+    btn.onclick = async () => {
+      const key = btn.dataset.toggleFresh;
+      const cur = btn.dataset.active === '1';
       const next = !cur;
-      e.target.dataset.enabled = next ? 1 : 0;
-      e.target.textContent = next ? 'ON' : 'OFF';
-      e.target.classList.toggle('off', !next);
-      const card = e.target.closest('.variant-edit-card');
-      card.style.opacity = next ? '1' : '0.6';
-      card.style.background = next ? '#faf7ff' : '#f5f5f5';
+      btn.dataset.active = next ? '1' : '0';
+      btn.textContent = next ? 'ON' : 'OFF';
+      btn.classList.toggle('off', !next);
+      const card = btn.closest('.product-card');
+      card?.classList.toggle('stock-empty', !next);
 
-      state.pendingPricing[key] = {
-        ...(state.pendingPricing[key] || {}),
-        enabled: next
-      };
-      updateSaveBar();
+      try {
+        await api('/api/reseller/products/pricing', {
+          method: 'POST',
+          body: {
+            key: `FRESH:${key}`,
+            override: { enabled: next }
+          }
+        });
+        const r = state.freshProducts.find(x => x.product_key === key);
+        if (r) r.enabled = next;
+        toast(`Status produk fresh ${key} diubah ke ${next ? 'Aktif' : 'Nonaktif'}`);
+      } catch (err) {
+        toast(err.message, true);
+        renderProductCatalogView();
+      }
     };
   });
 
-  $$('.btn-sync-variants').forEach(btn => {
+  // Edit Regular Product
+  $$('[data-edit-product]').forEach(btn => {
     btn.onclick = () => {
-      const code = btn.dataset.code;
+      const code = btn.dataset.editProduct;
       const p = state.products.find(x => x.code === code);
-      if (!p || !p.variants) return;
+      if (p) openProductEditModal(p);
+    };
+  });
 
-      const promptMargin = prompt(`Tentukan margin profit (Rp) untuk seluruh varian ${p.name}:`, '2000');
-      if (promptMargin === null) return;
-      const marginVal = Math.max(0, Number(promptMargin.replace(/[^0-9]/g, '')) || 0);
-
-      p.variants.forEach(v => {
-        const vKey = `${p.code}:v${v.id}`;
-        state.pendingPricing[vKey] = {
-          ...(state.pendingPricing[vKey] || {}),
-          margin: marginVal,
-          sell_price: v.base_cost + marginVal
-        };
-      });
-
-      toast(`Margin ${money(marginVal)} diterapkan ke semua varian ${p.name}`);
-      renderPricingView($('#productSearch')?.value, $('#productStatus')?.value, $('#productCategory')?.value);
-      updateSaveBar();
+  // Edit Fresh Product
+  $$('[data-edit-fresh]').forEach(btn => {
+    btn.onclick = () => {
+      const key = btn.dataset.editFresh;
+      const r = state.freshProducts.find(x => x.product_key === key);
+      if (r) openFreshProductModal(r);
     };
   });
 }
 
-$('#btnDiscardPricing').onclick = () => {
-  state.pendingPricing = {};
-  updateSaveBar();
-  renderPricingView($('#productSearch')?.value, $('#productStatus')?.value, $('#productCategory')?.value);
-  toast('Perubahan dibatalkan');
-};
+// Modal Edit Produk Reguler (Persis Dashboard Owner)
+function openProductEditModal(p) {
+  const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
 
-$('#btnSavePricingFloating').onclick = async () => {
-  const btn = $('#btnSavePricingFloating');
-  btn.disabled = true;
-  btn.textContent = 'Menyimpan...';
+  const variantsListHtml = hasVariants ? `
+    <div class="full" style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;margin-bottom:6px">
+      <b>📦 Atur Margin & Status Varian (${p.variants.length})</b>
+      <button type="button" class="neo-btn white tiny" id="btnModalSyncVariants">⚡ Samakan Semua Margin</button>
+    </div>
+    <div class="full" style="display:flex;flex-direction:column;gap:10px;max-height:360px;overflow-y:auto;padding-right:4px">
+      ${p.variants.map((v, i) => {
+        const vStock = v.delivery_mode === 'preorder' ? 'PO' : (Number(v.stock || 0) > 0 ? `Ready ${v.stock}` : 'Habis');
+        return `
+          <div class="variant-edit-card" style="padding:10px;border:2px solid var(--ink, #0c0c0f);border-radius:10px;background:#fdfdfd">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div><b>${esc(v.name)}</b> <span class="stock-state-pill ${Number(v.stock || 0) > 0 ? 'ready' : 'empty'}" style="font-size:10px;padding:2px 6px">${vStock}</span></div>
+              <label style="margin:0;font-size:11px;display:flex;align-items:center;gap:4px">
+                Status di Bot:
+                <select class="modal-var-enabled" data-key="${esc(v.key)}" style="padding:2px 6px;font-size:11px">
+                  <option value="true" ${v.enabled ? 'selected' : ''}>Aktif</option>
+                  <option value="false" ${!v.enabled ? 'selected' : ''}>Nonaktif</option>
+                </select>
+              </label>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <div style="background:#f5f5f7;border:1px solid #ccc;border-radius:6px;padding:4px 8px">
+                <small style="display:block;font-size:10px;color:var(--muted)">Modal Owner</small>
+                <b style="font-size:12px">${money(v.owner_price)}</b>
+              </div>
+              <div style="background:#edffdc;border:1px solid #82d847;border-radius:6px;padding:4px 8px">
+                <small style="display:block;font-size:10px;color:#1a5e00">Margin Profit (+)</small>
+                <input type="number" class="modal-var-margin" data-key="${esc(v.key)}" data-base="${v.owner_price}" value="${v.margin || 0}" min="0" step="500" style="width:100%;font-size:12px;font-weight:700;padding:2px;border:1px solid #000;border-radius:4px" />
+              </div>
+              <div style="background:#fffbd4;border:1px solid #ffd91a;border-radius:6px;padding:4px 8px">
+                <small style="display:block;font-size:10px;color:#705300">Harga Jual</small>
+                <b class="modal-var-sell" style="font-size:12px">${money(v.reseller_price)}</b>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  ` : `
+    <div class="full" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px">
+      <div style="background:#f5f5f7;border:1px solid #ccc;border-radius:6px;padding:6px 10px">
+        <small style="display:block;font-size:11px;color:var(--muted)">Modal Owner</small>
+        <b style="font-size:13px">${money(p.owner_price)}</b>
+      </div>
+      <div style="background:#edffdc;border:1px solid #82d847;border-radius:6px;padding:6px 10px">
+        <small style="display:block;font-size:11px;color:#1a5e00">Margin Profit (+)</small>
+        <input type="number" name="margin" id="modalProductMargin" data-base="${p.owner_price}" value="${p.margin || 0}" min="0" step="500" style="width:100%;font-size:13px;font-weight:700;padding:4px;border:1px solid #000;border-radius:4px" />
+      </div>
+      <div style="background:#fffbd4;border:1px solid #ffd91a;border-radius:6px;padding:6px 10px">
+        <small style="display:block;font-size:11px;color:#705300">Harga Jual Pembeli</small>
+        <b id="modalProductSell" style="font-size:13px">${money(p.reseller_price)}</b>
+      </div>
+    </div>
+  `;
 
-  try {
-    const existing = state.bot?.pricing_overrides || {};
-    const merged = { ...existing };
+  const html = `
+    <div class="form-grid product-form">
+      <label>Kode Produk<input value="${esc(p.code)}" disabled></label>
+      <label>Nama Produk<input value="${esc(p.name)}" disabled></label>
+      <label>Kategori<input value="${esc(p.category || 'Digital')}" disabled></label>
+      <label>Status di Bot Anda
+        <select name="enabled">
+          <option value="true" ${p.enabled ? 'selected' : ''}>Aktif (ON)</option>
+          <option value="false" ${!p.enabled ? 'selected' : ''}>Nonaktif (OFF)</option>
+        </select>
+      </label>
+      <label class="full">
+        Deskripsi Produk (Kustom Bot Anda)
+        <textarea name="description" rows="4" placeholder="Kosongkan jika ingin memakai deskripsi default dari Owner">${esc(p.custom_description || '')}</textarea>
+        <small class="muted">Teks deskripsi yang akan dibaca pembeli saat memilih produk di Bot Anda.</small>
+      </label>
+      <label class="full">
+        Syarat & Ketentuan / SNK (Kustom Bot Anda)
+        <textarea name="terms" rows="4" placeholder="Kosongkan jika ingin memakai SNK default dari Owner">${esc(p.custom_terms || '')}</textarea>
+        <small class="muted">Ketentuan garansi / klaim untuk pembeli bot Anda.</small>
+      </label>
+      ${variantsListHtml}
+    </div>
+  `;
 
-    for (const [key, patch] of Object.entries(state.pendingPricing)) {
-      merged[key] = {
-        ...(typeof merged[key] === 'object' && merged[key] !== null ? merged[key] : {}),
-        ...patch
-      };
+  modal(`Edit Produk · ${p.name}`, html, async (fd) => {
+    const patch = {};
+
+    // Base product override
+    patch[p.code] = {
+      ...(state.bot?.pricing_overrides?.[p.code] || {}),
+      enabled: fd.enabled === 'true',
+      description: String(fd.description || '').trim(),
+      terms: String(fd.terms || '').trim()
+    };
+
+    if (!hasVariants) {
+      const marginVal = Math.max(0, Number(fd.margin || 0));
+      patch[p.code].margin = marginVal;
+      patch[p.code].sell_price = p.owner_price + marginVal;
+    } else {
+      $$('.modal-var-margin').forEach(inp => {
+        const key = inp.dataset.key;
+        const base = Number(inp.dataset.base || 0);
+        const marginVal = Math.max(0, Number(inp.value || 0));
+        const enabledSelect = document.querySelector(`.modal-var-enabled[data-key="${key}"]`);
+        const isEn = enabledSelect ? enabledSelect.value === 'true' : true;
+        patch[key] = {
+          ...(state.bot?.pricing_overrides?.[key] || {}),
+          enabled: isEn,
+          margin: marginVal,
+          sell_price: base + marginVal
+        };
+      });
     }
 
-    const res = await api('/api/reseller/products/pricing', {
+    await api('/api/reseller/products/pricing', {
       method: 'POST',
-      body: { pricing_overrides: merged }
+      body: { pricing_overrides: patch }
     });
 
-    state.bot.pricing_overrides = res.pricing_overrides || merged;
-    state.pendingPricing = {};
-    updateSaveBar();
-    toast('Semua margin & status varian berhasil disimpan!');
+    toast(`Produk ${p.name} berhasil diperbarui!`);
     await loadPricing();
-  } catch (err) {
-    toast(err.message, true);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '💾 Simpan Perubahan';
-  }
-};
+  }, { submit: 'Simpan Perubahan' });
 
+  // Live price calculation in modal
+  if (!hasVariants) {
+    const inp = $('#modalProductMargin');
+    const sell = $('#modalProductSell');
+    if (inp && sell) {
+      inp.oninput = () => {
+        const base = Number(inp.dataset.base || 0);
+        const m = Math.max(0, Number(inp.value || 0));
+        sell.textContent = money(base + m);
+      };
+    }
+  } else {
+    $$('.modal-var-margin').forEach(inp => {
+      inp.oninput = () => {
+        const base = Number(inp.dataset.base || 0);
+        const m = Math.max(0, Number(inp.value || 0));
+        const card = inp.closest('.variant-edit-card');
+        const sell = card?.querySelector('.modal-var-sell');
+        if (sell) sell.textContent = money(base + m);
+      };
+    });
+
+    const syncBtn = $('#btnModalSyncVariants');
+    if (syncBtn) {
+      syncBtn.onclick = () => {
+        const val = prompt('Tentukan margin (Rp) untuk seluruh varian produk ini:', '2000');
+        if (val === null) return;
+        const num = Math.max(0, Number(val.replace(/[^0-9]/g, '')) || 0);
+        $$('.modal-var-margin').forEach(inp => {
+          inp.value = num;
+          const base = Number(inp.dataset.base || 0);
+          const card = inp.closest('.variant-edit-card');
+          const sell = card?.querySelector('.modal-var-sell');
+          if (sell) sell.textContent = money(base + num);
+        });
+        toast(`Margin ${money(num)} disamakan ke seluruh varian.`);
+      };
+    }
+  }
+}
+
+// Modal Edit Produk Fresh (Persis Dashboard Owner)
+function openFreshProductModal(r) {
+  const priceOptions = Array.isArray(r.price_options) ? r.price_options : [];
+  const hasOptions = priceOptions.length > 1;
+
+  const optionsHtml = hasOptions ? `
+    <div class="full" style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;margin-bottom:6px">
+      <b>⚡ Opsi Paket / Durasi (${priceOptions.length})</b>
+      <button type="button" class="neo-btn white tiny" id="btnModalSyncFresh">⚡ Samakan Semua Margin</button>
+    </div>
+    <div class="full" style="display:flex;flex-direction:column;gap:10px;max-height:360px;overflow-y:auto;padding-right:4px">
+      ${priceOptions.map((opt, i) => {
+        const optLabel = Object.entries(opt.options || {}).map(([k, v]) => `${k}: ${v}`).join(' · ') || `Opsi #${opt.id}`;
+        return `
+          <div class="variant-edit-card" style="padding:10px;border:2px solid var(--ink, #0c0c0f);border-radius:10px;background:#fdfdfd">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div><b>${esc(optLabel)}</b></div>
+              <label style="margin:0;font-size:11px;display:flex;align-items:center;gap:4px">
+                Status di Bot:
+                <select class="modal-fresh-enabled" data-key="${esc(opt.key)}" style="padding:2px 6px;font-size:11px">
+                  <option value="true" ${opt.enabled ? 'selected' : ''}>Aktif</option>
+                  <option value="false" ${!opt.enabled ? 'selected' : ''}>Nonaktif</option>
+                </select>
+              </label>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <div style="background:#f5f5f7;border:1px solid #ccc;border-radius:6px;padding:4px 8px">
+                <small style="display:block;font-size:10px;color:var(--muted)">Modal Owner</small>
+                <b style="font-size:12px">${money(opt.owner_price)}</b>
+              </div>
+              <div style="background:#edffdc;border:1px solid #82d847;border-radius:6px;padding:4px 8px">
+                <small style="display:block;font-size:10px;color:#1a5e00">Margin Profit (+)</small>
+                <input type="number" class="modal-fresh-margin" data-key="${esc(opt.key)}" data-base="${opt.owner_price}" value="${opt.margin || 0}" min="0" step="500" style="width:100%;font-size:12px;font-weight:700;padding:2px;border:1px solid #000;border-radius:4px" />
+              </div>
+              <div style="background:#fffbd4;border:1px solid #ffd91a;border-radius:6px;padding:4px 8px">
+                <small style="display:block;font-size:10px;color:#705300">Harga Jual</small>
+                <b class="modal-fresh-sell" style="font-size:12px">${money(opt.reseller_price)}</b>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  ` : `
+    <div class="full" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px">
+      <div style="background:#f5f5f7;border:1px solid #ccc;border-radius:6px;padding:6px 10px">
+        <small style="display:block;font-size:11px;color:var(--muted)">Modal Owner</small>
+        <b style="font-size:13px">${money(r.owner_price)}</b>
+      </div>
+      <div style="background:#edffdc;border:1px solid #82d847;border-radius:6px;padding:6px 10px">
+        <small style="display:block;font-size:11px;color:#1a5e00">Margin Profit (+)</small>
+        <input type="number" name="margin" id="modalFreshSingleMargin" data-base="${r.owner_price}" value="${r.margin || 0}" min="0" step="500" style="width:100%;font-size:13px;font-weight:700;padding:4px;border:1px solid #000;border-radius:4px" />
+      </div>
+      <div style="background:#fffbd4;border:1px solid #ffd91a;border-radius:6px;padding:6px 10px">
+        <small style="display:block;font-size:11px;color:#705300">Harga Jual Pembeli</small>
+        <b id="modalFreshSingleSell" style="font-size:13px">${money(r.reseller_price)}</b>
+      </div>
+    </div>
+  `;
+
+  const html = `
+    <div class="form-grid product-form">
+      <label>Key Produk<input value="${esc(r.product_key)}" disabled></label>
+      <label>Nama Produk<input value="${esc(r.name)}" disabled></label>
+      <label class="full">Status di Bot Anda
+        <select name="enabled">
+          <option value="true" ${r.enabled ? 'selected' : ''}>Aktif (ON)</option>
+          <option value="false" ${!r.enabled ? 'selected' : ''}>Nonaktif (OFF)</option>
+        </select>
+      </label>
+      <label class="full">
+        Deskripsi Produk Fresh (Kustom Bot Anda)
+        <textarea name="description" rows="4" placeholder="Kosongkan jika ingin memakai deskripsi default dari Owner">${esc(r.custom_description || '')}</textarea>
+        <small class="muted">Teks deskripsi akun fresh yang akan dibaca pembeli saat memilih produk di Bot Anda.</small>
+      </label>
+      <label class="full">
+        Syarat & Ketentuan / SNK (Kustom Bot Anda)
+        <textarea name="terms" rows="4" placeholder="Kosongkan jika ingin memakai SNK default dari Owner">${esc(r.custom_terms || '')}</textarea>
+        <small class="muted">Ketentuan garansi / durasi akun bagi pembeli bot Anda.</small>
+      </label>
+      <div class="full info-note">
+        💡 <b>Harga Modal Reseller:</b> Mengikuti harga jual yang ditentukan oleh Owner Toko Utama. Anda bebas menentukan margin profit tambahan di atas harga modal tersebut.
+      </div>
+      ${optionsHtml}
+    </div>
+  `;
+
+  modal(`Edit Produk Fresh · ${r.name}`, html, async (fd) => {
+    const itemKey = `FRESH:${r.product_key}`;
+    const patch = {};
+
+    patch[itemKey] = {
+      ...(state.bot?.pricing_overrides?.[itemKey] || {}),
+      enabled: fd.enabled === 'true',
+      description: String(fd.description || '').trim(),
+      terms: String(fd.terms || '').trim()
+    };
+
+    if (!hasOptions) {
+      const marginVal = Math.max(0, Number(fd.margin || 0));
+      patch[itemKey].margin = marginVal;
+      patch[itemKey].sell_price = r.owner_price + marginVal;
+    } else {
+      $$('.modal-fresh-margin').forEach(inp => {
+        const key = inp.dataset.key;
+        const base = Number(inp.dataset.base || 0);
+        const marginVal = Math.max(0, Number(inp.value || 0));
+        const enabledSelect = document.querySelector(`.modal-fresh-enabled[data-key="${key}"]`);
+        const isEn = enabledSelect ? enabledSelect.value === 'true' : true;
+        patch[key] = {
+          ...(state.bot?.pricing_overrides?.[key] || {}),
+          enabled: isEn,
+          margin: marginVal,
+          sell_price: base + marginVal
+        };
+      });
+    }
+
+    await api('/api/reseller/products/pricing', {
+      method: 'POST',
+      body: { pricing_overrides: patch }
+    });
+
+    toast(`Produk Fresh ${r.name} berhasil diperbarui!`);
+    await loadPricing();
+  }, { submit: 'Simpan Perubahan' });
+
+  // Live price calculation in fresh modal
+  if (!hasOptions) {
+    const inp = $('#modalFreshSingleMargin');
+    const sell = $('#modalFreshSingleSell');
+    if (inp && sell) {
+      inp.oninput = () => {
+        const base = Number(inp.dataset.base || 0);
+        const m = Math.max(0, Number(inp.value || 0));
+        sell.textContent = money(base + m);
+      };
+    }
+  } else {
+    $$('.modal-fresh-margin').forEach(inp => {
+      inp.oninput = () => {
+        const base = Number(inp.dataset.base || 0);
+        const m = Math.max(0, Number(inp.value || 0));
+        const card = inp.closest('.variant-edit-card');
+        const sell = card?.querySelector('.modal-fresh-sell');
+        if (sell) sell.textContent = money(base + m);
+      };
+    });
+
+    const syncBtn = $('#btnModalSyncFresh');
+    if (syncBtn) {
+      syncBtn.onclick = () => {
+        const val = prompt('Tentukan margin (Rp) untuk seluruh opsi produk fresh ini:', '3000');
+        if (val === null) return;
+        const num = Math.max(0, Number(val.replace(/[^0-9]/g, '')) || 0);
+        $$('.modal-fresh-margin').forEach(inp => {
+          inp.value = num;
+          const base = Number(inp.dataset.base || 0);
+          const card = inp.closest('.variant-edit-card');
+          const sell = card?.querySelector('.modal-fresh-sell');
+          if (sell) sell.textContent = money(base + num);
+        });
+        toast(`Margin ${money(num)} disamakan ke seluruh opsi.`);
+      };
+    }
+  }
+}
+
+// Bulk Markup Modal
 function showBulkMarkupModal() {
   const html = `
     <div class="form-grid">
       <label>
-        Terapkan Margin Cepat
+        Target Produk
+        <select name="bulk_target" id="bulkTarget">
+          <option value="all">Semua Produk (Reguler & Fresh)</option>
+          <option value="regular">Hanya Produk Reguler</option>
+          <option value="fresh">Hanya Produk Fresh</option>
+        </select>
+      </label>
+      <label>
+        Mode Markup
         <select name="bulk_mode" id="bulkMarkupMode">
           <option value="fixed">Tambah Nominal Tetap (Rp)</option>
           <option value="percent">Tambah Persentase (%)</option>
         </select>
       </label>
-      <label>
+      <label class="full">
         Nilai Tambahan Margin
         <input name="bulk_value" id="bulkMarkupVal" type="number" min="0" value="2000" placeholder="Contoh: 2000" required />
       </label>
       <div class="full info-note">
-        Fitur ini akan menghitung margin baru untuk <b>seluruh produk dan varian</b> yang ada di katalog. Anda tetap bisa memeriksa dan menyimpannya setelah menekan tombol Terapkan.
+        💡 Nilai margin ini dihitung di atas <b>Modal Owner</b>. Perubahan akan langsung disimpan ke sistem bot toko Anda.
       </div>
     </div>
   `;
 
   modal('⚡ Markup Margin Massal', html, async (data) => {
+    const target = data.bulk_target || 'all';
     const mode = data.bulk_mode;
     const val = Number(data.bulk_value || 0);
+    const patch = {};
 
-    state.products.forEach(p => {
-      if (Array.isArray(p.variants) && p.variants.length) {
-        p.variants.forEach(v => {
-          const vKey = `${p.code}:v${v.id}`;
-          const margin = mode === 'percent' ? Math.round(v.base_cost * val / 100) : val;
-          state.pendingPricing[vKey] = {
-            ...(state.pendingPricing[vKey] || {}),
+    if (target === 'all' || target === 'regular') {
+      state.products.forEach(p => {
+        if (Array.isArray(p.variants) && p.variants.length) {
+          p.variants.forEach(v => {
+            const vKey = `${p.code}:v${v.id}`;
+            const margin = mode === 'percent' ? Math.round(v.owner_price * val / 100) : val;
+            patch[vKey] = {
+              ...(state.bot?.pricing_overrides?.[vKey] || {}),
+              margin,
+              sell_price: v.owner_price + margin
+            };
+          });
+        } else {
+          const margin = mode === 'percent' ? Math.round(p.owner_price * val / 100) : val;
+          patch[p.code] = {
+            ...(state.bot?.pricing_overrides?.[p.code] || {}),
             margin,
-            sell_price: v.base_cost + margin
+            sell_price: p.owner_price + margin
           };
-        });
-      } else {
-        const margin = mode === 'percent' ? Math.round(p.base_cost * val / 100) : val;
-        state.pendingPricing[p.code] = {
-          ...(state.pendingPricing[p.code] || {}),
-          margin,
-          sell_price: p.base_cost + margin
-        };
-      }
+        }
+      });
+    }
+
+    if (target === 'all' || target === 'fresh') {
+      state.freshProducts.forEach(r => {
+        const itemKey = `FRESH:${r.product_key}`;
+        if (Array.isArray(r.price_options) && r.price_options.length > 1) {
+          r.price_options.forEach(opt => {
+            const margin = mode === 'percent' ? Math.round(opt.owner_price * val / 100) : val;
+            patch[opt.key] = {
+              ...(state.bot?.pricing_overrides?.[opt.key] || {}),
+              margin,
+              sell_price: opt.owner_price + margin
+            };
+          });
+        } else {
+          const margin = mode === 'percent' ? Math.round(r.owner_price * val / 100) : val;
+          patch[itemKey] = {
+            ...(state.bot?.pricing_overrides?.[itemKey] || {}),
+            margin,
+            sell_price: r.owner_price + margin
+          };
+        }
+      });
+    }
+
+    await api('/api/reseller/products/pricing', {
+      method: 'POST',
+      body: { pricing_overrides: patch }
     });
 
-    toast(`Markup massal diterapkan ke seluruh produk & varian!`);
-    renderPricingView($('#productSearch')?.value, $('#productStatus')?.value, $('#productCategory')?.value);
-    updateSaveBar();
-  }, { submit: 'Terapkan ke Semua' });
+    toast(`Markup massal berhasil diterapkan dan disimpan!`);
+    await loadPricing();
+  }, { submit: 'Terapkan & Simpan' });
 }
 
 // ---------------------------------------------------------------------

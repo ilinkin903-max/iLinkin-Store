@@ -12,16 +12,18 @@ const state = {
   freshProducts: [],
   pendingPricing: {},
   orders: [],
-  withdrawals: []
+  withdrawals: [],
+  report: {}
 };
 
 const titles = {
   dashboard: ['Dashboard', 'Ringkasan performa toko dan komisi profit Anda'],
   bot: ['Pengaturan', 'Kelola token bot, nama toko, banner, dan pengaturan layanan'],
   pricing: ['Produk', 'Katalog produk dan pengaturan margin keuntungan bot toko Anda'],
-  broadcast: ['Broadcast Pelanggan', 'Kirim pesan massal promosi, info diskon, atau pengumuman ke pembeli bot Anda'],
+  orders: ['Pesanan Pembeli', 'Daftar riwayat transaksi pembeli yang masuk melalui bot Anda'],
+  reports: ['Laporan', 'Omzet, profit, dan performa penjualan bot toko Anda'],
   withdraw: ['Tarik Saldo', 'Pencairan saldo komisi profit ke rekening bank atau e-wallet'],
-  orders: ['Pesanan Pembeli', 'Daftar riwayat transaksi pembeli yang masuk melalui bot Anda']
+  broadcast: ['Broadcast Pelanggan', 'Kirim pesan massal promosi, info diskon, atau pengumuman ke pembeli bot Anda']
 };
 
 function esc(v = '') {
@@ -276,9 +278,10 @@ async function navigate(view, silent = false) {
       dashboard: loadDashboard,
       bot: loadBot,
       pricing: loadPricing,
-      broadcast: loadBroadcast,
+      orders: loadOrders,
+      reports: loadReports,
       withdraw: loadWithdraw,
-      orders: loadOrders
+      broadcast: loadBroadcast
     }[view] || loadDashboard)();
     $('#lastUpdated').textContent = 'Terakhir diperbarui: ' + new Date().toLocaleTimeString('id-ID');
   } catch (e) {
@@ -1396,7 +1399,7 @@ function showBulkMarkupModal() {
 }
 
 // ---------------------------------------------------------------------
-// VIEW 4: TARIK SALDO (Identical to Owner layout)
+// VIEW 4: TARIK SALDO
 // ---------------------------------------------------------------------
 async function loadWithdraw() {
   const me = await api('/api/reseller/me');
@@ -1412,7 +1415,7 @@ async function loadWithdraw() {
       <div class="order-head">
         <div>
           <small>PENARIKAN #${w.id}</small>
-          <b class="mono">${esc(w.bank_name)} · ${esc(w.bank_account_number)} (${esc(w.bank_account_name)})</b>
+          <b class="mono">${esc(w.bank_name)} · ${esc(w.account_number || w.bank_account_number)} (${esc(w.account_name || w.bank_account_name)})</b>
         </div>
         ${badge(w.status)}
       </div>
@@ -1437,9 +1440,28 @@ async function loadWithdraw() {
       ${stat('💸', 'purple', 'Akumulasi Dana Ditarik', money(r.withdrawn_total), 'Total komisi yang telah cair')}
     </div>
 
+    <!-- Syarat & Ketentuan Penarikan Dana -->
+    <section class="report-card" style="margin-top:16px;background:#fffdfa;border:2px solid var(--ink, #0c0c0f);border-radius:12px;padding:16px">
+      <div class="card-heading" style="margin-bottom:10px">
+        <div>
+          <h3 style="margin:0;font-size:16px">⚖️ Syarat &amp; Ketentuan Penarikan Dana</h3>
+          <p style="margin:4px 0 0;font-size:12px;color:var(--muted)">Harap baca dan perhatikan ketentuan penarikan saldo komisi berikut sebelum mengajukan:</p>
+        </div>
+      </div>
+      <div style="font-size:13px;line-height:1.7;color:#222;display:flex;flex-direction:column;gap:6px">
+        <div>• <b>Batas Minimal Penarikan:</b> Minimal nominal pencairan saldo komisi adalah <b>Rp 10.000</b> per transaksi.</div>
+        <div>• <b>Pilihan Metode:</b> Mendukung <b>Transfer Bank</b> (BCA, BRI, Mandiri, BNI, SeaBank, Bank Jago, dll.) dan <b>E-Wallet</b> (DANA, GoPay, OVO, ShopeePay, LinkAja).</div>
+        <div>• <b>Input Data Manual:</b> Setiap kali penarikan, masukkan manual: nominal, metode, nama bank/e-wallet, nomor rekening/HP, serta nama pemilik rekening yang sesuai.</div>
+        <div>• <b>Kebenaran Rekening:</b> Pastikan nomor rekening / nomor e-wallet dan nama pemilik rekening terdaftar sesuai dan aktif. Kesalahan penulisan data rekening menjadi tanggung jawab reseller sepenuhnya.</div>
+        <div>• <b>Waktu Proses &amp; Verifikasi:</b> Pengajuan penarikan dana diverifikasi dan ditransfer secara manual oleh Owner Toko Utama.</div>
+        <div>• <b>Bukti Transfer:</b> Setelah diproses transfer oleh Owner, foto bukti transfer resmi dapat dicek langsung pada riwayat penarikan di bawah ini.</div>
+        <div>• <b>Pemotongan Saldo:</b> Saldo komisi akan dipotong sementara saat pengajuan dibuat. Jika pengajuan ditolak, saldo otomatis dikembalikan utuh ke akun Anda.</div>
+      </div>
+    </section>
+
     <div class="section-title product-section-title" style="margin-top:20px">
       <div>
-        <h2>💸 Pengajuan Penarikan Saldo Profit</h2>
+        <h2>💸 Formulir Pengajuan Penarikan</h2>
         <p>Transfer pencairan dana diproses oleh Owner ke rekening bank atau e-wallet Anda.</p>
       </div>
       <span>
@@ -1477,43 +1499,171 @@ function showWithdrawModal() {
 
   const html = `
     <div class="form-grid">
-      <label>
-        Pilih Bank / E-Wallet
-        <select name="bank_name" required>
-          <option value="DANA">DANA</option>
-          <option value="GOPAY">GoPay</option>
-          <option value="OVO">OVO</option>
-          <option value="SHOPEEPAY">ShopeePay</option>
-          <option value="BCA">BCA</option>
-          <option value="BNI">BNI</option>
-          <option value="BRI">BRI</option>
-          <option value="MANDIRI">MANDIRI</option>
-          <option value="SEABANK">SeaBank</option>
-          <option value="JAGO">Bank Jago</option>
-        </select>
-      </label>
-      <label>
-        Nomor Rekening / No. E-Wallet
-        <input name="bank_account_number" placeholder="Contoh: 081234567890" value="${esc(r.bank_account_number || '')}" required />
-      </label>
-      <label class="full">
-        Nama Pemilik Rekening
-        <input name="bank_account_name" placeholder="Sesuai nama di buku tabungan / e-wallet" value="${esc(r.bank_account_name || '')}" required />
-      </label>
       <label class="full">
         Nominal Penarikan (Rp)
-        <input name="amount" type="number" min="10000" max="${maxWd}" value="${maxWd}" required />
-        <small>Tersedia: <b>${money(maxWd)}</b></small>
+        <input name="amount" id="wdAmount" type="number" min="10000" max="${maxWd}" value="${maxWd}" required />
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+          <small>Saldo tersedia: <b>${money(maxWd)}</b></small>
+        </div>
+        <div class="quick-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <button type="button" class="neo-btn white tiny btn-wd-quick" data-val="10000">10k</button>
+          <button type="button" class="neo-btn white tiny btn-wd-quick" data-val="50000">50k</button>
+          <button type="button" class="neo-btn white tiny btn-wd-quick" data-val="100000">100k</button>
+          <button type="button" class="neo-btn white tiny btn-wd-quick" data-val="250000">250k</button>
+          <button type="button" class="neo-btn white tiny btn-wd-quick" data-val="${maxWd}">Semua Saldo</button>
+        </div>
       </label>
+
+      <label>
+        Metode Pencairan
+        <select name="method" id="wdMethod" required>
+          <option value="bank" selected>🏦 Transfer Bank</option>
+          <option value="ewallet">📱 E-Wallet (DANA, GoPay, OVO, ShopeePay)</option>
+        </select>
+      </label>
+
+      <label>
+        <span id="wdBankLabel">Nama Bank</span>
+        <select id="wdBankSelect" style="width:100%">
+          <option value="BCA">BCA</option>
+          <option value="BRI">BRI</option>
+          <option value="BNI">BNI</option>
+          <option value="MANDIRI">Mandiri</option>
+          <option value="SEABANK">SeaBank</option>
+          <option value="JAGO">Bank Jago</option>
+          <option value="CIMB">CIMB Niaga</option>
+          <option value="PERMATA">Permata</option>
+          <option value="BSI">BSI (Bank Syariah Indonesia)</option>
+          <option value="NEO">Bank Neo Commerce</option>
+          <option value="CUSTOM">Lainnya (Ketik Manual)</option>
+        </select>
+        <input name="custom_bank_name" id="wdBankCustom" placeholder="Ketik nama bank/e-wallet..." style="display:none;margin-top:6px;width:100%" />
+      </label>
+
+      <label>
+        <span id="wdNumberLabel">Nomor Rekening Bank</span>
+        <input name="bank_account_number" id="wdAccountNumber" placeholder="Masukkan nomor rekening tujuan..." value="${esc(r.bank_account_number || '')}" required />
+      </label>
+
+      <label>
+        <span id="wdNameLabel">Atas Nama Pemilik Rekening</span>
+        <input name="bank_account_name" id="wdAccountName" placeholder="Nama sesuai di rekening / e-wallet..." value="${esc(r.bank_account_name || '')}" required />
+      </label>
+
+      <label class="full">
+        Catatan untuk Owner (Opsional)
+        <input name="note" placeholder="Catatan opsional..." />
+      </label>
+
+      <div class="full info-note" style="margin-top:6px;font-size:12px">
+        ⚖️ <b>Syarat &amp; Ketentuan:</b> Minimal penarikan Rp 10.000. Pastikan nomor rekening dan nama pemilik rekening sudah benar. Transfer dana akan diproses manual oleh Owner ke rekening tujuan.
+      </div>
     </div>
   `;
 
   modal('💸 Formulir Penarikan Saldo', html, async (data) => {
-    data.amount = Number(data.amount || 0);
-    await api('/api/reseller/withdrawals', { method: 'POST', body: data });
+    const amt = Number(data.amount || 0);
+    if (amt < 10000) {
+      throw new Error('Minimal penarikan saldo adalah Rp 10.000');
+    }
+    if (amt > maxWd) {
+      throw new Error(`Saldo profit tidak mencukupi (Tersedia: ${money(maxWd)})`);
+    }
+
+    const method = $('#wdMethod')?.value || 'bank';
+    const selectBank = $('#wdBankSelect')?.value || '';
+    const customBank = $('#wdBankCustom')?.value?.trim() || '';
+    const finalBank = (selectBank === 'CUSTOM' ? customBank : selectBank) || customBank;
+
+    if (!finalBank) {
+      throw new Error('Nama bank atau e-wallet wajib diisi');
+    }
+    const accNum = String(data.bank_account_number || '').trim();
+    if (!accNum) {
+      throw new Error('Nomor rekening atau nomor e-wallet wajib diisi');
+    }
+    const accName = String(data.bank_account_name || '').trim();
+    if (!accName) {
+      throw new Error('Nama pemilik rekening / atas nama wajib diisi');
+    }
+
+    const payload = {
+      amount: amt,
+      method: method,
+      bank_name: finalBank,
+      bank_account_number: accNum,
+      bank_account_name: accName,
+      note: String(data.note || '').trim()
+    };
+
+    await api('/api/reseller/withdrawals', { method: 'POST', body: payload });
     toast('Pengajuan penarikan berhasil dikirim ke Owner!');
     await loadWithdraw();
   }, { submit: 'Kirim Pengajuan' });
+
+  // Event handlers inside modal
+  const methodSelect = $('#wdMethod');
+  const bankSelect = $('#wdBankSelect');
+  const bankCustom = $('#wdBankCustom');
+  const bankLabel = $('#wdBankLabel');
+  const numberLabel = $('#wdNumberLabel');
+  const nameLabel = $('#wdNameLabel');
+  const accNumInp = $('#wdAccountNumber');
+
+  const bankOptions = [
+    { val: 'BCA', text: 'BCA' },
+    { val: 'BRI', text: 'BRI' },
+    { val: 'BNI', text: 'BNI' },
+    { val: 'MANDIRI', text: 'Mandiri' },
+    { val: 'SEABANK', text: 'SeaBank' },
+    { val: 'JAGO', text: 'Bank Jago' },
+    { val: 'CIMB', text: 'CIMB Niaga' },
+    { val: 'PERMATA', text: 'Permata' },
+    { val: 'BSI', text: 'BSI (Bank Syariah Indonesia)' },
+    { val: 'NEO', text: 'Bank Neo Commerce' },
+    { val: 'CUSTOM', text: 'Lainnya (Ketik Manual)' }
+  ];
+
+  const ewalletOptions = [
+    { val: 'DANA', text: 'DANA' },
+    { val: 'GOPAY', text: 'GoPay' },
+    { val: 'OVO', text: 'OVO' },
+    { val: 'SHOPEEPAY', text: 'ShopeePay' },
+    { val: 'LINKAJA', text: 'LinkAja' },
+    { val: 'ASTRAPAY', text: 'AstraPay' },
+    { val: 'CUSTOM', text: 'Lainnya (Ketik Manual)' }
+  ];
+
+  const updateMethodUI = () => {
+    const isEw = methodSelect.value === 'ewallet';
+    bankLabel.textContent = isEw ? 'Nama E-Wallet' : 'Nama Bank';
+    numberLabel.textContent = isEw ? 'Nomor HP E-Wallet' : 'Nomor Rekening Bank';
+    nameLabel.textContent = isEw ? 'Atas Nama Akun E-Wallet' : 'Atas Nama Pemilik Rekening';
+    accNumInp.placeholder = isEw ? 'Contoh: 08123456789' : 'Contoh: 1234567890';
+
+    const opts = isEw ? ewalletOptions : bankOptions;
+    bankSelect.innerHTML = opts.map(o => `<option value="${o.val}">${o.text}</option>`).join('');
+    bankCustom.style.display = 'none';
+    bankCustom.value = '';
+  };
+
+  if (methodSelect) methodSelect.onchange = updateMethodUI;
+
+  if (bankSelect) {
+    bankSelect.onchange = () => {
+      const isCustom = bankSelect.value === 'CUSTOM';
+      bankCustom.style.display = isCustom ? 'block' : 'none';
+      if (isCustom) bankCustom.focus();
+    };
+  }
+
+  $$('.btn-wd-quick').forEach(b => {
+    b.onclick = () => {
+      const val = Number(b.dataset.val || 0);
+      const inp = $('#wdAmount');
+      if (inp) inp.value = Math.min(val, maxWd);
+    };
+  });
 }
 
 // ---------------------------------------------------------------------
@@ -1590,7 +1740,134 @@ function renderOrdersView(filterStatus = '', search = '') {
 }
 
 // ---------------------------------------------------------------------
-// VIEW 6: BROADCAST (Reseller Broadcast to Bot Customers)
+// VIEW 6: LAPORAN (Persis Dashboard Owner)
+// ---------------------------------------------------------------------
+async function loadReports() {
+  const d = new Date(), r = state.report || {};
+  if (!r.date) r.date = d.toISOString().slice(0, 10);
+  if (!r.month) r.month = d.toISOString().slice(0, 7);
+  if (!r.year) r.year = String(d.getFullYear());
+  state.report = r;
+
+  $('#content').innerHTML = `
+    <section class="report-filter panel">
+      <div class="section-head">
+        <div>
+          <h3>📊 Pilih Laporan</h3>
+          <p>Sesuaikan tipe dan periode laporan performa bot toko Anda.</p>
+        </div>
+      </div>
+      <div class="report-filter-grid">
+        <label>
+          Tipe Laporan
+          <select id="reportType">
+            <option value="daily" ${r.type === 'daily' ? 'selected' : ''}>Harian</option>
+            <option value="monthly" ${r.type === 'monthly' || !r.type ? 'selected' : ''}>Bulanan</option>
+            <option value="yearly" ${r.type === 'yearly' ? 'selected' : ''}>Tahunan</option>
+          </select>
+        </label>
+        <label id="reportPeriodWrap"></label>
+        <button id="applyReport" class="neo-btn purple">Tampilkan Laporan</button>
+      </div>
+    </section>
+    <div id="reportResult"><div class="empty-product">Memuat laporan...</div></div>
+  `;
+
+  const renderPeriod = () => {
+    const t = $('#reportType').value;
+    $('#reportPeriodWrap').innerHTML = t === 'daily'
+      ? `Periode<input id="reportPeriod" type="date" value="${esc(r.date)}">`
+      : t === 'monthly'
+        ? `Periode<input id="reportPeriod" type="month" value="${esc(r.month)}">`
+        : `Tahun<input id="reportPeriod" type="number" min="2020" max="2100" value="${esc(r.year)}">`;
+  };
+  renderPeriod();
+  $('#reportType').onchange = renderPeriod;
+
+  $('#applyReport').onclick = async () => {
+    const type = $('#reportType').value, val = $('#reportPeriod').value;
+    state.report.type = type;
+    if (type === 'daily') state.report.date = val;
+    if (type === 'monthly') state.report.month = val;
+    if (type === 'yearly') state.report.year = val;
+    await fetchReport();
+  };
+  await fetchReport();
+}
+
+async function fetchReport() {
+  const r = state.report, t = r.type || 'monthly';
+  let qs = `type=${encodeURIComponent(t)}`;
+  let periodLabel = '';
+  if (t === 'daily') {
+    qs += `&date=${encodeURIComponent(r.date)}`;
+    periodLabel = new Date(r.date + 'T00:00:00').toLocaleDateString('id-ID', { dateStyle: 'long' });
+  } else if (t === 'monthly') {
+    const [y, m] = (r.month || '').split('-');
+    qs += `&month=${encodeURIComponent(m || '')}&year=${encodeURIComponent(y || '')}`;
+    periodLabel = new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+  } else {
+    qs += `&year=${encodeURIComponent(r.year)}`;
+    periodLabel = 'Tahun ' + r.year;
+  }
+
+  const res = await api('/api/reseller/reports?' + qs);
+  const x = res.data || {};
+  const sum = x.summary || {};
+  const series = x.series || [];
+  const max = Math.max(1, ...series.map(v => Number(v.revenue || 0)));
+
+  $('#reportResult').innerHTML = `
+    <div class="stats-row">
+      ${stat('🛒', 'purple', 'Pesanan', sum.total_orders || 0, periodLabel)}
+      ${stat('📈', 'pink', 'Omzet', money(sum.revenue), 'Total transaksi pembeli')}
+      ${stat('💵', 'green', 'Profit Komisi', money(sum.profit), 'Keuntungan bersih Anda')}
+      ${stat('⏳', 'yellow', 'Pending', sum.pending || 0, 'Menunggu pembayaran')}
+    </div>
+    <div class="grid-2">
+      <section class="report-card">
+        <div class="card-heading">
+          <div>
+            <h3>📊 ${t === 'daily' ? 'Omzet per Jam' : t === 'monthly' ? 'Omzet Harian' : 'Omzet Bulanan'}</h3>
+            <p>${esc(periodLabel)}</p>
+          </div>
+        </div>
+        <div class="report-series">
+          ${series.length ? series.map(v => `
+            <div class="series-row">
+              <span>${esc(v.bucket)}</span>
+              <div class="series-track"><i style="width:${Math.max(2, Math.round(Number(v.revenue || 0) / max * 100))}%"></i></div>
+              <b>${money(v.revenue)}</b>
+            </div>
+          `).join('') : '<div class="empty compact">Belum ada transaksi pada periode ini.</div>'}
+        </div>
+      </section>
+      <section class="report-card">
+        <div class="card-heading">
+          <div>
+            <h3>🏆 Produk Terlaris</h3>
+            <p>${esc(periodLabel)}</p>
+          </div>
+        </div>
+        <div class="top-list">
+          ${(x.top_products || []).length ? (x.top_products || []).map((p, i) => `
+            <div class="top-item">
+              <span class="rank">${i + 1}</span>
+              <div>
+                <b>${esc(p.product_name || '-')}</b>
+                <small>${p.qty || 0} item terjual · ${p.orders || 0} transaksi</small>
+              </div>
+              <strong>${money(p.revenue)}</strong>
+            </div>
+          `).join('') : '<div class="empty compact">Belum ada data penjualan produk.</div>'}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+// ---------------------------------------------------------------------
+// VIEW 7: BROADCAST (Reseller Broadcast to Bot Customers)
 // ---------------------------------------------------------------------
 async function loadBroadcast() {
   if (state.broadcastPollTimer) {

@@ -869,19 +869,31 @@ function bindCatalogActions() {
 // Modal Edit Produk Reguler (Persis Dashboard Owner)
 function openProductEditModal(p) {
   const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
+  const prodDefDesc = p.default_description || p.description || '';
+  const prodDefTerms = p.default_terms || p.terms || '';
+  const prodCurDesc = p.custom_description || prodDefDesc;
+  const prodCurTerms = p.custom_terms || prodDefTerms;
 
   const variantsListHtml = hasVariants ? `
-    <div class="full" style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;margin-bottom:6px">
-      <b>📦 Atur Margin & Status Varian (${p.variants.length})</b>
+    <div class="full" style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;margin-bottom:8px">
+      <b>📦 Atur Margin, Deskripsi & SNK per Varian (${p.variants.length})</b>
       <button type="button" class="neo-btn white tiny" id="btnModalSyncVariants">⚡ Samakan Semua Margin</button>
     </div>
-    <div class="full" style="display:flex;flex-direction:column;gap:10px;max-height:360px;overflow-y:auto;padding-right:4px">
+    <div class="full" style="display:flex;flex-direction:column;gap:12px;max-height:440px;overflow-y:auto;padding-right:4px">
       ${p.variants.map((v, i) => {
         const vStock = v.delivery_mode === 'preorder' ? 'PO' : (Number(v.stock || 0) > 0 ? `Ready ${v.stock}` : 'Habis');
+        const vDefDesc = v.default_description || prodDefDesc || '';
+        const vDefTerms = v.default_terms || prodDefTerms || '';
+        const vCurDesc = v.custom_description || vDefDesc;
+        const vCurTerms = v.custom_terms || vDefTerms;
+
         return `
-          <div class="variant-edit-card" style="padding:10px;border:2px solid var(--ink, #0c0c0f);border-radius:10px;background:#fdfdfd">
+          <div class="variant-edit-card" style="padding:12px;border:2px solid var(--ink, #0c0c0f);border-radius:10px;background:#fdfdfd">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-              <div><b>${esc(v.name)}</b> <span class="stock-state-pill ${Number(v.stock || 0) > 0 ? 'ready' : 'empty'}" style="font-size:10px;padding:2px 6px">${vStock}</span></div>
+              <div>
+                <b style="font-size:13px">${esc(v.name)}</b>
+                <span class="stock-state-pill ${Number(v.stock || 0) > 0 ? 'ready' : 'empty'}" style="font-size:10px;padding:2px 6px">${vStock}</span>
+              </div>
               <label style="margin:0;font-size:11px;display:flex;align-items:center;gap:4px">
                 Status di Bot:
                 <select class="modal-var-enabled" data-key="${esc(v.key)}" style="padding:2px 6px;font-size:11px">
@@ -890,7 +902,8 @@ function openProductEditModal(p) {
                 </select>
               </label>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
               <div style="background:#f5f5f7;border:1px solid #ccc;border-radius:6px;padding:4px 8px">
                 <small style="display:block;font-size:10px;color:var(--muted)">Modal Owner</small>
                 <b style="font-size:12px">${money(v.owner_price)}</b>
@@ -903,6 +916,24 @@ function openProductEditModal(p) {
                 <small style="display:block;font-size:10px;color:#705300">Harga Jual</small>
                 <b class="modal-var-sell" style="font-size:12px">${money(v.reseller_price)}</b>
               </div>
+            </div>
+
+            <!-- Deskripsi Varian -->
+            <div style="margin-top:6px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                <span style="font-size:11px;font-weight:700">📝 Deskripsi Varian</span>
+                <button type="button" class="btn-reset-v-desc" data-target="vdesc_${v.id}" data-default="${esc(vDefDesc)}" style="background:none;border:none;color:#4361ee;font-size:11px;cursor:pointer;text-decoration:underline">↺ Default Owner</button>
+              </div>
+              <textarea id="vdesc_${v.id}" class="modal-var-desc" data-key="${esc(v.key)}" rows="2" placeholder="Deskripsi varian..." style="width:100%;font-size:12px;border:1px solid #ccc;border-radius:6px;padding:6px;box-sizing:border-box">${esc(vCurDesc)}</textarea>
+            </div>
+
+            <!-- SNK Varian -->
+            <div style="margin-top:6px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                <span style="font-size:11px;font-weight:700">⚖️ Syarat & Ketentuan (SNK)</span>
+                <button type="button" class="btn-reset-v-terms" data-target="vterms_${v.id}" data-default="${esc(vDefTerms)}" style="background:none;border:none;color:#4361ee;font-size:11px;cursor:pointer;text-decoration:underline">↺ Default Owner</button>
+              </div>
+              <textarea id="vterms_${v.id}" class="modal-var-terms" data-key="${esc(v.key)}" rows="2" placeholder="Ketentuan garansi/klaim varian..." style="width:100%;font-size:12px;border:1px solid #ccc;border-radius:6px;padding:6px;box-sizing:border-box">${esc(vCurTerms)}</textarea>
             </div>
           </div>
         `;
@@ -937,13 +968,19 @@ function openProductEditModal(p) {
         </select>
       </label>
       <label class="full">
-        Deskripsi Produk (Kustom Bot Anda)
-        <textarea name="description" rows="4" placeholder="Kosongkan jika ingin memakai deskripsi default dari Owner">${esc(p.custom_description || '')}</textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span>Deskripsi Produk ${hasVariants ? '(Umum / Default)' : '(Kustom Bot Anda)'}</span>
+          <button type="button" id="btnResetProdDesc" style="background:none;border:none;color:#4361ee;font-size:11px;cursor:pointer;text-decoration:underline">↺ Default Owner</button>
+        </div>
+        <textarea name="description" id="modalProdDesc" rows="3" placeholder="Teks deskripsi produk...">${esc(prodCurDesc)}</textarea>
         <small class="muted">Teks deskripsi yang akan dibaca pembeli saat memilih produk di Bot Anda.</small>
       </label>
       <label class="full">
-        Syarat & Ketentuan / SNK (Kustom Bot Anda)
-        <textarea name="terms" rows="4" placeholder="Kosongkan jika ingin memakai SNK default dari Owner">${esc(p.custom_terms || '')}</textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span>Syarat & Ketentuan / SNK ${hasVariants ? '(Umum / Default)' : '(Kustom Bot Anda)'}</span>
+          <button type="button" id="btnResetProdTerms" style="background:none;border:none;color:#4361ee;font-size:11px;cursor:pointer;text-decoration:underline">↺ Default Owner</button>
+        </div>
+        <textarea name="terms" id="modalProdTerms" rows="3" placeholder="Ketentuan garansi / klaim produk...">${esc(prodCurTerms)}</textarea>
         <small class="muted">Ketentuan garansi / klaim untuk pembeli bot Anda.</small>
       </label>
       ${variantsListHtml}
@@ -972,11 +1009,16 @@ function openProductEditModal(p) {
         const marginVal = Math.max(0, Number(inp.value || 0));
         const enabledSelect = document.querySelector(`.modal-var-enabled[data-key="${key}"]`);
         const isEn = enabledSelect ? enabledSelect.value === 'true' : true;
+        const descEl = document.querySelector(`.modal-var-desc[data-key="${key}"]`);
+        const termsEl = document.querySelector(`.modal-var-terms[data-key="${key}"]`);
+
         patch[key] = {
           ...(state.bot?.pricing_overrides?.[key] || {}),
           enabled: isEn,
           margin: marginVal,
-          sell_price: base + marginVal
+          sell_price: base + marginVal,
+          description: descEl ? String(descEl.value || '').trim() : '',
+          terms: termsEl ? String(termsEl.value || '').trim() : ''
         };
       });
     }
@@ -989,6 +1031,36 @@ function openProductEditModal(p) {
     toast(`Produk ${p.name} berhasil diperbarui!`);
     await loadPricing();
   }, { submit: 'Simpan Perubahan' });
+
+  // Reset helpers for single product
+  const resetDesc = $('#btnResetProdDesc');
+  if (resetDesc) {
+    resetDesc.onclick = () => {
+      const el = $('#modalProdDesc');
+      if (el) el.value = prodDefDesc;
+    };
+  }
+  const resetTerms = $('#btnResetProdTerms');
+  if (resetTerms) {
+    resetTerms.onclick = () => {
+      const el = $('#modalProdTerms');
+      if (el) el.value = prodDefTerms;
+    };
+  }
+
+  // Reset helpers for variants
+  $$('.btn-reset-v-desc').forEach(btn => {
+    btn.onclick = () => {
+      const target = document.getElementById(btn.dataset.target);
+      if (target) target.value = btn.dataset.default || '';
+    };
+  });
+  $$('.btn-reset-v-terms').forEach(btn => {
+    btn.onclick = () => {
+      const target = document.getElementById(btn.dataset.target);
+      if (target) target.value = btn.dataset.default || '';
+    };
+  });
 
   // Live price calculation in modal
   if (!hasVariants) {

@@ -333,4 +333,17 @@
   color: #705300;
   letter-spacing: -0.2px;
 }
+.modal-var-desc, .modal-var-terms {
+  font-family: inherit;
+  resize: vertical;
+  min-height: 48px;
+  line-height: 1.4;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.modal-var-desc:focus, .modal-var-terms:focus {
+  border-color: var(--primary, #6c2cff) !important;
+  box-shadow: 0 0 0 2px rgba(108, 44, 255, 0.2);
+}
+
 

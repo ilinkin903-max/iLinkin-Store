@@ -266,6 +266,35 @@
   color: #8c0006;
 }
 
+/* 7-Day Chart Styling in Reseller Dashboard */
+.reseller-chart-card {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.chart-summary-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.chart-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 9px;
+  border: 2px solid var(--ink, #0c0c0f);
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 2px 2px 0 var(--ink, #0c0c0f);
+}
+
+.chart-pill.purple { background: #ecdfff; color: #3c1285; }
+.chart-pill.green { background: #edffdc; color: #1a5e00; }
+.chart-pill.blue { background: #dff4ff; color: #005085; }
+
 /* Responsive Overrides */
 @media (max-width: 620px) {
   .pricing-toolbar {
@@ -282,4 +311,9 @@
   .toggle-switch-group {
     justify-content: space-between;
   }
+  .chart-summary-pills {
+    width: 100%;
+    margin-top: 8px;
+  }
 }
+

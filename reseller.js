@@ -15,8 +15,8 @@ const state = {
 
 const titles = {
   dashboard: ['Dashboard', 'Ringkasan performa toko dan komisi profit Anda'],
-  bot: ['Bot Toko', 'Kelola token bot, nama toko, banner, dan pengaturan layanan'],
-  pricing: ['Katalog & Margin Varian', 'Sesuaikan keuntungan harga jual per produk dan per varian'],
+  bot: ['Pengaturan', 'Kelola token bot, nama toko, banner, dan pengaturan layanan'],
+  pricing: ['Produk', 'Katalog produk dan pengaturan margin keuntungan bot toko Anda'],
   broadcast: ['Broadcast Pelanggan', 'Kirim pesan massal promosi, info diskon, atau pengumuman ke pembeli bot Anda'],
   withdraw: ['Tarik Saldo', 'Pencairan saldo komisi profit ke rekening bank atau e-wallet'],
   orders: ['Pesanan Pembeli', 'Daftar riwayat transaksi pembeli yang masuk melalui bot Anda']
@@ -241,7 +241,7 @@ async function navigate(view, silent = false) {
 }
 
 // ---------------------------------------------------------------------
-// VIEW 1: DASHBOARD (Identical to Owner loadDashboard())
+// VIEW 1: DASHBOARD
 // ---------------------------------------------------------------------
 async function loadDashboard() {
   const data = await api('/api/reseller/overview');
@@ -252,97 +252,73 @@ async function loadDashboard() {
   updateShellUI();
 
   const r = state.reseller || {};
-  const b = state.bot || {};
-  const rt = state.runtime || {};
   const stats = data.stats || {};
 
-  const botStatusBadge = !b.bot_token
-    ? '<span class="badge">Belum Setup</span>'
-    : rt.running
-    ? '<span class="badge ok">🟢 Online</span>'
-    : '<span class="badge warn">🟡 Stopped</span>';
+  // 7-day chart data
+  const daily = Array.isArray(data.last7) && data.last7.length ? data.last7 : (() => {
+    const arr = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000);
+      arr.push({ day: d.toISOString().slice(0, 10), revenue: 0, orders: 0, profit: 0 });
+    }
+    return arr;
+  })();
 
-  const recentOrderCards = state.orders.slice(0, 5).map(o => `
-    <article class="order-card">
-      <div class="order-head">
-        <div><small>Invoice</small><b class="mono">#${esc(o.order_ref || String(o.id))}</b></div>
-        ${badge(o.status)}
+  const max = Math.max(1, ...daily.map(x => Number(x.revenue || 0)));
+  const total7Revenue = daily.reduce((sum, x) => sum + Number(x.revenue || 0), 0);
+  const total7Profit = daily.reduce((sum, x) => sum + Number(x.profit || 0), 0);
+  const total7Orders = daily.reduce((sum, x) => sum + Number(x.orders || 0), 0);
+
+  const chartBars = daily.map(x => {
+    const rev = Number(x.revenue || 0);
+    const prof = Number(x.profit || 0);
+    const ords = Number(x.orders || 0);
+    const h = rev > 0 ? Math.max(8, Math.round((rev / max) * 100)) : 4;
+    let lbl = x.day;
+    try {
+      lbl = new Date(x.day + 'T00:00:00').toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+    } catch {}
+    const tip = `${money(rev)} (${ords} pesanan · profit ${money(prof)})`;
+    return `
+      <div class="day-col">
+        <div class="day-value" title="${esc(tip)}">${rev > 0 ? money(rev) : 'Rp 0'}</div>
+        <div class="day-track">
+          <div class="day-bar" style="height:${h}%" title="${esc(tip)}"></div>
+        </div>
+        <div class="day-label">${esc(lbl)}</div>
       </div>
-      <div class="order-grid">
-        <div><small>Produk</small><strong>${esc(o.product_name)}</strong><span>${esc(o.variant_name || 'Default')}</span></div>
-        <div><small>Qty</small><strong>${o.quantity || 1}</strong></div>
-        <div><small>Harga Jual</small><strong>${money(o.total_price)}</strong></div>
-        <div style="background:#edffdc"><small>Profitmu</small><strong style="color:#1a5e00">+${money(o.reseller_profit)}</strong></div>
-        <div><small>Metode</small><strong>${esc(o.payment_method || 'QRIS')}</strong></div>
-        <div class="wide"><small>Waktu</small><strong>${date(o.created_at)}</strong></div>
-      </div>
-    </article>
-  `).join('');
+    `;
+  }).join('');
 
   $('#content').innerHTML = `
     <div class="dashboard-kpis">
-      ${stat('💵', 'green', 'Saldo Komisi Profit', money(stats.profit_balance), 'Siap dicairkan')}
-      ${stat('📈', 'pink', 'Total Omset Toko', money(stats.revenue_total), 'Penjualan toko Anda')}
-      ${stat('🛒', 'purple', 'Total Order', stats.orders_count || 0, 'Pesanan selesai')}
-      ${stat('👥', 'blue', 'Pelanggan Bot', `${stats.customers_count || 0} User`, 'Pembeli terdaftar')}
+      ${stat('💵', 'green', 'Saldo Komisi Profit', money(r.profit_balance ?? stats.profit_balance), 'Siap dicairkan')}
+      ${stat('📈', 'pink', 'Total Omset Toko', money(stats.total_revenue ?? stats.revenue_total), 'Penjualan toko Anda')}
+      ${stat('🛒', 'purple', 'Total Order', (stats.total_orders ?? stats.orders_count) || 0, 'Pesanan selesai')}
+      ${stat('👥', 'blue', 'Pelanggan Bot', `${(stats.total_users ?? stats.customers_count) || 0} User`, 'Pembeli terdaftar')}
     </div>
 
-    <div class="dashboard-grid">
-      <section class="report-card chart-card">
-        <div class="card-heading">
-          <div>
-            <h3>🤖 Bot Toko White-Label</h3>
-            <p>Status operasional bot reseller Anda</p>
-          </div>
-          ${botStatusBadge}
+    <section class="report-card chart-card reseller-chart-card">
+      <div class="card-heading">
+        <div>
+          <h3>📊 Grafik 7 Hari Terakhir</h3>
+          <p>Performa omset penjualan bot toko Anda selama 7 hari terakhir</p>
         </div>
-        <div style="padding:16px 0">
-          <p style="margin:0 0 10px;font-size:14px">Nama Toko: <b>${esc(b.branding?.store_name || b.bot_name || 'Belum Diatur')}</b></p>
-          <p style="margin:0 0 16px;font-size:14px">Bot Username: <b>${b.bot_username ? '@' + b.bot_username : '-'}</b></p>
-          <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <button type="button" class="neo-btn purple small" id="dashGoBotBtn">⚙️ Atur Konfigurasi Bot</button>
-            ${b.bot_username ? `<a class="neo-btn blue small" href="https://t.me/${b.bot_username.replace(/^@+/, '')}" target="_blank">✈ Buka Bot Telegram</a>` : ''}
-          </div>
+        <div class="chart-summary-pills">
+          <span class="chart-pill purple">Omset: <b>${money(total7Revenue)}</b></span>
+          <span class="chart-pill green">Profit: <b>+${money(total7Profit)}</b></span>
+          <span class="chart-pill blue">Pesanan: <b>${total7Orders}</b></span>
         </div>
-      </section>
-
-      <section class="report-card top-products-card">
-        <div class="card-heading">
-          <div>
-            <h3>👛 Saldo & Penarikan</h3>
-            <p>Ringkasan profit yang telah dicairkan</p>
-          </div>
-          <button type="button" class="neo-btn green small" id="dashGoWdBtn">💸 Tarik Saldo</button>
-        </div>
-        <div style="padding:16px 0">
-          <p style="margin:0 0 10px;font-size:14px">Total Sudah Ditarik: <b>${money(stats.withdrawn_total)}</b></p>
-          <p style="margin:0 0 16px;font-size:14px">Mode Markup Global: <b>${r.markup_mode === 'percent' ? `+${r.markup_value}%` : `+${money(r.markup_value)}`}</b></p>
-          <button type="button" class="neo-btn white small" id="dashGoPricingBtn">🏷️ Sesuaikan Margin Produk →</button>
-        </div>
-      </section>
-    </div>
-
-    <div class="section-title product-section-title" style="margin-top:20px">
-      <div>
-        <h2>🛒 5 Pesanan Pembeli Terkini</h2>
-        <p>Pesanan terbaru yang masuk melalui bot toko Anda</p>
       </div>
-      <span>
-        <button id="dashGoOrdersBtn" class="neo-btn purple">Lihat Semua Pesanan →</button>
-      </span>
-    </div>
-
-    ${state.orders.length ? `<div class="order-list">${recentOrderCards}</div>` : '<div class="empty-product">Belum ada transaksi pesanan di bot toko Anda.</div>'}
+      <div class="seven-chart">
+        ${chartBars}
+      </div>
+    </section>
   `;
-
-  $('#dashGoBotBtn').onclick = () => navigate('bot');
-  $('#dashGoWdBtn').onclick = () => navigate('withdraw');
-  $('#dashGoPricingBtn').onclick = () => navigate('pricing');
-  $('#dashGoOrdersBtn').onclick = () => navigate('orders');
 }
 
 // ---------------------------------------------------------------------
-// VIEW 2: BOT TOKO (Identical to Owner bot settings)
+// VIEW 2: PENGATURAN (Toko & Bot)
 // ---------------------------------------------------------------------
 async function loadBot() {
   const data = await api('/api/reseller/me');
@@ -361,8 +337,8 @@ async function loadBot() {
   $('#content').innerHTML = `
     <div class="section-title product-section-title">
       <div>
-        <h2>🤖 Pengaturan Bot Toko Reseller</h2>
-        <p>Hubungkan token bot dari @BotFather dan kelola branding toko white-label Anda.</p>
+        <h2>⚙️ Pengaturan Toko & Bot</h2>
+        <p>Hubungkan token bot dari @BotFather dan kelola branding toko Anda.</p>
       </div>
       <span>
         ${rt.running ? '<span class="badge ok">🟢 Online</span>' : b.bot_token ? '<span class="badge warn">🟡 Stopped</span>' : '<span class="badge">Belum Setup</span>'}
@@ -545,8 +521,8 @@ function renderPricingView(searchFilter = '', statusFilter = 'all', categoryFilt
   $('#content').innerHTML = `
     <div class="section-title product-section-title">
       <div>
-        <h2>📦 Katalog Produk & Atur Margin Varian</h2>
-        <p>Sesuaikan margin keuntungan per produk dan varian untuk bot toko Anda.</p>
+        <h2>📦 Katalog Produk</h2>
+        <p>Katalog produk dan pengaturan margin keuntungan bot toko Anda.</p>
       </div>
       <span>
         <button id="btnOpenBulkModal" class="neo-btn purple">⚡ Markup Massal</button>

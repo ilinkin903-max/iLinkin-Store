@@ -867,6 +867,7 @@ function bindCatalogActions() {
 }
 
 // Modal Edit Produk Reguler (Persis Dashboard Owner)
+// Modal Edit Produk Reguler (Persis Dashboard Owner)
 function openProductEditModal(p) {
   const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
   const prodDefDesc = p.default_description || p.description || '';
@@ -874,134 +875,166 @@ function openProductEditModal(p) {
   const prodCurDesc = p.custom_description || prodDefDesc;
   const prodCurTerms = p.custom_terms || prodDefTerms;
 
-  const variantsListHtml = hasVariants ? `
-    <div class="full" style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;margin-bottom:8px">
-      <b>📦 Atur Margin, Deskripsi & SNK per Varian (${p.variants.length})</b>
-      <button type="button" class="neo-btn white tiny" id="btnModalSyncVariants">⚡ Samakan Semua Margin</button>
-    </div>
-    <div class="full" style="display:flex;flex-direction:column;gap:12px;max-height:440px;overflow-y:auto;padding-right:4px">
-      ${p.variants.map((v, i) => {
-        const vStock = v.delivery_mode === 'preorder' ? 'PO' : (Number(v.stock || 0) > 0 ? `Ready ${v.stock}` : 'Habis');
-        const vDefDesc = v.default_description || prodDefDesc || '';
-        const vDefTerms = v.default_terms || prodDefTerms || '';
-        const vCurDesc = v.custom_description || vDefDesc;
-        const vCurTerms = v.custom_terms || vDefTerms;
+  let bodyHtml = '';
 
-        return `
-          <div class="variant-edit-card" style="padding:12px;border:2px solid var(--ink, #0c0c0f);border-radius:10px;background:#fdfdfd">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-              <div>
-                <b style="font-size:13px">${esc(v.name)}</b>
-                <span class="stock-state-pill ${Number(v.stock || 0) > 0 ? 'ready' : 'empty'}" style="font-size:10px;padding:2px 6px">${vStock}</span>
-              </div>
-              <label style="margin:0;font-size:11px;display:flex;align-items:center;gap:4px">
-                Status di Bot:
-                <select class="modal-var-enabled" data-key="${esc(v.key)}" style="padding:2px 6px;font-size:11px">
-                  <option value="true" ${v.enabled ? 'selected' : ''}>Aktif</option>
-                  <option value="false" ${!v.enabled ? 'selected' : ''}>Nonaktif</option>
-                </select>
-              </label>
-            </div>
+  if (hasVariants) {
+    bodyHtml = `
+      <div class="form-grid product-form">
+        <label>Kode Produk<input value="${esc(p.code)}" disabled></label>
+        <label>Nama Produk<input value="${esc(p.name)}" disabled></label>
+        <label>Kategori<input value="${esc(p.category || 'Digital')}" disabled></label>
+        <label>Subtitle<input value="${esc(p.subtitle || '-')}" disabled></label>
+        <label>Tag<input value="${esc(p.tag || '-')}" disabled></label>
+        <label>Status di Bot Anda
+          <select name="enabled">
+            <option value="true" ${p.enabled ? 'selected' : ''}>Aktif (ON)</option>
+            <option value="false" ${!p.enabled ? 'selected' : ''}>Nonaktif (OFF)</option>
+          </select>
+        </label>
+        <div class="full info-note variant-default-hidden-note">
+          <b>Produk memakai varian (${p.variants.length} Varian).</b><br>
+          Deskripsi, SNK, modal, dan margin keuntungan diatur langsung per masing-masing varian di bawah ini.
+        </div>
+      </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
-              <div style="background:#f5f5f7;border:1px solid #ccc;border-radius:6px;padding:4px 8px">
-                <small style="display:block;font-size:10px;color:var(--muted)">Modal Owner</small>
-                <b style="font-size:12px">${money(v.owner_price)}</b>
-              </div>
-              <div style="background:#edffdc;border:1px solid #82d847;border-radius:6px;padding:4px 8px">
-                <small style="display:block;font-size:10px;color:#1a5e00">Margin Profit (+)</small>
-                <input type="number" class="modal-var-margin" data-key="${esc(v.key)}" data-base="${v.owner_price}" value="${v.margin || 0}" min="0" step="500" style="width:100%;font-size:12px;font-weight:700;padding:2px;border:1px solid #000;border-radius:4px" />
-              </div>
-              <div style="background:#fffbd4;border:1px solid #ffd91a;border-radius:6px;padding:4px 8px">
-                <small style="display:block;font-size:10px;color:#705300">Harga Jual</small>
-                <b class="modal-var-sell" style="font-size:12px">${money(v.reseller_price)}</b>
-              </div>
-            </div>
-
-            <!-- Deskripsi Varian -->
-            <div style="margin-top:6px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-                <span style="font-size:11px;font-weight:700">📝 Deskripsi Varian</span>
-                <button type="button" class="btn-reset-v-desc" data-target="vdesc_${v.id}" data-default="${esc(vDefDesc)}" style="background:none;border:none;color:#4361ee;font-size:11px;cursor:pointer;text-decoration:underline">↺ Default Owner</button>
-              </div>
-              <textarea id="vdesc_${v.id}" class="modal-var-desc" data-key="${esc(v.key)}" rows="2" placeholder="Deskripsi varian..." style="width:100%;font-size:12px;border:1px solid #ccc;border-radius:6px;padding:6px;box-sizing:border-box">${esc(vCurDesc)}</textarea>
-            </div>
-
-            <!-- SNK Varian -->
-            <div style="margin-top:6px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-                <span style="font-size:11px;font-weight:700">⚖️ Syarat & Ketentuan (SNK)</span>
-                <button type="button" class="btn-reset-v-terms" data-target="vterms_${v.id}" data-default="${esc(vDefTerms)}" style="background:none;border:none;color:#4361ee;font-size:11px;cursor:pointer;text-decoration:underline">↺ Default Owner</button>
-              </div>
-              <textarea id="vterms_${v.id}" class="modal-var-terms" data-key="${esc(v.key)}" rows="2" placeholder="Ketentuan garansi/klaim varian..." style="width:100%;font-size:12px;border:1px solid #ccc;border-radius:6px;padding:6px;box-sizing:border-box">${esc(vCurTerms)}</textarea>
-            </div>
+      <div class="variant-editor full" style="margin-top:16px;padding-top:14px;border-top:2px solid var(--ink, #0c0c0f)">
+        <div class="variant-editor-head" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px">
+          <div>
+            <h3 style="margin:0;font-size:16px">📦 Atur Varian Produk (${p.variants.length})</h3>
+            <p style="margin:4px 0 0;font-size:12px;color:var(--muted)">Tentukan margin keuntungan, status aktif, deskripsi, dan SNK untuk setiap varian.</p>
           </div>
-        `;
-      }).join('')}
-    </div>
-  ` : `
-    <div class="full" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px">
-      <div style="background:#f5f5f7;border:1px solid #ccc;border-radius:6px;padding:6px 10px">
-        <small style="display:block;font-size:11px;color:var(--muted)">Modal Owner</small>
-        <b style="font-size:13px">${money(p.owner_price)}</b>
-      </div>
-      <div style="background:#edffdc;border:1px solid #82d847;border-radius:6px;padding:6px 10px">
-        <small style="display:block;font-size:11px;color:#1a5e00">Margin Profit (+)</small>
-        <input type="number" name="margin" id="modalProductMargin" data-base="${p.owner_price}" value="${p.margin || 0}" min="0" step="500" style="width:100%;font-size:13px;font-weight:700;padding:4px;border:1px solid #000;border-radius:4px" />
-      </div>
-      <div style="background:#fffbd4;border:1px solid #ffd91a;border-radius:6px;padding:6px 10px">
-        <small style="display:block;font-size:11px;color:#705300">Harga Jual Pembeli</small>
-        <b id="modalProductSell" style="font-size:13px">${money(p.reseller_price)}</b>
-      </div>
-    </div>
-  `;
-
-  const html = `
-    <div class="form-grid product-form">
-      <label>Kode Produk<input value="${esc(p.code)}" disabled></label>
-      <label>Nama Produk<input value="${esc(p.name)}" disabled></label>
-      <label>Kategori<input value="${esc(p.category || 'Digital')}" disabled></label>
-      <label>Status di Bot Anda
-        <select name="enabled">
-          <option value="true" ${p.enabled ? 'selected' : ''}>Aktif (ON)</option>
-          <option value="false" ${!p.enabled ? 'selected' : ''}>Nonaktif (OFF)</option>
-        </select>
-      </label>
-      <label class="full">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span>Deskripsi Produk ${hasVariants ? '(Umum / Default)' : '(Kustom Bot Anda)'}</span>
-          <button type="button" id="btnResetProdDesc" style="background:none;border:none;color:#4361ee;font-size:11px;cursor:pointer;text-decoration:underline">↺ Default Owner</button>
+          <button type="button" class="neo-btn white small" id="btnModalSyncVariants">⚡ Samakan Semua Margin</button>
         </div>
-        <textarea name="description" id="modalProdDesc" rows="3" placeholder="Teks deskripsi produk...">${esc(prodCurDesc)}</textarea>
-        <small class="muted">Teks deskripsi yang akan dibaca pembeli saat memilih produk di Bot Anda.</small>
-      </label>
-      <label class="full">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span>Syarat & Ketentuan / SNK ${hasVariants ? '(Umum / Default)' : '(Kustom Bot Anda)'}</span>
-          <button type="button" id="btnResetProdTerms" style="background:none;border:none;color:#4361ee;font-size:11px;cursor:pointer;text-decoration:underline">↺ Default Owner</button>
-        </div>
-        <textarea name="terms" id="modalProdTerms" rows="3" placeholder="Ketentuan garansi / klaim produk...">${esc(prodCurTerms)}</textarea>
-        <small class="muted">Ketentuan garansi / klaim untuk pembeli bot Anda.</small>
-      </label>
-      ${variantsListHtml}
-    </div>
-  `;
 
-  modal(`Edit Produk · ${p.name}`, html, async (fd) => {
+        <div class="variant-edit-list" style="display:flex;flex-direction:column;gap:12px;max-height:460px;overflow-y:auto;padding-right:4px">
+          ${p.variants.map((v, i) => {
+            const vStock = v.delivery_mode === 'preorder' ? 'PO' : (Number(v.stock || 0) > 0 ? `Ready ${v.stock}` : 'Habis');
+            const vStockState = v.delivery_mode === 'preorder' ? 'preorder' : (Number(v.stock || 0) > 0 ? 'ready' : 'empty');
+            const vDefDesc = v.default_description || prodDefDesc || '';
+            const vDefTerms = v.default_terms || prodDefTerms || '';
+            const vCurDesc = v.custom_description || vDefDesc;
+            const vCurTerms = v.custom_terms || vDefTerms;
+
+            return `
+              <div class="variant-edit-card" style="padding:12px;border:2px solid var(--ink, #0c0c0f);border-radius:10px;background:#faf7ff;display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <b style="font-size:14px">${esc(v.name)}</b>
+                    <span class="stock-state-pill ${vStockState}" style="font-size:10px;padding:2px 6px">${vStock}</span>
+                  </div>
+                  <label style="margin:0;font-size:11px;display:inline-flex;align-items:center;gap:4px">
+                    Status di Bot:
+                    <select class="modal-var-enabled" data-key="${esc(v.key)}" style="padding:3px 8px;font-size:11px;border-radius:4px;border:1px solid #000">
+                      <option value="true" ${v.enabled ? 'selected' : ''}>Aktif</option>
+                      <option value="false" ${!v.enabled ? 'selected' : ''}>Nonaktif</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+                  <div style="background:#f5f5f7;border:1px solid #ccc;border-radius:6px;padding:6px 8px">
+                    <small style="display:block;font-size:10px;color:var(--muted);font-weight:700">Modal Owner</small>
+                    <b style="font-size:13px">${money(v.owner_price)}</b>
+                  </div>
+                  <div style="background:#edffdc;border:1px solid #82d847;border-radius:6px;padding:6px 8px">
+                    <small style="display:block;font-size:10px;color:#1a5e00;font-weight:700">Margin Profit (+)</small>
+                    <input type="number" class="modal-var-margin" data-key="${esc(v.key)}" data-base="${v.owner_price}" value="${v.margin || 0}" min="0" step="500" style="width:100%;font-size:13px;font-weight:700;padding:2px 4px;border:1px solid #000;border-radius:4px" />
+                  </div>
+                  <div style="background:#fffbd4;border:1px solid #ffd91a;border-radius:6px;padding:6px 8px">
+                    <small style="display:block;font-size:10px;color:#705300;font-weight:700">Harga Jual</small>
+                    <b class="modal-var-sell" style="font-size:13px">${money(v.reseller_price)}</b>
+                  </div>
+                </div>
+
+                <!-- Deskripsi Varian -->
+                <div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                    <span style="font-size:11px;font-weight:700">📝 Deskripsi Varian</span>
+                    <button type="button" class="btn-reset-v-desc" data-target="vdesc_${v.id}" data-default="${esc(vDefDesc)}" style="background:none;border:none;color:#4361ee;font-size:11px;cursor:pointer;text-decoration:underline">↺ Default Owner</button>
+                  </div>
+                  <textarea id="vdesc_${v.id}" class="modal-var-desc" data-key="${esc(v.key)}" rows="2" placeholder="Deskripsi varian..." style="width:100%;font-size:12px;border:1px solid #ccc;border-radius:6px;padding:6px;box-sizing:border-box">${esc(vCurDesc)}</textarea>
+                </div>
+
+                <!-- SNK Varian -->
+                <div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                    <span style="font-size:11px;font-weight:700">⚖️ Syarat & Ketentuan (SNK)</span>
+                    <button type="button" class="btn-reset-v-terms" data-target="vterms_${v.id}" data-default="${esc(vDefTerms)}" style="background:none;border:none;color:#4361ee;font-size:11px;cursor:pointer;text-decoration:underline">↺ Default Owner</button>
+                  </div>
+                  <textarea id="vterms_${v.id}" class="modal-var-terms" data-key="${esc(v.key)}" rows="2" placeholder="Ketentuan garansi/klaim varian..." style="width:100%;font-size:12px;border:1px solid #ccc;border-radius:6px;padding:6px;box-sizing:border-box">${esc(vCurTerms)}</textarea>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  } else {
+    // Produk tanpa varian (Single)
+    bodyHtml = `
+      <div class="form-grid product-form">
+        <label>Kode Produk<input value="${esc(p.code)}" disabled></label>
+        <label>Nama Produk<input value="${esc(p.name)}" disabled></label>
+        <label>Kategori<input value="${esc(p.category || 'Digital')}" disabled></label>
+        <label>Subtitle<input value="${esc(p.subtitle || '-')}" disabled></label>
+        <label>Tag<input value="${esc(p.tag || '-')}" disabled></label>
+        <label>Status di Bot Anda
+          <select name="enabled">
+            <option value="true" ${p.enabled ? 'selected' : ''}>Aktif (ON)</option>
+            <option value="false" ${!p.enabled ? 'selected' : ''}>Nonaktif (OFF)</option>
+          </select>
+        </label>
+
+        <div class="full" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px">
+          <div style="background:#f5f5f7;border:1px solid #ccc;border-radius:6px;padding:6px 10px">
+            <small style="display:block;font-size:11px;color:var(--muted);font-weight:700">Modal Owner</small>
+            <b style="font-size:13px">${money(p.owner_price)}</b>
+          </div>
+          <div style="background:#edffdc;border:1px solid #82d847;border-radius:6px;padding:6px 10px">
+            <small style="display:block;font-size:11px;color:#1a5e00;font-weight:700">Margin Profit (+)</small>
+            <input type="number" name="margin" id="modalProductMargin" data-base="${p.owner_price}" value="${p.margin || 0}" min="0" step="500" style="width:100%;font-size:13px;font-weight:700;padding:4px;border:1px solid #000;border-radius:4px" />
+          </div>
+          <div style="background:#fffbd4;border:1px solid #ffd91a;border-radius:6px;padding:6px 10px">
+            <small style="display:block;font-size:11px;color:#705300;font-weight:700">Harga Jual Pembeli</small>
+            <b id="modalProductSell" style="font-size:13px">${money(p.reseller_price)}</b>
+          </div>
+        </div>
+
+        <label class="full">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span>Deskripsi Produk (Kustom Bot Anda)</span>
+            <button type="button" id="btnResetProdDesc" style="background:none;border:none;color:#4361ee;font-size:11px;cursor:pointer;text-decoration:underline">↺ Default Owner</button>
+          </div>
+          <textarea name="description" id="modalProdDesc" rows="4" placeholder="Teks deskripsi produk...">${esc(prodCurDesc)}</textarea>
+          <small class="muted">Teks deskripsi yang akan dibaca pembeli saat memilih produk di Bot Anda.</small>
+        </label>
+        <label class="full">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span>Syarat & Ketentuan / SNK (Kustom Bot Anda)</span>
+            <button type="button" id="btnResetProdTerms" style="background:none;border:none;color:#4361ee;font-size:11px;cursor:pointer;text-decoration:underline">↺ Default Owner</button>
+          </div>
+          <textarea name="terms" id="modalProdTerms" rows="4" placeholder="Ketentuan garansi / klaim produk...">${esc(prodCurTerms)}</textarea>
+          <small class="muted">Ketentuan garansi / klaim untuk pembeli bot Anda.</small>
+        </label>
+      </div>
+    `;
+  }
+
+  modal(`Edit Produk · ${p.name}`, bodyHtml, async (fd) => {
     const patch = {};
 
     // Base product override
     patch[p.code] = {
       ...(state.bot?.pricing_overrides?.[p.code] || {}),
-      enabled: fd.enabled === 'true',
-      description: String(fd.description || '').trim(),
-      terms: String(fd.terms || '').trim()
+      enabled: fd.enabled === 'true'
     };
 
     if (!hasVariants) {
       const marginVal = Math.max(0, Number(fd.margin || 0));
       patch[p.code].margin = marginVal;
       patch[p.code].sell_price = p.owner_price + marginVal;
+      patch[p.code].description = String(fd.description || '').trim();
+      patch[p.code].terms = String(fd.terms || '').trim();
     } else {
       $$('.modal-var-margin').forEach(inp => {
         const key = inp.dataset.key;

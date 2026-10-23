@@ -4,12 +4,14 @@ const $$ = (s) => [...document.querySelectorAll(s)];
 const state = {
   token: sessionStorage.getItem('ilink_reseller_token') || localStorage.getItem('ilink_reseller_token') || '',
   view: 'dashboard',
+  mainProductTab: 'custom',
   productTab: 'regular',
   reseller: null,
   bot: null,
   runtime: null,
   products: [],
   freshProducts: [],
+  customProducts: [],
   pendingPricing: {},
   orders: [],
   users: [],
@@ -19,7 +21,7 @@ const state = {
 
 const titles = {
   dashboard: ['Dashboard', 'Ringkasan performa toko dan komisi profit Anda'],
-  pricing: ['Produk', 'Katalog produk dan pengaturan margin keuntungan bot toko Anda'],
+  pricing: ['Produk', 'Kelola produk reseller Anda sendiri dan katalog produk toko'],
   orders: ['Pesanan', 'Daftar riwayat transaksi pembeli yang masuk melalui bot Anda'],
   reports: ['Laporan', 'Omzet, profit, dan performa penjualan bot toko Anda'],
   broadcast: ['Broadcast Pelanggan', 'Kirim pesan massal promosi, info diskon, atau pengumuman ke pembeli bot Anda'],
@@ -106,6 +108,104 @@ function variantChip(v = {}) {
   return `<span class="variant-chip stock-${st}" title="${esc(v.name)} · ${label}">${esc(v.name)} · ${label}</span>`;
 }
 
+function bulkTiers(value) {
+  let rows = value;
+  if (typeof rows === 'string') {
+    try { rows = JSON.parse(rows); } catch { rows = []; }
+  }
+  if (!Array.isArray(rows)) rows = [];
+  const byQty = new Map();
+  for (const row of rows) {
+    const min = Math.max(2, Math.floor(Number(row?.min_qty ?? row?.minQty ?? row?.qty ?? 0) || 0));
+    const price = Math.max(0, Math.floor(Number(row?.price ?? row?.unit_price ?? 0) || 0));
+    if (min >= 2 && price > 0) byQty.set(min, { min_qty: min, price });
+  }
+  return [...byQty.values()].sort((a, b) => a.min_qty - b.min_qty);
+}
+
+function bulkUnitPrice(base, tiers, qty = 1) {
+  let price = Math.max(0, Number(base || 0)), q = Math.max(1, Number(qty || 1));
+  for (const t of bulkTiers(tiers)) {
+    if (q >= t.min_qty) price = t.price;
+    else break;
+  }
+  return price;
+}
+
+function bulkEditorHtml(prefix, tiers = []) {
+  const rows = bulkTiers(tiers);
+  return `<div class="full bulk-editor"><div class="bulk-editor-head"><div><b>Harga Bulk / Grosir</b><small>Harga per pcs otomatis berubah saat jumlah pesanan mencapai minimal tier.</small></div><button type="button" id="${prefix}Add" class="neo-btn purple small">＋ Tambah Tier</button></div><div id="${prefix}Rows" class="bulk-tier-list"></div><input type="hidden" name="bulk_prices" id="${prefix}Value" value="${esc(JSON.stringify(rows))}"><div class="bulk-help">Contoh: mulai 2 pcs Rp 845/pcs, mulai 50 pcs Rp 200/pcs. Tier diurutkan otomatis dari jumlah terkecil.</div></div>`;
+}
+
+function bindBulkEditor(prefix, initial = []) {
+  let rows = bulkTiers(initial);
+  const host = $(`#${prefix}Rows`), value = $(`#${prefix}Value`), add = $(`#${prefix}Add`);
+  const sync = () => { if (value) value.value = JSON.stringify(bulkTiers(rows)); };
+  const render = () => {
+    if (!host) return;
+    host.innerHTML = rows.length ? rows.map((t, i) => `
+      <div class="bulk-tier-row">
+        <label>Mulai Qty<input type="number" min="2" value="${Number(t.min_qty)}" data-bulk-qty="${i}"></label>
+        <label>Harga / pcs<input type="number" min="1" value="${Number(t.price)}" data-bulk-price="${i}"></label>
+        <button type="button" class="neo-btn red small" data-bulk-remove="${i}">Hapus</button>
+      </div>
+    `).join('') : '<div class="empty compact">Belum ada harga bulk. Harga normal berlaku untuk semua jumlah.</div>';
+    sync();
+    $$('[data-bulk-qty]').forEach(el => el.oninput = () => {
+      rows[Number(el.dataset.bulkQty)].min_qty = Math.max(2, Number(el.value || 2));
+      sync();
+    });
+    $$('[data-bulk-price]').forEach(el => el.oninput = () => {
+      rows[Number(el.dataset.bulkPrice)].price = Math.max(1, Number(el.value || 1));
+      sync();
+    });
+    $$('[data-bulk-remove]').forEach(el => el.onclick = () => {
+      rows.splice(Number(el.dataset.bulkRemove), 1);
+      render();
+    });
+  };
+  if (add) add.onclick = () => {
+    const normalized = bulkTiers(rows), last = normalized.at(-1);
+    rows = normalized;
+    rows.push({ min_qty: last ? last.min_qty + 1 : 2, price: last ? last.price : 1 });
+    render();
+  };
+  render();
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result || '').split(',').pop() || '');
+    r.onerror = () => reject(new Error('Gagal membaca file.'));
+    r.readAsDataURL(file);
+  });
+}
+
+async function uploadMedia(file, kind = 'media', onProgress = null) {
+  if (!file) throw new Error('Pilih file terlebih dahulu.');
+  const isVideo = String(file.type || '').startsWith('video/') || /\.(mp4|webm)$/i.test(String(file.name || ''));
+  const max = isVideo ? 40 * 1024 * 1024 : 8 * 1024 * 1024;
+  if (file.size > max) throw new Error(`Ukuran ${isVideo ? 'video' : 'gambar'} maksimal ${Math.round(max / 1024 / 1024)} MB.`);
+  const init = await api('/api/reseller/media/upload/init', { method: 'POST', body: { name: file.name, mime: file.type, size: file.size, kind } });
+  const uploadId = init.upload_id;
+  const chunkSize = Math.min(Number(init.chunk_bytes || 512 * 1024), 512 * 1024);
+  let offset = 0;
+  try {
+    while (offset < file.size) {
+      const blob = file.slice(offset, Math.min(file.size, offset + chunkSize));
+      const data = await fileToBase64(blob);
+      const r = await api('/api/reseller/media/upload/chunk', { method: 'POST', body: { upload_id: uploadId, offset, data_base64: data } });
+      offset = Number(r.received || offset + blob.size);
+      if (onProgress) onProgress(Math.min(100, Math.round(offset / file.size * 100)));
+    }
+    return await api('/api/reseller/media/upload/complete', { method: 'POST', body: { upload_id: uploadId } });
+  } catch (e) {
+    try { await api('/api/reseller/media/upload/cancel', { method: 'POST', body: { upload_id: uploadId } }); } catch {}
+    throw e;
+  }
+}
+
 function toast(msg, bad = false) {
   const t = $('#toast');
   if (!t) return;
@@ -142,14 +242,14 @@ function modal(title, html, onSubmit, options = {}) {
   if (alertBox) { alertBox.className = 'modal-alert hidden'; alertBox.textContent = ''; }
   submitBtn.textContent = options.submit || 'Simpan';
   submitBtn.disabled = false;
-  submitBtn.classList.toggle('hidden', options.noSubmit === true);
+  submitBtn.classList.toggle('hidden', options.noSubmit === true || options.hideSubmit === true);
   const cancelBtn = $('#modalCancel');
   if (cancelBtn) {
-    cancelBtn.textContent = options.cancelText || (options.noSubmit === true ? 'Tutup' : 'Batal');
+    cancelBtn.textContent = options.cancelText || (options.noSubmit === true || options.hideSubmit === true ? 'Tutup' : 'Batal');
   }
   form.onsubmit = async (e) => {
     e.preventDefault();
-    if (options.noSubmit === true) return;
+    if (options.noSubmit === true || options.hideSubmit === true) return;
     if (!onSubmit) return m.close();
     submitBtn.disabled = true;
     submitBtn.textContent = 'Menyimpan...';
@@ -618,22 +718,24 @@ async function loadBot(preserveScroll = false) {
 // ---------------------------------------------------------------------
 async function loadPricing(preserveScroll = false, targetKey = null) {
   const scrollY = preserveScroll ? window.scrollY : 0;
-  const [res, freshRes] = await Promise.all([
+  const [res, freshRes, customRes] = await Promise.all([
     api('/api/reseller/products'),
-    api('/api/reseller/fresh-products').catch(() => ({ items: [] }))
+    api('/api/reseller/fresh-products').catch(() => ({ items: [] })),
+    api('/api/reseller/custom-products').catch(() => ({ items: [] }))
   ]);
   state.products = res.items || [];
   state.freshProducts = freshRes.items || [];
+  state.customProducts = customRes.items || [];
   state.pendingPricing = {};
   updateSaveBar();
 
-  renderProductCatalogView();
+  renderPricingView();
 
   if (preserveScroll) {
     window.scrollTo({ top: scrollY, behavior: 'instant' });
     if (targetKey) {
       setTimeout(() => {
-        const el = $(`[data-product-card="${targetKey}"], [data-fresh-card="${targetKey}"]`);
+        const el = $(`[data-product-card="${targetKey}"], [data-fresh-card="${targetKey}"], [data-custom-product-card="${targetKey}"]`);
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }, 50);
     }
@@ -656,9 +758,536 @@ function categories(rows) {
   return [...new Set(rows.map(x => x.category).filter(Boolean))].sort().map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
 }
 
+function renderPricingView(searchFilter = '', statusFilter = 'all', categoryFilter = '') {
+  state.mainProductTab = state.mainProductTab || 'custom';
+  if (state.mainProductTab === 'custom') {
+    renderCustomProductView(searchFilter, statusFilter, categoryFilter);
+  } else {
+    renderProductCatalogView(searchFilter, statusFilter, categoryFilter);
+  }
+}
+
+function renderCustomProductView(searchFilter = '', statusFilter = 'all', categoryFilter = '') {
+  const q = (searchFilter !== '' ? searchFilter : ($('#customProductSearch')?.value || '')).toLowerCase().trim();
+  const stFilter = statusFilter !== 'all' ? statusFilter : ($('#customProductStatus')?.value || 'all');
+  const catFilter = categoryFilter !== '' ? categoryFilter : ($('#customProductCategory')?.value || '');
+
+  const filtered = (state.customProducts || []).filter(p => {
+    const matchSearch = !q || [p.name, p.code, p.display_code, p.category, p.tag].some(x => String(x || '').toLowerCase().includes(q)) || (p.variants || []).some(v => String(v.name || '').toLowerCase().includes(q));
+    const matchCat = !catFilter || p.category === catFilter;
+    if (!matchSearch || !matchCat) return false;
+    if (stFilter === '1' || stFilter === 'enabled') return p.active !== 0;
+    if (stFilter === '0' || stFilter === 'disabled') return p.active === 0;
+    return true;
+  });
+
+  const toolbarHtml = `
+    <div class="toolbar product-toolbar">
+      <div class="searchbox"><input id="customProductSearch" placeholder="Cari nama produk, kode, atau varian..." value="${esc(q)}" /></div>
+      <select id="customProductCategory">
+        <option value="">Semua Kategori</option>
+        ${categories(state.customProducts || [])}
+      </select>
+      <select id="customProductStatus">
+        <option value="all" ${stFilter === 'all' ? 'selected' : ''}>Semua Status</option>
+        <option value="1" ${stFilter === '1' || stFilter === 'enabled' ? 'selected' : ''}>Hanya Aktif</option>
+        <option value="0" ${stFilter === '0' || stFilter === 'disabled' ? 'selected' : ''}>Hanya Nonaktif</option>
+      </select>
+    </div>
+  `;
+
+  const gridHtml = filtered.length
+    ? filtered.map((p, idx) => customProductCard(p, idx)).join('')
+    : `<div class="empty-product">
+        <h3>${(state.customProducts || []).length ? 'Tidak ada produk yang cocok' : 'Belum Ada Produk Reseller'}</h3>
+        <p>${(state.customProducts || []).length ? 'Coba ubah kata kunci pencarian atau filter status.' : 'Anda dapat menambahkan produk digital sendiri dengan menekan tombol <b>＋ Tambah Produk</b> di atas.'}</p>
+      </div>`;
+
+  const existingGrid = $('#customProductGrid');
+  const renderedMainView = $('#content')?.dataset?.mainProductView;
+  if (existingGrid && renderedMainView === 'custom') {
+    existingGrid.innerHTML = gridHtml;
+    bindCustomProductActions();
+    return;
+  }
+
+  const contentEl = $('#content');
+  if (contentEl) {
+    contentEl.dataset.mainProductView = 'custom';
+    delete contentEl.dataset.activeProductTab;
+  }
+  $('#content').innerHTML = `
+    <div class="section-title product-section-title">
+      <div>
+        <h2>📦 Produk Reseller</h2>
+        <p>Tambah dan kelola produk digital Anda sendiri, varian, harga jual, SNK, dan stok penjualan bot Anda.</p>
+      </div>
+      <span>
+        <button id="addCustomProduct" class="neo-btn purple">＋ Tambah Produk</button>
+      </span>
+    </div>
+
+    <div class="tabs main-product-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+      <button class="tab-btn active" data-main-product-tab="custom" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">📦 Produk Reseller (${(state.customProducts || []).length})</button>
+      <button class="tab-btn" data-main-product-tab="store" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">🏬 Produk Toko (${(state.products || []).length + (state.freshProducts || []).length})</button>
+    </div>
+
+    ${toolbarHtml}
+
+    <div id="customProductGrid" class="product-grid">
+      ${gridHtml}
+    </div>
+  `;
+
+  if (catFilter && $('#customProductCategory')) {
+    $('#customProductCategory').value = catFilter;
+  }
+
+  const onFilter = () => renderCustomProductView();
+  if ($('#customProductSearch')) $('#customProductSearch').oninput = onFilter;
+  if ($('#customProductCategory')) $('#customProductCategory').onchange = onFilter;
+  if ($('#customProductStatus')) $('#customProductStatus').onchange = onFilter;
+  if ($('#addCustomProduct')) $('#addCustomProduct').onclick = () => openCustomProduct();
+
+  $$('[data-main-product-tab]').forEach(btn => {
+    btn.onclick = () => {
+      state.mainProductTab = btn.dataset.mainProductTab;
+      renderPricingView();
+    };
+  });
+
+  bindCustomProductActions();
+}
+
+function customProductCard(p, idx = 0) {
+  const vars = (p.variants || []).filter(v => v.active);
+  const chips = vars.slice(0, 3).map(variantChip).join('') + (vars.length > 3 ? `<span class="variant-chip muted">+${vars.length - 3} VARIAN</span>` : '');
+  const allVariants = Array.isArray(p.variants) ? p.variants : [];
+  const price = allVariants.length && !vars.length ? 'Tidak ada varian aktif' : p.price_min === p.price_max ? money(p.price_min) : `${money(p.price_min)} - ${money(p.price_max)}`;
+  const icon = ['💎', '🤖', '🎨', '🎬', '🛍️'][idx % 5];
+  const thumb = `<span class="thumb-fallback">${icon}</span>${p.image_url ? `<img src="${esc(mediaSrc(p.image_url))}" alt="${esc(p.name || 'Produk')}" loading="lazy" onerror="this.remove()">` : ''}`;
+  const stockState = productStockState(p);
+  const stockNumber = Number(p.sale_stock ?? p.stock ?? 0);
+  const stockText = stockStateLabel(stockState, stockNumber);
+  const defaultChipLabel = `DEFAULT · ${stockState === 'ready' ? `Ready ${stockNumber}` : stockState === 'preorder' ? 'PO' : 'Habis'}`;
+  const variantSummary = allVariants.length ? (chips || '<span class="variant-chip muted">Tidak ada varian aktif</span>') : `<span class="variant-chip stock-${stockState}">${esc(defaultChipLabel)}</span>`;
+
+  return `
+    <article class="product-card stock-${stockState}" data-custom-product-card="${p.id}">
+      <span class="product-index">${String(idx + 1).padStart(2, '0')}</span>
+      <div class="product-thumb">${thumb}</div>
+      <div class="product-body">
+        <div class="product-head">
+          <div class="product-title">
+            <h3>${esc(p.name)}</h3>
+            <p>${esc(p.subtitle || p.category || 'Produk Digital')}</p>
+            ${p.tag ? `<span class="tag-chip"># ${esc(String(p.tag).replace(/^#/, '').toUpperCase())}</span>` : ''}
+            <span class="tag-chip" style="background:rgba(123,227,20,0.15);color:#7be314;border-color:#7be314"># PRODUK RESELLER</span>
+          </div>
+          <div class="product-head-actions">
+            <span class="stock-state-pill ${stockState}">${stockText}</span>
+            <button class="toggle ${p.active ? '' : 'off'}" data-toggle-custom-product="${p.id}" data-active="${p.active ? 1 : 0}">
+              ${p.active ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        </div>
+        <div class="product-info">
+          <div class="info-box stock-box ${stockState}">
+            <small>📦 Stok</small>
+            <strong>${stockState === 'preorder' ? 'PO' : stockNumber}</strong>
+            <em>${stockState === 'ready' ? 'Ready stok' : stockState === 'preorder' ? 'Pre-order' : 'Stok habis'}</em>
+          </div>
+          <div class="info-box price">
+            <small>🏷 Harga</small>
+            <strong>${price}</strong>
+            ${bulkTiers(p.bulk_prices).length ? `<em>Bulk mulai ${bulkTiers(p.bulk_prices)[0].min_qty} pcs</em>` : (Number(p.cost || 0) > 0 ? `<em>Modal: ${money(p.cost)}</em>` : '')}
+          </div>
+        </div>
+        <div class="variant-row">${variantSummary}</div>
+        <div class="product-actions">
+          <button class="neo-btn blue small" data-edit-custom-product="${p.id}">✎ EDIT</button>
+          <button class="neo-btn green small" data-stock-custom-product="${p.id}">📦 STOK</button>
+          <button class="neo-btn yellow small" data-manage-custom-product="${p.id}">⚙ KELOLA</button>
+          <button class="neo-btn red small" data-delete-custom-product="${p.id}">🗑 HAPUS</button>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function bindCustomProductActions() {
+  $$('[data-edit-custom-product]').forEach(b => {
+    b.onclick = () => openCustomProduct(findCustomProduct(b.dataset.editCustomProduct));
+  });
+  $$('[data-stock-custom-product]').forEach(b => {
+    b.onclick = () => openCustomStock(findCustomProduct(b.dataset.stockCustomProduct));
+  });
+  $$('[data-manage-custom-product]').forEach(b => {
+    b.onclick = () => openCustomManageProduct(findCustomProduct(b.dataset.manageCustomProduct));
+  });
+  $$('[data-delete-custom-product]').forEach(b => {
+    b.onclick = () => remove(
+      `/api/reseller/custom-products/${b.dataset.deleteCustomProduct}`,
+      'Hapus produk reseller beserta varian dan stoknya?',
+      () => reloadCustomProducts()
+    );
+  });
+  $$('[data-toggle-custom-product]').forEach(b => {
+    b.onclick = async () => {
+      try {
+        await api(`/api/reseller/custom-products/${b.dataset.toggleCustomProduct}/toggle`, {
+          method: 'POST',
+          body: { active: b.dataset.active !== '1' }
+        });
+        toast('Status produk diperbarui');
+        await reloadCustomProducts(b.dataset.toggleCustomProduct);
+      } catch (e) {
+        toast(e.message, true);
+      }
+    };
+  });
+}
+
+function findCustomProduct(id) {
+  return (state.customProducts || []).find(x => String(x.id) === String(id)) || {};
+}
+
+async function reloadCustomProducts(targetProductId = null) {
+  const scrollY = window.scrollY;
+  const searchVal = $('#customProductSearch')?.value || '';
+  const catVal = $('#customProductCategory')?.value || '';
+  const statusVal = $('#customProductStatus')?.value || '';
+  const r = await api('/api/reseller/custom-products');
+  state.customProducts = r.items || [];
+  if (state.view === 'pricing' && state.mainProductTab === 'custom') {
+    renderCustomProductView(searchVal, statusVal, catVal);
+    if (targetProductId) {
+      const targetCard = $(`[data-custom-product-card="${targetProductId}"]`);
+      if (targetCard) targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      else window.scrollTo({ top: scrollY, behavior: 'instant' });
+    } else {
+      window.scrollTo({ top: scrollY, behavior: 'instant' });
+    }
+  }
+}
+
+function customVariantEditorHtml(item) {
+  if (!item.id) {
+    return `<div class="variant-editor"><div class="variant-editor-head"><div><h3>Varian Produk</h3><p>Simpan produk terlebih dahulu, lalu buka Edit untuk menambahkan varian.</p></div></div></div>`;
+  }
+  const rows = (item.variants || []).map(v => {
+    const st = v.delivery_mode === 'preorder' ? 'preorder' : Number(v.stock || 0) > 0 ? 'ready' : 'empty';
+    const label = st === 'ready' ? `READY · ${Number(v.stock || 0)}` : st === 'preorder' ? 'PRE-ORDER' : 'HABIS';
+    return `
+      <div class="variant-edit-card stock-${st}">
+        <div>
+          <div class="variant-edit-title"><b>${esc(v.name)}</b><span class="stock-state-pill ${st}">${label}</span></div>
+          <small>${money(v.price)}${Number(v.cost || 0) > 0 ? ` · modal ${money(v.cost)}` : ''} · stok ${v.stock}${bulkTiers(v.bulk_prices).length ? ` · ${bulkTiers(v.bulk_prices).length} tier bulk` : ''}</small>
+          <p>${esc(v.description || 'Tanpa deskripsi varian')}</p>
+        </div>
+        <div class="actions">
+          <button type="button" class="neo-btn yellow small" data-edit-custom-variant="${v.id}">Edit</button>
+          <button type="button" class="neo-btn red small" data-delete-custom-variant="${v.id}">Hapus</button>
+        </div>
+      </div>
+    `;
+  }).join('') || '<div class="empty compact">Belum ada varian. Produk memakai data default.</div>';
+
+  return `
+    <div class="variant-editor">
+      <div class="variant-editor-head">
+        <div>
+          <h3>Varian Produk</h3>
+          <p>Setiap varian dapat memiliki harga jual, modal, harga bulk, deskripsi, dan SNK sendiri.</p>
+        </div>
+        <button type="button" id="addCustomVariant" class="neo-btn purple small">＋ Tambah Varian</button>
+      </div>
+      <div class="variant-edit-list">${rows}</div>
+    </div>
+  `;
+}
+
+function openCustomProduct(item = {}) {
+  const edit = !!item.id, hasVariants = Array.isArray(item.variants) && item.variants.length > 0;
+  const defaultSettings = hasVariants ?
+    `<div class="full info-note variant-default-hidden-note"><b>Produk memakai varian.</b><br>Harga, modal, harga bulk, mode pengiriman, dan stok Default disembunyikan. Atur seluruh nilai jual melalui masing-masing varian agar tidak ada dua sumber konfigurasi.</div>` :
+    `<label>Harga Jual Default<input name="price" type="number" min="0" value="${Number(item.price || 0)}" required></label>
+     <label>Modal Default (Opsional)<input name="cost" type="number" min="0" value="${Number(item.cost || 0)}"><small class="muted">Untuk perhitungan profit bersih Anda</small></label>
+     ${bulkEditorHtml('customProductBulk', item.bulk_prices || [])}
+     <label>Mode Pengiriman<select name="delivery_mode">
+       <option value="auto" ${item.delivery_mode !== 'preorder' ? 'selected' : ''}>AUTO (Ambil dari stok)</option>
+       <option value="preorder" ${item.delivery_mode === 'preorder' ? 'selected' : ''}>PRE-ORDER</option>
+     </select></label>`;
+
+  modal(edit ? 'Edit Produk Reseller' : 'Tambah Produk Reseller', `
+    <div class="form-grid product-form">
+      <label>Kode Produk<input name="code" required value="${esc(item.display_code || item.code || '')}" placeholder="Contoh: VIP1"></label>
+      <label>Nama Produk<input name="name" required value="${esc(item.name || '')}" placeholder="Contoh: Akun Canva Pro"></label>
+      <label>Kategori<input name="category" value="${esc(item.category || '')}" placeholder="Contoh: Desain"></label>
+      <label>Subtitle<input name="subtitle" value="${esc(item.subtitle || '')}" placeholder="Contoh: Private Akun"></label>
+      <label>Tag<input name="tag" value="${esc(item.tag || '')}" placeholder="Contoh: BESTSELLER"></label>
+      <label class="full">Gambar Produk (disimpan di VPS)
+        <div class="media-uploader">
+          <input id="customProductImageFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+          <button type="button" id="uploadCustomProductImage" class="neo-btn blue small">Upload Gambar</button>
+          <button type="button" id="clearCustomProductImage" class="neo-btn white small">Hapus</button>
+        </div>
+        <input type="hidden" name="image_url" id="customProductImageValue" value="${esc(item.image_url || '')}">
+        <div id="customProductImagePreview" class="media-preview">${item.image_url ? `<img src="${esc(mediaSrc(item.image_url))}" alt="Preview">` : 'Belum ada gambar.'}</div>
+      </label>
+      ${defaultSettings}
+      <label>Status Toko<select name="active">
+        <option value="true" ${item.active !== 0 ? 'selected' : ''}>Aktif</option>
+        <option value="false" ${item.active === 0 ? 'selected' : ''}>Nonaktif</option>
+      </select></label>
+      <label class="full">Deskripsi Produk<textarea name="description" rows="5" placeholder="Deskripsi lengkap produk...">${esc(item.description || '')}</textarea></label>
+      <label class="full">Syarat & Ketentuan (SNK)<textarea name="terms" rows="5" placeholder="Syarat garansi, aturan klaim, dsb...">${esc(item.terms || '')}</textarea></label>
+    </div>
+    ${customVariantEditorHtml(item)}
+  `, async b => {
+    if (!hasVariants) {
+      ['price', 'cost'].forEach(k => b[k] = Number(b[k] || 0));
+      b.bulk_prices = bulkTiers(b.bulk_prices);
+    } else {
+      delete b.price;
+      delete b.cost;
+      delete b.bulk_prices;
+      delete b.delivery_mode;
+    }
+    b.active = b.active === 'true';
+    const saved = await api(edit ? `/api/reseller/custom-products/${item.id}` : '/api/reseller/custom-products', {
+      method: edit ? 'PATCH' : 'POST',
+      body: b
+    });
+    toast(edit ? 'Produk diperbarui' : 'Produk dibuat. Buka Edit untuk menambahkan varian.');
+    const pid = edit ? item.id : (saved?.item?.id || saved?.id);
+    await reloadCustomProducts(pid);
+  });
+
+  if (!hasVariants) bindBulkEditor('customProductBulk', item.bulk_prices || []);
+
+  const uploadImgBtn = $('#uploadCustomProductImage');
+  if (uploadImgBtn) {
+    uploadImgBtn.onclick = async () => {
+      try {
+        const file = $('#customProductImageFile').files?.[0];
+        if (!file) return toast('Pilih file gambar terlebih dahulu.', true);
+        uploadImgBtn.disabled = true;
+        uploadImgBtn.textContent = 'Mengupload...';
+        const r = await uploadMedia(file, 'product');
+        $('#customProductImageValue').value = r.item.key;
+        $('#customProductImagePreview').innerHTML = `<img src="${esc(mediaSrc(r.item.key))}" alt="Preview"><small>${esc(r.item.filename || 'Tersimpan di VPS')}</small>`;
+        if (edit) {
+          await api(`/api/reseller/custom-products/${item.id}`, { method: 'PATCH', body: { image_url: r.item.key } });
+          item.image_url = r.item.key;
+          const cached = findCustomProduct(item.id);
+          if (cached) cached.image_url = r.item.key;
+          toast('Gambar tersimpan dan langsung dipasang ke produk');
+        } else {
+          toast('Gambar tersimpan. Tekan Simpan untuk memasang ke produk baru.');
+        }
+      } catch (e) {
+        toast(e.message, true);
+      } finally {
+        uploadImgBtn.disabled = false;
+        uploadImgBtn.textContent = 'Upload Gambar';
+      }
+    };
+  }
+
+  const clearImgBtn = $('#clearCustomProductImage');
+  if (clearImgBtn) {
+    clearImgBtn.onclick = async () => {
+      try {
+        $('#customProductImageValue').value = '';
+        $('#customProductImagePreview').textContent = 'Belum ada gambar.';
+        if (edit) {
+          await api(`/api/reseller/custom-products/${item.id}`, { method: 'PATCH', body: { image_url: '' } });
+          item.image_url = '';
+          const cached = findCustomProduct(item.id);
+          if (cached) cached.image_url = '';
+          toast('Gambar produk dihapus');
+        }
+      } catch (e) {
+        toast(e.message, true);
+      }
+    };
+  }
+
+  if (edit) {
+    const current = findCustomProduct(item.id) || item;
+    const add = $('#addCustomVariant');
+    if (add) add.onclick = () => openCustomVariant(findCustomProduct(item.id) || current);
+    $$('[data-edit-custom-variant]').forEach(b => b.onclick = () => {
+      const curProd = findCustomProduct(item.id) || current;
+      const targetVar = (curProd.variants || []).find(v => String(v.id) === b.dataset.editCustomVariant);
+      openCustomVariant(curProd, targetVar);
+    });
+    $$('[data-delete-custom-variant]').forEach(b => b.onclick = async () => {
+      if (!confirm('Hapus varian ini?')) return;
+      try {
+        await api(`/api/reseller/custom-variants/${b.dataset.deleteCustomVariant}`, { method: 'DELETE' });
+        toast('Varian dihapus');
+        await reloadCustomProducts(item.id);
+        openCustomProduct(findCustomProduct(item.id) || item);
+      } catch (e) {
+        toast(e.message, true);
+      }
+    });
+  }
+}
+
+function openCustomVariant(p, v = {}) {
+  const edit = !!v.id;
+  const parentId = p.id;
+  const titleHtml = `<button type="button" class="back-modal-btn" id="backToCustomProductModal" title="Kembali ke Produk">←</button> ${(edit ? 'Edit' : 'Tambah') + ' Varian · ' + esc(p.name)}`;
+  modal(titleHtml, `
+    <div class="form-grid">
+      <label>Nama Varian<input name="name" required value="${esc(v.name || '')}" placeholder="Contoh: 1 Bulan"></label>
+      <label>Key / SKU<input name="variant_key" value="${esc(v.variant_key || '')}" placeholder="Contoh: 1M"></label>
+      <label>Harga Jual<input name="price" type="number" min="0" value="${Number(v.price ?? p.price ?? 0)}" required></label>
+      <label>Modal (Opsional)<input name="cost" type="number" min="0" value="${Number(v.cost ?? p.cost ?? 0)}"></label>
+      ${bulkEditorHtml('customVariantBulk', v.bulk_prices || [])}
+      <label>Mode Pengiriman<select name="delivery_mode">
+        <option value="auto" ${v.delivery_mode !== 'preorder' ? 'selected' : ''}>AUTO (Ambil dari stok)</option>
+        <option value="preorder" ${v.delivery_mode === 'preorder' ? 'selected' : ''}>PRE-ORDER</option>
+      </select></label>
+      <label>Status Toko<select name="active">
+        <option value="true" ${v.active !== 0 ? 'selected' : ''}>Aktif</option>
+        <option value="false" ${v.active === 0 ? 'selected' : ''}>Nonaktif</option>
+      </select></label>
+      <label class="full">Deskripsi Varian<textarea name="description" rows="4" placeholder="Deskripsi varian...">${esc(v.description || '')}</textarea></label>
+      <label class="full">SNK Varian<textarea name="terms" rows="4" placeholder="SNK varian...">${esc(v.terms || '')}</textarea></label>
+    </div>
+  `, async b => {
+    ['price', 'cost'].forEach(k => b[k] = Number(b[k] || 0));
+    b.bulk_prices = bulkTiers(b.bulk_prices);
+    b.active = b.active === 'true';
+    await api(edit ? `/api/reseller/custom-variants/${v.id}` : `/api/reseller/custom-products/${parentId}/variants`, {
+      method: edit ? 'PATCH' : 'POST',
+      body: b
+    });
+    toast(edit ? 'Varian berhasil diperbarui' : 'Varian baru ditambahkan');
+    await reloadCustomProducts(parentId);
+    openCustomProduct(findCustomProduct(parentId) || p);
+    return false;
+  }, {
+    submit: edit ? 'Simpan Varian' : '＋ Tambah Varian',
+    onCancel: () => { openCustomProduct(findCustomProduct(parentId) || p); return false; }
+  });
+
+  const backBtn = $('#backToCustomProductModal');
+  if (backBtn) backBtn.onclick = () => openCustomProduct(findCustomProduct(parentId) || p);
+  bindBulkEditor('customVariantBulk', v.bulk_prices || []);
+}
+
+function openCustomStock(p) {
+  const variants = Array.isArray(p.variants) ? p.variants : [];
+  const targets = variants.length
+    ? variants.map(v => ({ id: String(v.id), name: v.name, stock: Number(v.stock || 0) }))
+    : [{ id: '', name: 'Stok Default', stock: Number(p.stock || 0) }];
+  const variantOpts = targets.map(t => `<option value="${esc(t.id)}">${esc(t.name)} · ${t.stock} ready</option>`).join('');
+  const cards = targets.map(t => `<div class="stock-target-card"><span>📦</span><div><b>${esc(t.name)}</b><small>${t.stock} stok ready</small></div></div>`).join('');
+
+  modal('Tambah Stok · ' + p.name, `
+    <div class="stock-add-layout">
+      <div class="stock-target-grid">${cards}</div>
+      <div class="form-grid">
+        <label class="full">Target Stok<select name="variant_id" id="addCustomStockVariant">${variantOpts}</select></label>
+        <label class="full">Data Stok<textarea name="text" id="addCustomStockText" rows="13" placeholder="Satu akun / kode / data produk per baris"></textarea></label>
+        <div class="full stock-input-summary">
+          <span>Item yang akan ditambahkan</span>
+          <b id="addCustomStockCount">0</b>
+        </div>
+      </div>
+      <div class="info-note">${variants.length ? 'Produk ini memakai varian, sehingga stok Default tidak digunakan. ' : ''}Baris kosong otomatis diabaikan. Setiap baris mewakili 1 item stok yang akan dikirim otomatis ke pembeli.</div>
+    </div>
+  `, async b => {
+    const lines = String(b.text || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    if (!lines.length) throw new Error('Masukkan minimal 1 data stok.');
+    await api(`/api/reseller/custom-products/${p.id}/stock`, {
+      method: 'POST',
+      body: { variant_id: b.variant_id ? Number(b.variant_id) : null, mode: 'add', items: lines }
+    });
+    toast(`${lines.length} stok ditambahkan`);
+    await reloadCustomProducts(p.id);
+  }, { submit: '＋ Tambah Stok' });
+
+  const ta = $('#addCustomStockText'), count = $('#addCustomStockCount');
+  const recount = () => {
+    if (count) count.textContent = String(ta ? String(ta.value || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean).length : 0);
+  };
+  if (ta) ta.oninput = recount;
+  recount();
+}
+
+async function openCustomManageProduct(p) {
+  const variants = Array.isArray(p.variants) ? p.variants : [];
+  const targets = variants.length ? variants : [{ id: '', name: 'Stok Default' }];
+  const options = targets.map(v => `<option value="${esc(v.id || '')}">${esc(v.name)}</option>`).join('');
+
+  modal('Kelola Stok · ' + p.name, `
+    <div class="stock-manager">
+      <div class="stock-manager-controls">
+        <label>Target Stok<select id="manageCustomStockVariant">${options}</select></label>
+        <label>Status<select id="manageCustomStockStatus"><option value="available">Ready</option><option value="sold">Terjual</option><option value="">Semua</option></select></label>
+      </div>
+      <div id="customStockManagerSummary" class="stock-summary"></div>
+      <div id="customStockManagerList" class="stock-manager-list"><div class="empty compact">Memuat stok...</div></div>
+    </div>
+  `, async () => {}, { hideSubmit: true, noSubmit: true, cancelText: 'Tutup', onCancel: () => reloadCustomProducts(p.id) });
+
+  const load = async () => {
+    const vid = $('#manageCustomStockVariant').value;
+    const status = $('#manageCustomStockStatus').value;
+    try {
+      const r = await api(`/api/reseller/custom-products/${p.id}/stock?variant_id=${encodeURIComponent(vid)}&status=${encodeURIComponent(status)}&limit=2000`);
+      $('#customStockManagerSummary').innerHTML = `<b>${r.items.length}</b> item ditampilkan · <b>${r.count}</b> stok ready`;
+      $('#customStockManagerList').innerHTML = r.items.length ? r.items.map((x, i) => `
+        <div class="stock-item-card">
+          <div class="stock-item-head"><span>#${i + 1} · ID ${x.id}</span>${badge(x.status)}</div>
+          <textarea data-stock-value="${x.id}" ${x.status !== 'available' ? 'disabled' : ''}>${esc(x.value)}</textarea>
+          <div class="stock-item-meta"><span>${esc(date(x.created_at))}</span>${x.order_ref ? `<span>Order ${esc(x.order_ref)}</span>` : ''}</div>
+          ${x.status === 'available' ? `<div class="actions"><button type="button" class="neo-btn blue small" data-save-stock="${x.id}">Simpan Edit</button><button type="button" class="neo-btn red small" data-delete-stock="${x.id}">Hapus</button></div>` : ''}
+        </div>
+      `).join('') : '<div class="empty compact">Tidak ada stok pada target ini.</div>';
+
+      $$('[data-save-stock]').forEach(b => b.onclick = async () => {
+        try {
+          const val = $(`[data-stock-value="${b.dataset.saveStock}"]`).value;
+          await api(`/api/reseller/custom-stock/${b.dataset.saveStock}`, { method: 'PATCH', body: { value: val } });
+          toast('Stok diperbarui');
+          await load();
+          await reloadCustomProducts(p.id);
+        } catch (e) {
+          toast(e.message, true);
+        }
+      });
+      $$('[data-delete-stock]').forEach(b => b.onclick = async () => {
+        if (!confirm('Hapus stok ini?')) return;
+        try {
+          await api(`/api/reseller/custom-stock/${b.dataset.deleteStock}`, { method: 'DELETE' });
+          toast('Stok dihapus');
+          await load();
+          await reloadCustomProducts(p.id);
+        } catch (e) {
+          toast(e.message, true);
+        }
+      });
+    } catch (e) {
+      $('#customStockManagerList').innerHTML = `<div class="empty compact">${esc(e.message)}</div>`;
+    }
+  };
+
+  $('#manageCustomStockVariant').onchange = load;
+  $('#manageCustomStockStatus').onchange = load;
+  await load();
+}
+
 function renderProductCatalogView(searchFilter = '', statusFilter = 'all', categoryFilter = '') {
   const activeTab = state.productTab || 'regular';
   const existingGrid = $('#productGrid');
+  const renderedMainView = $('#content')?.dataset?.mainProductView;
   const renderedTab = $('#content')?.dataset?.activeProductTab;
 
   const q = (searchFilter !== '' ? searchFilter : ($('#productSearch')?.value || '')).toLowerCase().trim();
@@ -724,23 +1353,31 @@ function renderProductCatalogView(searchFilter = '', statusFilter = 'all', categ
   }
 
   // In-place update if shell and active tab already exist
-  if (existingGrid && renderedTab === activeTab) {
+  if (existingGrid && renderedMainView === 'store' && renderedTab === activeTab) {
     existingGrid.innerHTML = gridHtml;
     bindCatalogActions();
     return;
   }
 
   const contentEl = $('#content');
-  if (contentEl) contentEl.dataset.activeProductTab = activeTab;
+  if (contentEl) {
+    contentEl.dataset.mainProductView = 'store';
+    contentEl.dataset.activeProductTab = activeTab;
+  }
   $('#content').innerHTML = `
     <div class="section-title product-section-title">
       <div>
-        <h2>📦 Katalog Produk</h2>
-        <p>Kelola produk reguler & produk fresh, sesuaikan deskripsi, SNK, dan margin keuntungan bot Anda.</p>
+        <h2>🏬 Produk Toko</h2>
+        <p>Katalog produk dari toko owner. Sesuaikan margin keuntungan dan aktifkan produk yang ingin dijual di bot Anda.</p>
       </div>
       <span>
         <button id="btnOpenBulkModal" class="neo-btn purple">⚡ Markup Massal</button>
       </span>
+    </div>
+
+    <div class="tabs main-product-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+      <button class="tab-btn" data-main-product-tab="custom" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">📦 Produk Reseller (${(state.customProducts || []).length})</button>
+      <button class="tab-btn active" data-main-product-tab="store" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">🏬 Produk Toko (${(state.products || []).length + (state.freshProducts || []).length})</button>
     </div>
 
     <div class="tabs product-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
@@ -771,6 +1408,14 @@ function renderProductCatalogView(searchFilter = '', statusFilter = 'all', categ
     btn.onclick = () => {
       state.productTab = btn.dataset.productTab;
       renderProductCatalogView();
+    };
+  });
+
+  // Main tabs
+  $$('[data-main-product-tab]').forEach(btn => {
+    btn.onclick = () => {
+      state.mainProductTab = btn.dataset.mainProductTab;
+      renderPricingView();
     };
   });
 

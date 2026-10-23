@@ -235,9 +235,10 @@ body{overflow-x:hidden}.app-shell{min-height:100vh;display:grid;grid-template-co
 .fresh-price-grid.editable{grid-template-columns:1fr;gap:9px}
 .fresh-price-edit-card{align-items:flex-start;background:#fbf9ff}
 .fresh-price-main{min-width:0;display:grid;gap:4px}
-.fresh-price-input{display:grid;grid-template-columns:minmax(130px,auto) minmax(170px,240px);gap:9px;align-items:center;margin-top:6px}
+.fresh-price-input-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin-top:6px}
+.fresh-price-input{display:grid;gap:3px;margin-top:0}
 .fresh-price-input em{font-size:9px;font-style:normal;font-weight:950;color:#555}
-.fresh-price-input input[type=number]{width:100%;border:2px solid var(--ink);border-radius:9px;background:#fff;padding:8px 10px;font-weight:900}
+.fresh-price-input input[type=number]{width:100%;border:2px solid var(--ink);border-radius:9px;background:#fff;padding:7px 9px;font-weight:900;font-size:12px}
 .variant-default-hidden-note{background:#fff8cc}
 .supplier-product-actions [data-jaspay-toggle]{min-width:96px}
 
@@ -262,7 +263,8 @@ body{overflow-x:hidden}.app-shell{min-height:100vh;display:grid;grid-template-co
 .product-actions [data-sync-product-supplier-card]{grid-column:auto}
 
 @media(max-width:720px){
-  .fresh-price-input{grid-template-columns:1fr;gap:5px}.supplier-product-actions [data-jaspay-toggle]{min-width:0}
+  .fresh-price-input-row{grid-template-columns:1fr;gap:6px}
+  .fresh-price-input{grid-template-columns:1fr;gap:3px}.supplier-product-actions [data-jaspay-toggle]{min-width:0}
   .product-card{grid-template-columns:84px minmax(0,1fr);gap:9px;padding:9px}
   .product-thumb{width:84px;height:84px;font-size:34px}
   .product-title h3{font-size:17px}.product-title p{font-size:10px}

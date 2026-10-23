@@ -1,6 +1,6 @@
 const $=(s)=>document.querySelector(s);const $$=(s)=>[...document.querySelectorAll(s)];
-const state={token:sessionStorage.getItem('ilink_owner_token')||localStorage.getItem('ilink_owner_token')||'',view:'dashboard',cache:{supplierCatalogs:{}},me:null,overview:null,couponTab:'coupon',settingsTab:'',botTab:'',resellerTab:'resellers',resellerFilter:'',invitationTab:'emails',invitationSearch:'',invitationStatus:'',invitationSessionFilter:'',invitationsData:{items:[],sessions:[]},selectedEmailIds:new Set(),report:{type:'monthly'},legacyMigration:null,notifications:[],notificationTimer:null};
-const titles={dashboard:['Dashboard','Ringkasan performa toko hari ini'],products:['Produk','Katalog, varian, deskripsi, SNK, dan stok'],fresh:['Jaspay Fresh','Produk fresh, harga, mode, setting akun, dan perpanjang'],orders:['Pesanan','Pantau seluruh detail transaksi tanpa tabel horizontal'],invitations:['List Email & Sesi Undangan','Daftar email pembeli produk undangan (Canva, Gemini, dsb.) dan kelola sesi tim'],reports:['Laporan','Omzet, profit, dan performa penjualan'],coupons:['Kupon','Voucher promo dan kode redeem'],settings:['Pengaturan','Toko, referral, TopUp, pembayaran, supplier, dan backup'],bot:['Bot & Notifikasi','Bot, /start, link, transaksi, dan diagnostik'],broadcast:['Broadcast','Kirim dan pantau pesan massal ke pengguna'],users:['User','Data pengguna Telegram, saldo, referral, dan aktivitas'],resellers:['Reseller Bot','Kelola reseller, bot toko white-label, komisi profit, dan penarikan saldo']};
+const state={token:sessionStorage.getItem('ilink_owner_token')||localStorage.getItem('ilink_owner_token')||'',view:'dashboard',cache:{supplierCatalogs:{}},me:null,overview:null,couponTab:'coupon',settingsTab:'',botTab:'',resellerTab:'resellers',resellerFilter:'',invitationTab:'emails',invitationSearch:'',invitationStatus:'',invitationSessionFilter:'',invitationsData:{items:[],sessions:[]},selectedEmailIds:new Set(),promoData:{items:[],store:{}},promoTemplate:'wa',promoCategoryFilter:'',promoSearch:'',promoSelectedIds:new Set(),promoOptions:{showPrice:true,showStock:true,showBot:true,showCs:true,showWarranty:true,customHeader:'',customCs:'',customFooter:''},report:{type:'monthly'},legacyMigration:null,notifications:[],notificationTimer:null};
+const titles={dashboard:['Dashboard','Ringkasan performa toko hari ini'],products:['Produk','Katalog, varian, deskripsi, SNK, dan stok'],fresh:['Jaspay Fresh','Produk fresh, harga, mode, setting akun, dan perpanjang'],orders:['Pesanan','Pantau seluruh detail transaksi tanpa tabel horizontal'],invitations:['List Email & Sesi Undangan','Daftar email pembeli produk undangan (Canva, Gemini, dsb.) dan kelola sesi tim'],promotions:['Promosi Stok Ready','Daftar produk ready dan generator template promosi WhatsApp, Telegram, Flash Sale, & Story'],reports:['Laporan','Omzet, profit, dan performa penjualan'],coupons:['Kupon','Voucher promo dan kode redeem'],settings:['Pengaturan','Toko, referral, TopUp, pembayaran, supplier, dan backup'],bot:['Bot & Notifikasi','Bot, /start, link, transaksi, dan diagnostik'],broadcast:['Broadcast','Kirim dan pantau pesan massal ke pengguna'],users:['User','Data pengguna Telegram, saldo, referral, dan aktivitas'],resellers:['Reseller Bot','Kelola reseller, bot toko white-label, komisi profit, dan penarikan saldo']};
 function esc(v=''){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}function money(v){return'Rp '+Number(v||0).toLocaleString('id-ID')}function date(v){if(!v)return'-';try{return new Date(v).toLocaleString('id-ID')}catch{return String(v)}}function bytes(v){const n=Number(v||0);if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(1)+' KB';return(n/1048576).toFixed(1)+' MB'}function toast(msg,bad=false){const t=$('#toast');if(!t)return;const m=$('#modal');if(m&&m.open){if(t.parentElement!==m)m.appendChild(t);}else{if(t.parentElement!==document.body)document.body.appendChild(t);}t.textContent=msg;t.className='toast show'+(bad?' bad':'');clearTimeout(toast.t);toast.t=setTimeout(()=>{t.className='toast';if(!m||!m.open){if(t.parentElement!==document.body)document.body.appendChild(t);}},2800);}function badge(status){const s=String(status||'').toLowerCase();const cls=['completed','paid','success','active','running','waiting_delivery'].includes(s)?'ok':['pending','pending_payment','pending_approval','awaiting_payment','awaiting_token','supplier_pending','fresh_processing','fresh_attention','inactive'].includes(s)?'warn':['failed','blocked','canceled','cancelled','expired','rejected','suspended'].includes(s)?'bad':'purple';const labelMap={pending_approval:'Menunggu Persetujuan',awaiting_payment:'Menunggu Pembayaran',awaiting_token:'Menunggu Bot Token',active:'Aktif',suspended:'Ditangguhkan',rejected:'Ditolak'};const label=labelMap[s]||status||'-';return`<span class="badge ${cls}">${esc(label)}</span>`}function firstLetter(v){return esc(String(v||'?').trim().charAt(0).toUpperCase()||'?')}
 function bulkTiers(value){let rows=value;if(typeof rows==='string'){try{rows=JSON.parse(rows)}catch{rows=[]}}if(!Array.isArray(rows))rows=[];const byQty=new Map();for(const row of rows){const min=Math.max(2,Math.floor(Number(row?.min_qty??row?.minQty??row?.qty??0)||0)),price=Math.max(0,Math.floor(Number(row?.price??row?.unit_price??0)||0));if(min>=2&&price>0)byQty.set(min,{min_qty:min,price})}return[...byQty.values()].sort((a,b)=>a.min_qty-b.min_qty)}
 function bulkUnitPrice(base,tiers,qty=1){let price=Math.max(0,Number(base||0)),q=Math.max(1,Number(qty||1));for(const t of bulkTiers(tiers)){if(q>=t.min_qty)price=t.price;else break}return price}
@@ -52,7 +52,7 @@ function showLogin(){$('#loginView').classList.remove('hidden');$('#appView').cl
 $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginError').textContent='';try{const r=await api('/api/admin/auth/login',{method:'POST',body:{username:$('#loginUsername').value,password:$('#loginPassword').value}});state.token=r.token;sessionStorage.setItem('ilink_owner_token',r.token);localStorage.setItem('ilink_owner_token',r.token);$('#loginPassword').value='';await initialize()}catch(err){$('#loginError').textContent=err.message}};$('#logoutBtn').onclick=()=>logout();$('#refreshBtn').onclick=()=>navigate(state.view,true);$('#notifBtn').onclick=e=>{e.stopPropagation();toggleNotifications()};$('#notificationPanel').onclick=e=>e.stopPropagation();$('#notifMarkAll').onclick=async()=>{try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{all:true}});renderNotifications(r);toast('Semua notifikasi ditandai dibaca')}catch(e){toast(e.message,true)}};$('#notificationList').onclick=async e=>{const b=e.target.closest('[data-notif-key]');if(!b)return;try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{keys:[b.dataset.notifKey]}});renderNotifications(r)}catch{}closeNotifications();if(b.dataset.notifView)navigate(b.dataset.notifView)};document.addEventListener('click',closeNotifications);function closeSidebar(){$('#sidebar').classList.remove('open');$('#sidebarBackdrop')?.classList.remove('show');$('#menuBtn')?.setAttribute('aria-expanded','false')}$('#menuBtn').onclick=e=>{e.stopPropagation();const open=$('#sidebar').classList.toggle('open');$('#sidebarBackdrop')?.classList.toggle('show',open);$('#menuBtn').setAttribute('aria-expanded',open?'true':'false')};$('#sidebarBackdrop').onclick=closeSidebar;document.addEventListener('click',e=>{const side=$('#sidebar'),menu=$('#menuBtn');if(side?.classList.contains('open')&&!side.contains(e.target)&&!menu?.contains(e.target))closeSidebar()});$('#nav').onclick=e=>{const b=e.target.closest('[data-view]');if(b){closeSidebar();navigate(b.dataset.view)}};
 function setHeader(view){const[t,s]=titles[view]||[view,''];$('#pageTitle').textContent=t;$('#pageSubtitle').textContent=s;$$('#nav [data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))}
 async function initialize(){state.me=(await api('/api/admin/me')).user;showApp();await navigate('dashboard');await refreshNotifications();if(!state.notificationTimer)state.notificationTimer=setInterval(()=>refreshNotifications(true),60000)}
-async function navigate(view){if(state.broadcastPollTimer){clearInterval(state.broadcastPollTimer);state.broadcastPollTimer=null;}state.view=view;closeNotifications();setHeader(view);$('#content').innerHTML='<div class="empty-product">Memuat data...</div>';try{await({dashboard:loadDashboard,products:loadProducts,fresh:loadFresh,orders:loadOrders,invitations:loadInvitations,reports:loadReports,coupons:loadCoupons,settings:loadSettings,bot:loadBot,broadcast:loadBroadcast,users:loadUsers,resellers:loadResellers}[view]||loadDashboard)();$('#lastUpdated').textContent='Terakhir diperbarui: '+new Date().toLocaleString('id-ID');refreshNotifications(true)}catch(e){$('#content').innerHTML=`<div class="empty-product">${esc(e.message)}</div>`;toast(e.message,true)}}
+async function navigate(view){if(state.broadcastPollTimer){clearInterval(state.broadcastPollTimer);state.broadcastPollTimer=null;}state.view=view;closeNotifications();setHeader(view);$('#content').innerHTML='<div class="empty-product">Memuat data...</div>';try{await({dashboard:loadDashboard,products:loadProducts,fresh:loadFresh,orders:loadOrders,invitations:loadInvitations,promotions:loadPromotions,reports:loadReports,coupons:loadCoupons,settings:loadSettings,bot:loadBot,broadcast:loadBroadcast,users:loadUsers,resellers:loadResellers}[view]||loadDashboard)();$('#lastUpdated').textContent='Terakhir diperbarui: '+new Date().toLocaleString('id-ID');refreshNotifications(true)}catch(e){$('#content').innerHTML=`<div class="empty-product">${esc(e.message)}</div>`;toast(e.message,true)}}
 function applyShell(r){const s=r.settings||{};const o=r.stats||{};state.overview=r;$('#brandName').innerHTML=esc(String(s.store_name||'AUTO ORDER')).replace(/\s+/g,'<br>');$('#brandTagline').textContent=s.store_tagline||'Digital Store';$('#ownerName').textContent=s.owner_display_name||state.me?.display_name||'Owner';$('#ownerUsername').textContent='@'+String(s.owner_username||state.me?.owner_username||'owneradmin').replace(/^@/,'');const metric=String(s.store_balance_metric||o.store_balance_metric||'month_profit');const metricMap={month_profit:['Profit Bulan Ini',o.month_profit],month_revenue:['Omzet Bulan Ini',o.month_revenue],today_profit:['Profit Hari Ini',o.today_profit],today_revenue:['Omzet Hari Ini',o.today_revenue],manual:['Saldo Manual',s.store_balance??o.store_balance]};const selected=metricMap[metric]||metricMap.month_profit;$('#storeBalanceLabel').textContent=selected[0];$('#storeBalance').textContent=money(selected[1]||0);const badgeEl=$('#orderBadge');const pending=Number(o.pending_orders||0);badgeEl.textContent=pending;badgeEl.classList.toggle('hidden',pending<1);const resBadgeEl=$('#resellerBadge');if(resBadgeEl){api('/api/admin/resellers/overview').then(ro=>{const pWd=Number(ro?.stats?.pending_withdrawals||0);const pRes=Number(ro?.stats?.pending_resellers||0);const pTotal=pWd+pRes;resBadgeEl.textContent=pTotal;resBadgeEl.classList.toggle('hidden',pTotal<1);}).catch(()=>null);}const username=state.overview?.bot?.username;$('#telegramBtn').href=username?`https://t.me/${username}`:'#';$('#telegramBtn').textContent='✈ Telegram Mini App';$('#systemSafe').textContent=state.overview?.bot?.running?'Semua sistem berjalan dengan aman':'Dashboard aktif · Bot Telegram offline'}
 function stat(icon,color,label,value,small){return`<div class="stat-card"><div class="stat-icon ${color}">${icon}</div><div><small>${esc(label)}</small><strong>${esc(value)}</strong><em>${esc(small)}</em></div></div>`}
 function productStockState(p={}){const all=Array.isArray(p.variants)?p.variants:[],vars=all.filter(v=>v.active);if(all.length){if(vars.some(v=>v.delivery_mode!=='preorder'&&Number(v.stock||0)>0))return'ready';if(vars.some(v=>v.delivery_mode==='preorder'))return'preorder';return'empty'}if(p.delivery_mode==='preorder'&&Number(p.stock||0)<1)return'preorder';return Number(p.sale_stock??p.stock??0)>0?'ready':'empty'}
@@ -100,10 +100,11 @@ async function loadDashboard(){
 }
 function categories(rows){return[...new Set(rows.map(x=>x.category).filter(Boolean))].sort().map(x=>`<option>${esc(x)}</option>`).join('')}function renderProductCards(rows){return rows.length?rows.map(productCard).join(''):'<div class="empty-product"><h3>Belum ada produk</h3><p>Tekan Tambah Produk untuk membuat katalog pertama.</p></div>'}async function loadProducts(){
   const r=await api('/api/admin/products?limit=500');state.cache.products=r.items||[];
-  $('#content').innerHTML=`<div class="section-title product-section-title"><div><h2>📦 Katalog Produk</h2><p>Tambah dan edit produk hingga ke varian, deskripsi, dan SNK.</p></div><span><button id="addProduct" class="neo-btn purple">＋ Tambah Produk</button></span></div>
+  $('#content').innerHTML=`<div class="section-title product-section-title"><div><h2>📦 Katalog Produk</h2><p>Tambah dan edit produk hingga ke varian, deskripsi, dan SNK.</p></div><span style="display:flex;gap:8px;flex-wrap:wrap"><button id="gotoPromotions" class="neo-btn green">📢 Buat Promosi Stok Ready</button><button id="addProduct" class="neo-btn purple">＋ Tambah Produk</button></span></div>
   <div class="toolbar product-toolbar"><div class="searchbox"><input id="productSearch" placeholder="Cari produk..."></div><select id="productCategory"><option value="">Semua Kategori</option>${categories(state.cache.products)}</select><select id="productStatus"><option value="">Semua Status</option><option value="1">Aktif</option><option value="0">Nonaktif</option></select></div>
   <div id="productGrid" class="product-grid">${renderProductCards(state.cache.products)}</div>`;
   $('#addProduct').onclick=()=>openProduct();
+  $('#gotoPromotions').onclick=()=>navigate('promotions');
   const filter=()=>{const q=($('#productSearch')?.value||'').toLowerCase().trim(),cat=$('#productCategory')?.value||'',st=$('#productStatus')?.value||'';const rows=state.cache.products.filter(p=>(!q||[p.name,p.code,p.category,p.tag].some(x=>String(x||'').toLowerCase().includes(q)))&&(!cat||p.category===cat)&&(!st||String(p.active)===st));$('#productGrid').innerHTML=renderProductCards(rows);bindProductActions()};
   $('#productSearch').oninput=filter;$('#productCategory').onchange=filter;$('#productStatus').onchange=filter;bindProductActions();
 }
@@ -2684,6 +2685,568 @@ function openManualWithdrawalModal(defaultResellerId = null) {
       }
     };
   }
+}
+
+// ==========================================================================
+// READY STOCK PROMOTIONS & TEMPLATE GENERATOR
+// ==========================================================================
+function generateClientPromoText(template, items, options, store) {
+  const storeName = (options.customHeader || store.name || 'ILINK DIGITAL STORE').trim();
+  const botUser = (store.bot_username || '').replace(/^@/, '');
+  const botLink = botUser ? `https://t.me/${botUser}` : '';
+  const cs = (options.customCs || store.cs_contact || '@owneradmin').trim();
+  const showPrice = options.showPrice !== false;
+  const showStock = options.showStock !== false;
+  const showBot = options.showBot !== false;
+  const showCs = options.showCs !== false;
+  const showWarranty = options.showWarranty !== false;
+  const customFooter = (options.customFooter || '').trim();
+
+  if (!items || !items.length) {
+    return '⚠️ Belum ada produk yang dipilih. Silakan centang minimal 1 produk ready di sebelah kiri.';
+  }
+
+  // 1. WhatsApp Clean & Modern
+  if (template === 'wa') {
+    let t = `🏪 *${storeName.toUpperCase()} — LIST PRODUK READY* ⚡\n`;
+    t += `_Update Stok Terbaru Hari Ini_\n\n`;
+    t += `Halo kak! Berikut daftar produk digital yang *READY STOK* dan siap diproses instan:\n\n`;
+    for (const item of items) {
+      t += `📦 *${item.name.toUpperCase()}*\n`;
+      if (item.has_variants && item.variants && item.variants.length) {
+        for (const v of item.variants) {
+          const pStr = showPrice ? ` : ${money(v.price)}` : '';
+          const sStr = showStock ? ` (Sisa ${v.stock} pcs)` : '';
+          t += `• ${v.name}${pStr}${sStr}\n`;
+        }
+      } else {
+        const pStr = showPrice ? ` : ${money(item.single_price || item.price_min)}` : '';
+        const sStr = showStock ? ` (Sisa ${item.stock} pcs)` : '';
+        t += `• Ready Stok${pStr}${sStr}\n`;
+      }
+      t += `\n`;
+    }
+    if (showWarranty) {
+      t += `══════════════════════\n`;
+      t += `🛡️ *KEUNGGULAN BELANJA DI KAMI:*\n`;
+      t += `✅ 100% Bergaransi Resmi\n`;
+      t += `✅ Transaksi Aman & Cepat\n`;
+      t += `✅ Admin Siap Bantu 24 Jam\n\n`;
+    }
+    if (showBot || showCs) {
+      t += `📲 *CARA ORDER:*\n`;
+      if (showBot && botLink) t += `👉 Order via Bot : ${botLink}\n`;
+      if (showCs && cs) t += `👉 WhatsApp / CS : ${cs}\n\n`;
+    }
+    if (customFooter) {
+      t += `${customFooter}\n\n`;
+    }
+    t += `_⚡ Stok terbatas, amankan pesananmu sebelum kehabisan!_`;
+    return t;
+  }
+
+  // 2. Telegram Channel & Group (HTML & Monospace)
+  if (template === 'tg') {
+    let t = `📢 <b>LIST PRODUK READY STOK HARI INI</b> ⚡\n`;
+    t += `━━━━━━━━━━━━━━━━━━━━\n`;
+    t += `🏪 <i>${escapeHtml(storeName)}</i>\n\n`;
+    t += `Halo semuanya! Stok akun & layanan digital premium kami <b>READY</b> dan siap diorder otomatis 24 jam:\n\n`;
+    for (const item of items) {
+      const stockBadge = showStock ? ` <i>(Stok: ${item.stock})</i>` : '';
+      t += `📦 <b>${escapeHtml(item.name)}</b>${stockBadge}\n`;
+      if (item.has_variants && item.variants && item.variants.length) {
+        for (const v of item.variants) {
+          const pStr = showPrice ? ` : <code>${money(v.price)}</code>` : '';
+          const sStr = showStock ? ` (Sisa ${v.stock})` : '';
+          t += ` ▫️ ${escapeHtml(v.name)}${pStr}${sStr}\n`;
+        }
+      } else {
+        const pStr = showPrice ? ` : <code>${money(item.single_price || item.price_min)}</code>` : '';
+        const sStr = showStock ? ` (Sisa ${item.stock})` : '';
+        t += ` ▫️ Harga${pStr}${sStr}\n`;
+      }
+      t += `\n`;
+    }
+    t += `━━━━━━━━━━━━━━━━━━━━\n`;
+    if (showWarranty) {
+      t += `🛡️ <b>Garansi Penuh</b> · Sistem Otomatis · Layanan 24 Jam\n\n`;
+    }
+    if (showBot || showCs) {
+      t += `💡 <b>Order Mandiri Instan:</b>\n`;
+      if (showBot && botUser) t += `🤖 Bot Order: @${botUser}\n`;
+      if (showCs && cs) t += `📞 Customer Support: ${cs}\n\n`;
+    }
+    if (customFooter) {
+      t += `${customFooter}\n\n`;
+    }
+    t += `#ReadyStock #ProdukDigital #PromoTerbaru`;
+    return t;
+  }
+
+  // 3. Flash Sale / Urgensi Penjualan
+  if (template === 'flash') {
+    let t = `🔥 *FLASH SALE READY STOK TERBATAS!* 🔥\n`;
+    t += `_Jangan sampai kehabisan, langsung amankan slotmu sekarang!_\n\n`;
+    t += `⚡ *PRODUK PILIHAN SIAP AMBIL HARI INI:*\n`;
+    for (const item of items) {
+      if (item.has_variants && item.variants && item.variants.length) {
+        for (const v of item.variants.slice(0, 3)) {
+          const pStr = showPrice ? ` — *${money(v.price)}*` : '';
+          const sStr = showStock ? ` (Sisa ${v.stock} slot!)` : '';
+          t += `🚀 *${item.name} (${v.name})*${pStr}${sStr}\n`;
+        }
+      } else {
+        const pStr = showPrice ? ` — *${money(item.single_price || item.price_min)}*` : '';
+        const sStr = showStock ? ` (Sisa ${item.stock} slot!)` : '';
+        t += `🚀 *${item.name}*${pStr}${sStr}\n`;
+      }
+    }
+    t += `\n`;
+    if (showWarranty) {
+      t += `💎 *Kenapa harus beli sekarang?*\n`;
+      t += `⚡ Sistem otomatis proses dalam hitungan detik\n`;
+      t += `🛡️ Full garansi penggantian jika ada kendala\n`;
+      t += `💰 Jaminan harga bersaing & kualitas terjamin\n\n`;
+    }
+    if (showBot || showCs) {
+      t += `🛒 *ORDER INSTAN SEKARANG:*\n`;
+      if (showBot && botLink) t += `👉 Klik Bot: ${botLink}\n`;
+      if (showCs && cs) t += `👉 Chat CS: ${cs}\n\n`;
+    }
+    if (customFooter) {
+      t += `${customFooter}\n\n`;
+    }
+    t += `_⏰ Stok bergerak cepat setiap menit, amankan sebelum kehabisan!_`;
+    return t;
+  }
+
+  // 4. Katalog Lengkap per Kategori
+  if (template === 'catalog') {
+    const byCategory = {};
+    for (const item of items) {
+      const cat = item.category || 'Umum';
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(item);
+    }
+
+    let t = `📋 *KATALOG LENGKAP PRODUK READY STOK*\n`;
+    t += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    t += `🏪 *${storeName}* — _Digital Store_\n\n`;
+
+    for (const [catName, catItems] of Object.entries(byCategory)) {
+      t += `📁 *KATEGORI ${catName.toUpperCase()}*\n`;
+      for (const item of catItems) {
+        t += `▪️ *${item.name}*\n`;
+        if (item.has_variants && item.variants && item.variants.length) {
+          for (const v of item.variants) {
+            const pStr = showPrice ? ` : ${money(v.price)}` : '';
+            const sStr = showStock ? ` [Stok ${v.stock}]` : '';
+            t += `   • ${v.name}${pStr}${sStr}\n`;
+          }
+        } else {
+          const pStr = showPrice ? ` : ${money(item.single_price || item.price_min)}` : '';
+          const sStr = showStock ? ` [Stok ${item.stock}]` : '';
+          t += `   • Unit Ready${pStr}${sStr}\n`;
+        }
+      }
+      t += `\n`;
+    }
+
+    t += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    if (showWarranty) {
+      t += `💳 *Metode Pembayaran:* QRIS All Payment & Saldo Otomatis\n`;
+      t += `🛡️ *Garansi:* Seluruh produk aktif dilindungi garansi resmi toko.\n\n`;
+    }
+    if (showBot || showCs) {
+      if (showBot && botLink) t += `🔗 *Link Order:* ${botLink}\n`;
+      if (showCs && cs) t += `📞 *Kontak Admin:* ${cs}\n\n`;
+    }
+    if (customFooter) {
+      t += `${customFooter}\n\n`;
+    }
+    t += `_Pemesanan dibuka 24 jam nonstop._`;
+    return t;
+  }
+
+  // 5. Status WA / Story Ringkas
+  if (template === 'story') {
+    let t = `✨ *READY STOK HARI INI* ✨\n\n`;
+    for (const item of items) {
+      const pStr = showPrice
+        ? ` : ${money(item.has_variants && item.variants && item.variants.length ? item.variants[0].price : (item.single_price || item.price_min))}`
+        : '';
+      const sStr = showStock ? ` (Sisa ${item.stock})` : '';
+      t += `✅ ${item.name}${pStr}${sStr}\n`;
+    }
+    t += `\n⚡ Full Garansi & Proses Kilat!\n`;
+    if (showBot || showCs) {
+      t += `Order klik 👇\n${botLink || cs}`;
+    }
+    if (customFooter) {
+      t += `\n${customFooter}`;
+    }
+    return t;
+  }
+
+  return '';
+}
+
+async function loadPromotions() {
+  $('#content').innerHTML = '<div class="empty-product">Memuat data produk ready...</div>';
+  try {
+    const res = await api('/api/admin/promotions/ready-products');
+    state.promoData = {
+      items: Array.isArray(res?.items) ? res.items : [],
+      store: res?.store || {}
+    };
+
+    // Default: jika belum ada seleksi, pilih semua produk ready
+    if (!state.promoSelectedIds || state.promoSelectedIds.size === 0) {
+      state.promoSelectedIds = new Set(state.promoData.items.map(x => x.id));
+    }
+
+    renderPromotionsView();
+  } catch (err) {
+    $('#content').innerHTML = `
+      <div class="empty-product">
+        <h3>Gagal Memuat Produk Ready</h3>
+        <p>${esc(err.message)}</p>
+        <button class="neo-btn purple" style="margin-top:12px" onclick="loadPromotions()">🔄 Coba Lagi</button>
+      </div>
+    `;
+  }
+}
+
+function renderPromotionsView() {
+  const allItems = state.promoData.items || [];
+  const store = state.promoData.store || {};
+  const currentTemplate = state.promoTemplate || 'wa';
+  const options = state.promoOptions || {};
+
+  // Ambil daftar kategori unik
+  const catSet = new Set();
+  allItems.forEach(item => { if (item.category) catSet.add(item.category); });
+  const categoryList = Array.from(catSet).sort();
+
+  // Filter items
+  const q = (state.promoSearch || '').toLowerCase().trim();
+  const selectedCat = state.promoCategoryFilter || '';
+  const filteredItems = allItems.filter(item => {
+    const matchesQ = !q || item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q) || (item.tag && item.tag.toLowerCase().includes(q));
+    const matchesCat = !selectedCat || item.category === selectedCat;
+    return matchesQ && matchesCat;
+  });
+
+  // Filter items yang saat ini dicentang untuk dimasukkan ke teks promosi
+  const selectedItemsForPromo = allItems.filter(item => state.promoSelectedIds.has(item.id));
+  const generatedText = generateClientPromoText(currentTemplate, selectedItemsForPromo, options, store);
+
+  const totalReadyProducts = allItems.length;
+  const totalReadyUnits = allItems.reduce((sum, item) => sum + (Number(item.stock) || 0), 0);
+  const selectedCount = selectedItemsForPromo.length;
+
+  const isAllChecked = filteredItems.length > 0 && filteredItems.every(item => state.promoSelectedIds.has(item.id));
+
+  $('#content').innerHTML = `
+    <div class="section-title">
+      <div>
+        <h2>📢 Promosi Stok Ready</h2>
+        <p>Pilih produk yang ready dan generate teks promosi untuk WhatsApp, Telegram, Story, atau media sosial.</p>
+      </div>
+      <button class="neo-btn white" id="refreshPromoBtn">🔄 Segarkan Stok</button>
+    </div>
+
+    <div class="promo-layout">
+      <!-- KOLOM KIRI: LIST PRODUK READY -->
+      <section class="promo-panel">
+        <div class="promo-card">
+          <div class="promo-header-kpi">
+            <div class="promo-kpi-box">
+              <small>Produk Ready</small>
+              <strong>${totalReadyProducts}</strong>
+            </div>
+            <div class="promo-kpi-box">
+              <small>Total Unit</small>
+              <strong>${totalReadyUnits}</strong>
+            </div>
+            <div class="promo-kpi-box">
+              <small>Dipilih Promo</small>
+              <strong style="color:var(--green)">${selectedCount}</strong>
+            </div>
+          </div>
+
+          <div class="promo-filter-row">
+            <input type="text" id="promoSearchInput" placeholder="🔍 Cari produk ready..." value="${esc(state.promoSearch)}" style="flex:1;min-width:140px">
+            <select id="promoCategorySelect" style="max-width:140px">
+              <option value="">Semua Kategori</option>
+              ${categoryList.map(cat => `<option value="${esc(cat)}" ${selectedCat === cat ? 'selected' : ''}>${esc(cat)}</option>`).join('')}
+            </select>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:6px;border-bottom:2px dashed #e2e8f0">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;cursor:pointer">
+              <input type="checkbox" id="promoToggleAll" ${isAllChecked ? 'checked' : ''} class="promo-product-check">
+              Pilih Semua (${filteredItems.length} Produk)
+            </label>
+            <span style="font-size:11px;color:var(--muted);font-weight:700">Centang yang ingin dipromosikan</span>
+          </div>
+
+          <div class="promo-product-scroll" id="promoProductList">
+            ${filteredItems.length ? filteredItems.map(item => {
+              const checked = state.promoSelectedIds.has(item.id);
+              const priceDisplay = item.price_min === item.price_max
+                ? money(item.price_min)
+                : `${money(item.price_min)} - ${money(item.price_max)}`;
+              return `
+                <div class="promo-product-item ${checked ? 'selected' : ''}" data-product-id="${item.id}">
+                  <input type="checkbox" class="promo-product-check" data-item-check="${item.id}" ${checked ? 'checked' : ''}>
+                  <div class="promo-product-info">
+                    <b>${esc(item.name)}</b>
+                    <small>${esc(item.category)} · ${priceDisplay}</small>
+                    ${item.has_variants && item.variants && item.variants.length ? `
+                      <div class="promo-product-vars">
+                        ${item.variants.map(v => `<span class="promo-var-pill">${esc(v.name)}: ${money(v.price)} (${v.stock})</span>`).join('')}
+                      </div>
+                    ` : ''}
+                  </div>
+                  <div class="promo-product-badge">
+                    <span class="stock-ready">Ready ${item.stock}</span>
+                  </div>
+                </div>
+              `;
+            }).join('') : `
+              <div class="empty compact" style="padding:30px 10px;text-align:center">
+                <b>Tidak ada produk ready yang cocok</b>
+                <small style="display:block;margin-top:4px">Coba ubah kata kunci pencarian atau kategori.</small>
+              </div>
+            `}
+          </div>
+        </div>
+      </section>
+
+      <!-- KOLOM KANAN: TEMPLATE GENERATOR & LIVE PREVIEW -->
+      <section class="promo-panel">
+        <div class="promo-card promo-preview-card">
+          <!-- Pilihan Template -->
+          <div style="margin-bottom:8px">
+            <b style="font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:0.5px">Pilih Gaya Template:</b>
+          </div>
+          <div class="promo-tpl-tabs">
+            <button type="button" class="promo-tpl-btn ${currentTemplate === 'wa' ? 'active' : ''}" data-tpl="wa">
+              <b>🟢 WhatsApp</b>
+              <small>List rapi & emoji</small>
+            </button>
+            <button type="button" class="promo-tpl-btn ${currentTemplate === 'tg' ? 'active' : ''}" data-tpl="tg">
+              <b>✈️ Telegram</b>
+              <small>HTML & hashtag</small>
+            </button>
+            <button type="button" class="promo-tpl-btn ${currentTemplate === 'flash' ? 'active' : ''}" data-tpl="flash">
+              <b>🔥 Flash Sale</b>
+              <small>Hook urgensi stok</small>
+            </button>
+            <button type="button" class="promo-tpl-btn ${currentTemplate === 'catalog' ? 'active' : ''}" data-tpl="catalog">
+              <b>📋 Katalog Rinci</b>
+              <small>Kelompok kategori</small>
+            </button>
+            <button type="button" class="promo-tpl-btn ${currentTemplate === 'story' ? 'active' : ''}" data-tpl="story">
+              <b>💬 Story / Ringkas</b>
+              <small>Pendek 1 layar</small>
+            </button>
+          </div>
+
+          <!-- Opsi Kustomisasi Promosi -->
+          <div class="promo-options-box">
+            <div class="promo-options-title">
+              <span>Pengaturan Konten Template</span>
+              <span style="font-weight:600;text-transform:none">Otomatis Ter-update</span>
+            </div>
+            <div class="promo-toggles">
+              <label class="promo-toggle-item">
+                <input type="checkbox" id="optShowPrice" ${options.showPrice !== false ? 'checked' : ''}>
+                🏷️ Tampilkan Harga
+              </label>
+              <label class="promo-toggle-item">
+                <input type="checkbox" id="optShowStock" ${options.showStock !== false ? 'checked' : ''}>
+                📦 Tampilkan Sisa Stok
+              </label>
+              <label class="promo-toggle-item">
+                <input type="checkbox" id="optShowBot" ${options.showBot !== false ? 'checked' : ''}>
+                🤖 Sertakan Link Bot
+              </label>
+              <label class="promo-toggle-item">
+                <input type="checkbox" id="optShowCs" ${options.showCs !== false ? 'checked' : ''}>
+                📞 Sertakan Kontak CS
+              </label>
+              <label class="promo-toggle-item" style="grid-column:span 2">
+                <input type="checkbox" id="optShowWarranty" ${options.showWarranty !== false ? 'checked' : ''}>
+                🛡️ Sertakan Garansi & Keunggulan Toko
+              </label>
+            </div>
+            <div class="promo-custom-inputs">
+              <label>
+                Header / Nama Toko
+                <input type="text" id="optCustomHeader" placeholder="${esc(store.name || 'ILINK DIGITAL STORE')}" value="${esc(options.customHeader || '')}">
+              </label>
+              <label>
+                Kontak CS / WhatsApp
+                <input type="text" id="optCustomCs" placeholder="${esc(store.cs_contact || '@owneradmin')}" value="${esc(options.customCs || '')}">
+              </label>
+            </div>
+          </div>
+
+          <!-- Live Preview & Editor Textarea -->
+          <div class="promo-preview-toolbar">
+            <span>📝 Live Preview & Editor (Dapat Diedit Manual)</span>
+            <span id="promoCharCount">${generatedText.length} karakter · ${generatedText.split('\n').length} baris</span>
+          </div>
+          <textarea id="promoTextarea" class="promo-textarea" spellcheck="false">${esc(generatedText)}</textarea>
+
+          <!-- Action Buttons -->
+          <div class="promo-actions">
+            <button type="button" id="copyPromoBtn" class="neo-btn purple">
+              📋 Salin Teks Promosi
+            </button>
+            <button type="button" id="shareWaBtn" class="neo-btn promo-btn-wa">
+              🟢 Kirim ke WA
+            </button>
+            <button type="button" id="shareTgBtn" class="neo-btn promo-btn-tg">
+              ✈️ Kirim ke Telegram
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
+
+  // Bind Events
+  $('#refreshPromoBtn').onclick = () => loadPromotions();
+
+  // Search & Category
+  $('#promoSearchInput').oninput = (e) => {
+    state.promoSearch = e.target.value;
+    renderPromotionsView();
+  };
+  $('#promoCategorySelect').onchange = (e) => {
+    state.promoCategoryFilter = e.target.value;
+    renderPromotionsView();
+  };
+
+  // Toggle All Checkbox
+  $('#promoToggleAll').onchange = (e) => {
+    const checked = e.target.checked;
+    filteredItems.forEach(item => {
+      if (checked) state.promoSelectedIds.add(item.id);
+      else state.promoSelectedIds.delete(item.id);
+    });
+    renderPromotionsView();
+  };
+
+  // Individual Product Item / Checkbox Click
+  $$('[data-item-check]').forEach(chk => {
+    chk.onclick = (e) => {
+      e.stopPropagation();
+      const id = Number(chk.dataset.itemCheck);
+      if (chk.checked) state.promoSelectedIds.add(id);
+      else state.promoSelectedIds.delete(id);
+      renderPromotionsView();
+    };
+  });
+  $$('.promo-product-item').forEach(card => {
+    card.onclick = (e) => {
+      if (e.target.tagName === 'INPUT') return;
+      const id = Number(card.dataset.productId);
+      if (state.promoSelectedIds.has(id)) state.promoSelectedIds.delete(id);
+      else state.promoSelectedIds.add(id);
+      renderPromotionsView();
+    };
+  });
+
+  // Template Buttons Click
+  $$('.promo-tpl-btn').forEach(btn => {
+    btn.onclick = () => {
+      state.promoTemplate = btn.dataset.tpl;
+      renderPromotionsView();
+    };
+  });
+
+  // Toggles & Custom Options Change
+  const updateOptionState = () => {
+    state.promoOptions = {
+      showPrice: $('#optShowPrice')?.checked !== false,
+      showStock: $('#optShowStock')?.checked !== false,
+      showBot: $('#optShowBot')?.checked !== false,
+      showCs: $('#optShowCs')?.checked !== false,
+      showWarranty: $('#optShowWarranty')?.checked !== false,
+      customHeader: $('#optCustomHeader')?.value || '',
+      customCs: $('#optCustomCs')?.value || '',
+      customFooter: state.promoOptions?.customFooter || ''
+    };
+    const nextSelected = allItems.filter(item => state.promoSelectedIds.has(item.id));
+    const nextText = generateClientPromoText(state.promoTemplate, nextSelected, state.promoOptions, store);
+    const area = $('#promoTextarea');
+    if (area) {
+      area.value = nextText;
+      updateTextMetrics(nextText);
+    }
+  };
+
+  $('#optShowPrice').onchange = updateOptionState;
+  $('#optShowStock').onchange = updateOptionState;
+  $('#optShowBot').onchange = updateOptionState;
+  $('#optShowCs').onchange = updateOptionState;
+  $('#optShowWarranty').onchange = updateOptionState;
+  $('#optCustomHeader').oninput = updateOptionState;
+  $('#optCustomCs').oninput = updateOptionState;
+
+  function updateTextMetrics(txt) {
+    const el = $('#promoCharCount');
+    if (el) el.textContent = `${txt.length} karakter · ${txt.split('\n').length} baris`;
+  }
+
+  $('#promoTextarea').oninput = (e) => {
+    updateTextMetrics(e.target.value);
+  };
+
+  // Copy Button
+  $('#copyPromoBtn').onclick = async () => {
+    const textToCopy = $('#promoTextarea')?.value || '';
+    if (!textToCopy) {
+      toast('Teks promosi kosong.', true);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      toast('✅ Teks promosi berhasil disalin ke clipboard!');
+    } catch {
+      // Fallback manual selection
+      const area = $('#promoTextarea');
+      area.select();
+      document.execCommand('copy');
+      toast('✅ Teks promosi berhasil disalin!');
+    }
+  };
+
+  // Kirim ke WhatsApp
+  $('#shareWaBtn').onclick = () => {
+    const textToSend = $('#promoTextarea')?.value || '';
+    if (!textToSend) {
+      toast('Teks promosi kosong.', true);
+      return;
+    }
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(textToSend)}`;
+    window.open(url, '_blank');
+  };
+
+  // Kirim ke Telegram
+  $('#shareTgBtn').onclick = () => {
+    const textToSend = $('#promoTextarea')?.value || '';
+    if (!textToSend) {
+      toast('Teks promosi kosong.', true);
+      return;
+    }
+    const url = `https://t.me/share/url?text=${encodeURIComponent(textToSend)}`;
+    window.open(url, '_blank');
+  };
 }
 
 (async () => {

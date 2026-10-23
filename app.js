@@ -34,8 +34,10 @@ function freshPriceMatrixHtml(r,{editable=false}={}){
     const override=x.override_price===null||x.override_price===undefined?'':Number(x.override_price);
     const resOverride=x.reseller_override_price===null||x.reseller_override_price===undefined?'':Number(x.reseller_override_price);
     const resBase=Number(x.reseller_price||prodResPrice||0);
-    const resPlaceholder=prodResPrice>0?`modal umum (${money(prodResPrice)})`:'ikut harga jual';
-    return`<div class="fresh-price-card ${editable?'fresh-price-edit-card':''}"><span>#${i+1}</span><div class="fresh-price-main"><b>${esc(opts)}</b><small>API ${money(x.api_unit_price)} · Jual ${money(x.sell_price)} · Reseller ${resBase>0?money(resBase):'Ikut Jual'}${resOverride!==''?' (Custom)':''}</small>${editable?`<div class="fresh-price-input-row"><label class="fresh-price-input"><em>Harga Jual Kustom (Owner)</em><input name="price_override_${i}" type="number" min="1" step="1" value="${esc(override)}" placeholder="Kosong = ikut harga umum"><input type="hidden" name="price_key_${i}" value="${esc(x.price_key||'')}"></label><label class="fresh-price-input"><em>Harga Modal Reseller</em><input name="reseller_price_override_${i}" type="number" min="0" step="1" value="${esc(resOverride)}" placeholder="Kosong = ${resPlaceholder}"></label></div>`:''}</div></div>`;
+    const apiPrice=Number(x.api_unit_price||0);
+    const defaultSell=override!==''?override:Number(x.sell_price||Math.round(apiPrice*1.25));
+    const defaultRes=resOverride!==''?resOverride:(resBase>0?resBase:defaultSell);
+    return`<div class="fresh-price-card ${editable?'fresh-price-edit-card':''}"><span>#${i+1}</span><div class="fresh-price-main"><b>${esc(opts)}</b><small>Modal API Jaspay: <b>${money(apiPrice)}</b> · Jual: <b>${money(x.sell_price)}</b> · Modal Reseller: <b>${money(resBase>0?resBase:x.sell_price)}</b>${resOverride!==''?' (Khusus)':''}</small>${editable?`<div class="fresh-price-input-row"><label class="fresh-price-input"><em>🏷️ Harga Jual Owner (Customer)</em><input name="price_override_${i}" type="number" min="1" step="100" value="${esc(override)}" placeholder="Saat ini: ${money(defaultSell)}"><input type="hidden" name="price_key_${i}" value="${esc(x.price_key||'')}"></label><label class="fresh-price-input"><em>🤝 Harga Modal Reseller</em><input name="reseller_price_override_${i}" type="number" min="0" step="100" value="${esc(resOverride)}" placeholder="Saat ini: ${money(defaultRes)}"></label></div>`:''}</div></div>`;
   }).join('')}</div>`;
 }
 function freshPriceRange(r){const min=Number(r.api_price_min??r.api_unit_price??0),max=Number(r.api_price_max??r.api_unit_price??0);return min===max?money(min):`${money(min)} – ${money(max)}`;}
@@ -917,6 +919,10 @@ async function loadFresh(){
             <option value="refund_wallet" ${String(x.jaspay_partial_mode||'refund_wallet')==='refund_wallet'?'selected':''}>Refund sesuai aturan ke Saldo Bot</option>
           </select>
         </label>
+        <label class="full">JASPAY API Key (Supplier)
+          <input name="jaspay_api_key" type="password" value="${esc(x.jaspay_api_key||'')}" placeholder="Kosongkan jika sudah diisi di .env VPS, atau masukkan API Key di sini">
+          <small>API Key dipakai bot untuk mengecek saldo live, katalog produk, dan generate akun otomatis. Bisa diisi di sini tanpa restart VPS.</small>
+        </label>
         <label class="full">Teks Halaman READY STOK
           <textarea name="jaspay_ready_intro" rows="8" spellcheck="false">${esc(x.jaspay_ready_intro||'')}</textarea>
           <small>Mendukung Telegram HTML seperti &lt;b&gt;tebal&lt;/b&gt;. Produk, harga, dan jumlah stok dikelola dari kartu Produk Fresh di bawah.</small>
@@ -944,11 +950,12 @@ async function loadFresh(){
     e.preventDefault();
     const b=Object.fromEntries(new FormData(e.target).entries());
     b.jaspay_enabled=b.jaspay_enabled==='true';
+    if(b.jaspay_api_key!==undefined)b.jaspay_api_key=String(b.jaspay_api_key).trim();
     try{
       const saved=await api('/api/admin/settings',{method:'PATCH',body:b});
       state.cache.settings={...(state.cache.settings||{}),...(saved.settings||b)};
-      toast(`Produk Fresh ${b.jaspay_enabled?'diaktifkan':'dinonaktifkan'}`);
-      await refreshJaspayHub(false);
+      toast(`Pengaturan Jaspay Fresh disimpan`);
+      await refreshJaspayHub(true);
     }catch(err){toast(err.message,true);}
   };
 
@@ -972,8 +979,36 @@ async function refreshJaspayHub(force=false,targetKey=null){
     const x=st.data||{},q=x.queue||{},rows=pr.items||[];
     const maintenance=Boolean(st.maintenance||pr.maintenance);
     const globalEnabled=st.enabled===true;
+    const isConfigured=st.configured!==false;
     const manualReady=Math.max(0,Number(pr.manual_ready_stock_total||0));
     state.cache.jaspayProducts=rows;
+
+    let balanceVal=null;
+    if(x.balance!=null&&x.balance!=='')balanceVal=Number(x.balance);
+    else if(x.raw_balance!=null&&x.raw_balance!=='')balanceVal=Number(x.raw_balance);
+
+    let balanceTitle='-';
+    let balanceSub='Saldo akun supplier';
+    let balanceColor='pink';
+
+    if(!isConfigured){
+      balanceTitle='Belum Ada Key';
+      balanceSub='Isi API Key di ⚙️ Pengaturan Global';
+      balanceColor='yellow';
+    }else if(maintenance){
+      balanceTitle='Perbaikan';
+      balanceSub=esc(st.health?.message||'Sedang maintenance API');
+      balanceColor='yellow';
+    }else if(st.error){
+      balanceTitle='Gagal Cek';
+      balanceSub=esc(st.error);
+      balanceColor='yellow';
+    }else if(balanceVal!==null&&!isNaN(balanceVal)){
+      balanceTitle=`${balanceVal.toLocaleString('en-US',{maximumFractionDigits:2})} Credit`;
+      const rem=Number(x.daily_remaining||0);
+      balanceSub=rem>0?`Sisa limit: ${rem.toLocaleString('en-US')} Credit`:'Saldo aktif Jaspay';
+      balanceColor='green';
+    }
 
     const statusLabel=maintenance?'Maintenance':(globalEnabled?'Aktif':'Nonaktif');
     const dotState=!maintenance&&globalEnabled?'online':'offline';
@@ -981,12 +1016,14 @@ async function refreshJaspayHub(force=false,targetKey=null){
     if(isInitial){
       host.innerHTML=`
         <div class="dashboard-kpis fresh-kpis">
-          ${stat('⚡', dotState==='online'?'green':'yellow', 'Status Fresh', statusLabel, maintenance?'Sedang perbaikan':(globalEnabled?'API Online':'Global OFF'))}
-          ${stat('👛', 'pink', 'Saldo API Jaspay', maintenance?'Perbaikan':(x.balance==null?'-':Number(x.balance||0).toLocaleString('en-US',{maximumFractionDigits:2})+' Credit'), 'Saldo akun supplier')}
+          ${stat('⚡', dotState==='online'?'green':'yellow', 'Status Fresh', statusLabel, maintenance?'Sedang perbaikan':(!isConfigured?'API Key Kosong':(globalEnabled?'API Online':'Global OFF')))}
+          ${stat('👛', balanceColor, 'Saldo API Jaspay', balanceTitle, balanceSub)}
           ${stat('📦', 'green', 'Ready Stok Toko', manualReady+' Akun', 'Inventory milik toko')}
-          ${stat('⏳', 'purple', 'Antrean API', `${Number(q.in_use||0)}/${Number(q.max||0)}`, `Menunggu: ${Number(q.waiting||0)}`)}
+          ${stat('⏳', 'purple', 'Antrean API', `${Number(q.in_use||0)}/${Number(q.max||0)}`, q.error?`Info: ${esc(q.error)}`:`Menunggu: ${Number(q.waiting||0)}`)}
         </div>
 
+        ${!isConfigured?`<div class="warning-note" style="margin-bottom:12px"><b>⚠️ JASPAY API Key Belum Diatur</b><br>Bot belum dapat mengecek saldo live dan generate akun otomatis. Masukkan API Key melalui tombol <b>⚙️ Pengaturan Global</b> di atas atau di file <code>.env</code> VPS.</div>`:''}
+        ${st.error&&isConfigured?`<div class="warning-note" style="margin-bottom:12px"><b>⚠️ Tidak Dapat Terhubung ke API Jaspay</b><br>${esc(st.error)}<br><small>Pastikan API Key benar dan aktif. Buka <b>⚙️ Pengaturan Global</b> jika perlu memperbarui API Key.</small></div>`:''}
         ${maintenance?`<div class="warning-note" style="margin-bottom:12px"><b>🔴 Maintenance API Generate</b><br>${esc(st.health?.message||pr.health?.message||st.error||pr.error||'Bot sedang di update/perbaikan.')}<br><small>Inventory Ready Stok lokal tidak mengambil stok dari endpoint Ready Stock Jaspay.</small></div>`:''}
 
         <div class="toolbar product-toolbar">
@@ -1093,8 +1130,8 @@ function openJaspayProduct(key){
   const apiPriceSection=`<div class="full settings-subcard"><h4>💵 Harga Jual &amp; Modal Reseller per Pilihan API</h4><p class="muted">Setiap kombinasi paket, varian, mode, login, dan durasi dapat memiliki harga jual sendiri dan harga modal reseller sendiri. Kosongkan harga jual untuk ikut harga umum; kosongkan modal reseller untuk ikut harga modal produk.</p>${freshPriceMatrixHtml(r,{editable:true})}</div>`;
   const readyPriceOptions=priceRows.map((x,i)=>{const label=Object.entries(x.options||{}).filter(([k])=>!['accounts','accounts_token','password','domain','name','username','usernames','email','emails','recovery','recovery_email','recovery_provider','order_id','suffix_digits'].includes(k)).map(([k,v])=>freshOptionLabel(k,v,p)).join(' · ')||'Harga dasar';return`<option value="${i}" ${readyIndex===i?'selected':''}>${esc(label)} — ${money(x.sell_price)}</option>`}).join('');
   const readySection=`<div class="full settings-subcard ready-stock-config"><h4>▦ Ready Stok Lokal</h4><p class="muted">Ready Stok adalah akun milik toko sendiri. Pilih kombinasi harga Fresh yang dipakai; jumlah akun dikelola melalui tombol Stok Ready pada katalog.</p><div class="form-grid"><label>Tampilkan di READY STOK<select name="ready_stock_enabled"><option value="true" ${readyCfg.enabled===true?'selected':''}>Ya</option><option value="false" ${readyCfg.enabled!==true?'selected':''}>Tidak</option></select></label><label>Nama Tombol Ready<input name="ready_stock_label" maxlength="60" value="${esc(readyCfg.label||p.menu_label||r.name||'')}"></label><label class="full">Pakai Harga / Paket<select name="ready_stock_price_index">${priceRows.length?readyPriceOptions:'<option value="0">Harga dasar</option>'}</select><small>Harga Ready Stok tidak disimpan terpisah. Jika harga kombinasi Fresh berubah, harga Ready Stok ikut berubah otomatis.</small></label><div class="full ready-stock-config-summary">Stok available saat ini: <b>${Number(r.ready_stock_count||0)}</b> akun</div></div></div>`;
-  modal('Atur Produk Fresh · '+r.name,`<div class="form-grid"><label>Status Generate API<select name="enabled"><option value="true" ${r.enabled?'selected':''}>Aktif</option><option value="false" ${!r.enabled?'selected':''}>Nonaktif</option></select></label><label>Bisa Dijual Reseller<select name="reseller_allowed"><option value="true" ${r.reseller_allowed!==0?'selected':''}>Ya (Bisa di-reseller)</option><option value="false" ${r.reseller_allowed===0?'selected':''}>Tidak (Khusus Toko Owner)</option></select><small class="muted">Jika 'Tidak', produk fresh tidak tampil di bot & miniapp reseller</small></label><label>Harga Khusus Reseller<input name="reseller_price" type="number" min="0" value="${Number(r.reseller_price||0)}" placeholder="0 = ikuti harga umum/markup"><small class="muted">Harga modal yang dibayar reseller ke owner (0 = ikuti harga umum)</small></label><label>Mode Harga<select name="pricing_mode"><option value="markup_fixed" ${r.pricing_mode==='markup_fixed'?'selected':''}>Harga API + Markup Nominal</option><option value="markup_percent" ${r.pricing_mode==='markup_percent'?'selected':''}>Harga API + Markup Persen</option><option value="fixed" ${r.pricing_mode==='fixed'?'selected':''}>Harga Jual Tetap</option></select></label><label>Nilai Harga / Markup<input name="pricing_value" type="number" min="0" step="1" value="${Number(r.pricing_value||0)}"></label><label>Rentang Harga API<input disabled value="${esc(freshPriceRange(r))}"></label><label>Harga Jual Mulai<input disabled value="${money(r.sell_price_min??r.sell_price)}"></label><label>Maksimal / order<input disabled value="${Number(r.qty_max||1)} akun"></label>${apiPriceSection}${readySection}<div class="full settings-subcard"><h4>🤖 Tampilan Customer</h4><div class="form-grid"><label>Emoji Produk<input name="customer_emoji" maxlength="8" value="${esc(p.emoji||'⚡')}"></label><label>Nama di Menu<input name="customer_menu_label" maxlength="80" value="${esc(p.menu_label||r.name||'')}"></label><label class="full">Judul Halaman<input name="customer_title" maxlength="100" value="${esc(p.title||r.name||'')}"></label><label class="full">Deskripsi Singkat<textarea name="customer_short" rows="2">${esc(p.short_description||'')}</textarea></label><label class="full">Deskripsi Lengkap<textarea name="customer_description" rows="5">${esc(p.description||'')}</textarea></label><label>Teks Tombol Deskripsi<input name="description_button" maxlength="40" value="${esc(p.description_button||'☷ Deskripsi')}"></label><label>Warna Deskripsi<select name="description_button_style">${styleOptions(p.description_button_style||'primary')}</select></label><label>Warna Kembali<select name="back_button_style">${styleOptions(p.back_button_style||'primary')}</select></label></div></div>${accountSection}${renewalSection}${modeFields}<label class="full">Catatan Owner<textarea name="description" rows="3">${esc(r.description||'')}</textarea></label></div>`,async b=>{
-    b.enabled=b.enabled==='true';b.reseller_allowed=b.reseller_allowed==='true';b.reseller_price=Math.max(0,Number(b.reseller_price||0));b.pricing_value=Math.max(0,Number(b.pricing_value||0));
+  modal('Atur Produk Fresh · '+r.name,`<div class="form-grid"><label>Status Generate API<select name="enabled"><option value="true" ${r.enabled?'selected':''}>Aktif</option><option value="false" ${!r.enabled?'selected':''}>Nonaktif</option></select></label><label>Bisa Dijual Reseller<select name="reseller_allowed"><option value="true" ${r.reseller_allowed!==0?'selected':''}>Ya (Bisa di-reseller)</option><option value="false" ${r.reseller_allowed===0?'selected':''}>Tidak (Khusus Toko Owner)</option></select><small class="muted">Jika 'Tidak', produk fresh tidak tampil di bot & miniapp reseller</small></label><label>Rentang Modal API Jaspay<input disabled value="${esc(freshPriceRange(r))}"><small class="muted">Modal langsung dari supplier Jaspay</small></label><label>Maksimal / Order<input disabled value="${Number(r.qty_max||1)} akun"><small class="muted">Batas generate per transaksi customer</small></label>${apiPriceSection}${readySection}<div class="full settings-subcard"><h4>🤖 Tampilan Customer</h4><div class="form-grid"><label>Emoji Produk<input name="customer_emoji" maxlength="8" value="${esc(p.emoji||'⚡')}"></label><label>Nama di Menu<input name="customer_menu_label" maxlength="80" value="${esc(p.menu_label||r.name||'')}"></label><label class="full">Judul Halaman<input name="customer_title" maxlength="100" value="${esc(p.title||r.name||'')}"></label><label class="full">Deskripsi Singkat<textarea name="customer_short" rows="2">${esc(p.short_description||'')}</textarea></label><label class="full">Deskripsi Lengkap<textarea name="customer_description" rows="5">${esc(p.description||'')}</textarea></label><label>Teks Tombol Deskripsi<input name="description_button" maxlength="40" value="${esc(p.description_button||'☷ Deskripsi')}"></label><label>Warna Deskripsi<select name="description_button_style">${styleOptions(p.description_button_style||'primary')}</select></label><label>Warna Kembali<select name="back_button_style">${styleOptions(p.back_button_style||'primary')}</select></label></div></div>${accountSection}${renewalSection}${modeFields}<label class="full">Catatan Owner<textarea name="description" rows="3">${esc(r.description||'')}</textarea></label></div>`,async b=>{
+    b.enabled=b.enabled==='true';b.reseller_allowed=b.reseller_allowed==='true';
     const isReadyStockEnabled=b.ready_stock_enabled==='true';
     const presentation={emoji:b.customer_emoji||'⚡',menu_label:b.customer_menu_label||r.name,title:b.customer_title||r.name,short_description:b.customer_short||'',description:b.customer_description||'',description_button:b.description_button||'☷ Deskripsi',description_button_style:b.description_button_style||'primary',back_button_style:b.back_button_style||'primary',ready_stock:{enabled:isReadyStockEnabled,label:b.ready_stock_label||p.menu_label||r.name,options:{}},order_defaults:supportsNew?{domain:b.order_default_domain||'',password:b.order_default_password||'',name:b.order_default_name||'',suffix_digits:b.order_default_suffix_digits===''?'':Math.max(0,Number(b.order_default_suffix_digits||0))}:{...(p.order_defaults||{})},account_settings:supportsNew?{allow_user_edit:b.account_allow_edit==='true',edit_name:b.account_edit_name==='true',edit_domain:b.account_edit_domain==='true',edit_password:b.account_edit_password==='true',edit_suffix_digits:b.account_edit_suffix==='true'}:{...(p.account_settings||{})},renewal_pricing:supportsRenew?{'7':{sell_price:Math.max(0,Number(b.renew_sell_7||0)),refund_fail:b.renew_refund_7===''?'':Math.max(0,Number(b.renew_refund_7||0))},'14':{sell_price:Math.max(0,Number(b.renew_sell_14||0)),refund_fail:b.renew_refund_14===''?'':Math.max(0,Number(b.renew_refund_14||0))}}:{...(p.renewal_pricing||{})},mode_labels:{},mode_descriptions:{},mode_styles:{},mode_order:[],hidden_modes:[],price_overrides:{...(p.price_overrides&&typeof p.price_overrides==='object'&&!Array.isArray(p.price_overrides)?p.price_overrides:{})},reseller_price_overrides:{...(p.reseller_price_overrides&&typeof p.reseller_price_overrides==='object'&&!Array.isArray(p.reseller_price_overrides)?p.reseller_price_overrides:{})}};
     const readyRaw=String(b.ready_stock_price_index??'').trim();
@@ -1106,6 +1143,7 @@ function openJaspayProduct(key){
     }else{
       presentation.ready_stock.options={...(readyCfg.options||{})};
     }
+    let firstOverride=0,firstResellerOverride=0;
     for(let i=0;i<priceRows.length;i++){
       const pk=b[`price_key_${i}`]||priceRows[i].price_key||'';
       if(!pk)continue;
@@ -1113,17 +1151,23 @@ function openJaspayProduct(key){
       const raw=b[`price_override_${i}`];
       if(raw!==undefined&&raw!==null&&String(raw).trim()!==''){
         const value=Number(raw);
-        if(Number.isFinite(value)&&value>0)presentation.price_overrides[pk]=Math.round(value);
+        if(Number.isFinite(value)&&value>0){
+          presentation.price_overrides[pk]=Math.round(value);
+          if(!firstOverride)firstOverride=Math.round(value);
+        }
       }
       delete presentation.reseller_price_overrides[pk];
       const rawRes=b[`reseller_price_override_${i}`];
       if(rawRes!==undefined&&rawRes!==null&&String(rawRes).trim()!==''){
         const valRes=Number(rawRes);
-        if(Number.isFinite(valRes)&&valRes>0)presentation.reseller_price_overrides[pk]=Math.round(valRes);
+        if(Number.isFinite(valRes)&&valRes>0){
+          presentation.reseller_price_overrides[pk]=Math.round(valRes);
+          if(!firstResellerOverride)firstResellerOverride=Math.round(valRes);
+        }
       }
     }
     const ordered=[];for(let i=0;i<modes.length;i++){const mk=b[`mode_key_${i}`]||modes[i];presentation.mode_labels[mk]=b[`mode_label_${i}`]||mk;presentation.mode_descriptions[mk]=b[`mode_desc_${i}`]||'';presentation.mode_styles[mk]=b[`mode_style_${i}`]||'success';ordered.push({key:mk,n:Math.max(1,Number(b[`mode_order_${i}`]||i+1)),i});if(b[`mode_show_${i}`]!=='true')presentation.hidden_modes.push(mk);}presentation.mode_order=ordered.sort((a,c)=>a.n-c.n||a.i-c.i).map(x=>x.key);
-    const body={enabled:b.enabled,reseller_allowed:b.reseller_allowed,reseller_price:b.reseller_price,pricing_mode:b.pricing_mode,pricing_value:b.pricing_value,description:b.description||'',presentation};
+    const body={enabled:b.enabled,reseller_allowed:b.reseller_allowed,reseller_price:firstResellerOverride||Number(r.reseller_price||0),pricing_mode:r.pricing_mode||'markup_fixed',pricing_value:firstOverride?Math.max(0,firstOverride-Number(r.api_unit_price||0)):Number(r.pricing_value||0),description:b.description||'',presentation};
     const res=await api(`/api/admin/integrations/jaspay/products/${encodeURIComponent(r.product_key)}`,{method:'PATCH',body});
     if(res?.item){const idx=(state.cache.jaspayProducts||[]).findIndex(x=>String(x.product_key)===String(r.product_key));if(idx>=0)state.cache.jaspayProducts[idx]=res.item;}
     toast('Produk Fresh disimpan');

@@ -22,7 +22,7 @@ const state = {
 
 const titles = {
   dashboard: ['Dashboard', 'Ringkasan performa toko dan komisi profit Anda'],
-  pricing: ['Produk', 'Kelola produk reseller Anda sendiri dan katalog produk toko'],
+  pricing: ['Produk', 'Kelola produk toko Anda sendiri dan katalog produk reseller dari owner'],
   orders: ['Pesanan', 'Daftar riwayat transaksi pembeli yang masuk melalui bot Anda'],
   reports: ['Laporan', 'Omzet, profit, dan performa penjualan bot toko Anda'],
   broadcast: ['Broadcast Pelanggan', 'Kirim pesan massal promosi, info diskon, atau pengumuman ke pembeli bot Anda'],
@@ -393,7 +393,16 @@ $('#refreshBtn').onclick = () => navigate(state.view, true);
 $('#statusBarRefresh').onclick = () => navigate(state.view, true);
 
 function setHeader(view) {
-  const [t, s] = titles[view] || [view, ''];
+  let [t, s] = titles[view] || [view, ''];
+  if (view === 'pricing') {
+    if (state.canAddProducts) {
+      t = 'Produk';
+      s = 'Kelola produk toko Anda sendiri dan katalog produk reseller dari owner';
+    } else {
+      t = 'Produk';
+      s = 'Katalog produk reseller dari owner, sesuaikan margin keuntungan bot Anda';
+    }
+  }
   $('#pageTitle').textContent = t;
   $('#pageSubtitle').textContent = s;
   $$('#nav [data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
@@ -465,6 +474,11 @@ async function loadDashboard() {
   state.bot = data.bot;
   state.runtime = data.runtime;
   state.orders = data.recent_orders || [];
+  if (data.can_add_products !== undefined) {
+    state.canAddProducts = Boolean(data.can_add_products);
+  } else if (state.reseller && state.reseller.can_add_products !== undefined) {
+    state.canAddProducts = Boolean(state.reseller.can_add_products);
+  }
   updateShellUI();
 
   const r = state.reseller || {};
@@ -728,6 +742,7 @@ async function loadPricing(preserveScroll = false, targetKey = null) {
   state.freshProducts = freshRes.items || [];
   state.customProducts = customRes.items || [];
   state.canAddProducts = customRes.can_add_products !== undefined ? Boolean(customRes.can_add_products) : false;
+  setHeader('pricing');
   state.pendingPricing = {};
   updateSaveBar();
 
@@ -761,6 +776,11 @@ function categories(rows) {
 }
 
 function renderPricingView(searchFilter = '', statusFilter = 'all', categoryFilter = '') {
+  if (!state.canAddProducts) {
+    state.mainProductTab = 'reseller';
+    renderProductCatalogView(searchFilter, statusFilter, categoryFilter);
+    return;
+  }
   state.mainProductTab = state.mainProductTab || 'store';
   if (state.mainProductTab === 'store') {
     renderCustomProductView(searchFilter, statusFilter, categoryFilter);
@@ -770,6 +790,11 @@ function renderPricingView(searchFilter = '', statusFilter = 'all', categoryFilt
 }
 
 function renderCustomProductView(searchFilter = '', statusFilter = 'all', categoryFilter = '') {
+  if (!state.canAddProducts) {
+    state.mainProductTab = 'reseller';
+    renderProductCatalogView(searchFilter, statusFilter, categoryFilter);
+    return;
+  }
   const q = (searchFilter !== '' ? searchFilter : ($('#customProductSearch')?.value || '')).toLowerCase().trim();
   const stFilter = statusFilter !== 'all' ? statusFilter : ($('#customProductStatus')?.value || 'all');
   const catFilter = categoryFilter !== '' ? categoryFilter : ($('#customProductCategory')?.value || '');
@@ -981,6 +1006,11 @@ async function reloadCustomProducts(targetProductId = null) {
   state.customProducts = r.items || [];
   if (r.can_add_products !== undefined) {
     state.canAddProducts = Boolean(r.can_add_products);
+  }
+  if (!state.canAddProducts) {
+    state.mainProductTab = 'reseller';
+    renderPricingView();
+    return;
   }
   if (state.view === 'pricing' && state.mainProductTab === 'store') {
     renderCustomProductView(searchVal, statusVal, catVal);
@@ -1380,7 +1410,8 @@ function renderProductCatalogView(searchFilter = '', statusFilter = 'all', categ
   }
 
   // In-place update if shell and active tab already exist
-  if (existingGrid && renderedMainView === 'reseller' && renderedTab === activeTab) {
+  const renderedCanAdd = $('#content')?.dataset?.canAddProducts;
+  if (existingGrid && renderedMainView === 'reseller' && renderedTab === activeTab && renderedCanAdd === String(state.canAddProducts)) {
     existingGrid.innerHTML = gridHtml;
     bindCatalogActions();
     return;
@@ -1390,8 +1421,17 @@ function renderProductCatalogView(searchFilter = '', statusFilter = 'all', categ
   if (contentEl) {
     contentEl.dataset.mainProductView = 'reseller';
     contentEl.dataset.activeProductTab = activeTab;
+    contentEl.dataset.canAddProducts = String(state.canAddProducts);
   }
-  $('#content').innerHTML = `
+
+  const mainTabsHtml = state.canAddProducts ? `
+    <div class="tabs main-product-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+      <button class="tab-btn" data-main-product-tab="store" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">🏬 Produk Toko (${(state.customProducts || []).length})</button>
+      <button class="tab-btn active" data-main-product-tab="reseller" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">📦 Produk Reseller (${(state.products || []).length + (state.freshProducts || []).length})</button>
+    </div>
+  ` : '';
+
+  const sectionTitleHtml = state.canAddProducts ? `
     <div class="section-title product-section-title">
       <div>
         <h2>📦 Produk Reseller</h2>
@@ -1399,11 +1439,19 @@ function renderProductCatalogView(searchFilter = '', statusFilter = 'all', categ
       </div>
       <span></span>
     </div>
-
-    <div class="tabs main-product-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
-      <button class="tab-btn" data-main-product-tab="store" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">🏬 Produk Toko (${(state.customProducts || []).length})</button>
-      <button class="tab-btn active" data-main-product-tab="reseller" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">📦 Produk Reseller (${(state.products || []).length + (state.freshProducts || []).length})</button>
+  ` : `
+    <div class="section-title product-section-title">
+      <div>
+        <h2>📦 Produk</h2>
+        <p>Katalog produk dari toko owner. Sesuaikan margin keuntungan dan aktifkan produk yang ingin dijual di bot Anda.</p>
+      </div>
+      <span></span>
     </div>
+  `;
+
+  $('#content').innerHTML = `
+    ${sectionTitleHtml}
+    ${mainTabsHtml}
 
     <div class="tabs product-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
       <button class="tab-btn ${activeTab === 'regular' ? 'active' : ''}" data-product-tab="regular" style="width:100%;text-align:center;padding:10px 8px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;">📦 Daftar Produk (${state.products.length})</button>

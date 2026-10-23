@@ -454,4 +454,318 @@ body{overflow-x:hidden}.app-shell{min-height:100vh;display:grid;grid-template-co
   transform: translateX(-2px);
 }
 
+/* ========================================================
+   v2.6.11 Mobile Responsive Polish for Reseller Partnership
+   ======================================================== */
+.reseller-fee-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+@media(max-width: 640px) {
+  .reseller-fee-card {
+    padding: 12px;
+    gap: 12px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .reseller-fee-info {
+    width: 100%;
+  }
+  .reseller-fee-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .reseller-fee-title strong {
+    font-size: 14px;
+    line-height: 1.25;
+  }
+  .reseller-fee-actions {
+    margin-left: 0 !important;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 2px dashed #e2d9f3;
+    padding-top: 10px;
+    gap: 10px;
+  }
+  .reseller-fee-actions .reseller-fee-amount {
+    font-size: 18px;
+  }
+  .reseller-fee-actions .neo-btn {
+    flex: 1;
+    text-align: center;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  .reseller-grid, .bot-grid, .withdrawal-grid {
+    gap: 10px;
+  }
+  .reseller-card, .bot-card, .withdrawal-card {
+    padding: 12px;
+    border-radius: 14px;
+    gap: 10px;
+  }
+  .reseller-card-head, .bot-card-head, .withdrawal-card-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .reseller-card-head h3, .bot-card-head h3, .withdrawal-card-head h3 {
+    font-size: 17px;
+  }
+  .reseller-meta, .bot-meta, .withdrawal-meta {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .reseller-meta>div, .bot-meta>div, .withdrawal-meta>div {
+    padding: 6px 8px;
+  }
+  .reseller-meta small, .bot-meta small, .withdrawal-meta small {
+    font-size: 8px;
+  }
+  .reseller-meta strong, .bot-meta strong, .withdrawal-meta strong {
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+  .reseller-actions, .bot-actions, .withdrawal-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    width: 100%;
+  }
+  .reseller-actions .neo-btn, .bot-actions .neo-btn, .withdrawal-actions .neo-btn {
+    width: 100%;
+    text-align: center;
+    padding: 8px 6px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #resellerPartnershipSettingsForm .form-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+  #resellerPartnershipSettingsForm .form-actions .neo-btn {
+    width: 100%;
+    text-align: center;
+    padding: 12px;
+  }
+}
+
+/* ========================================================
+   Team Invitation Sessions & Buyer Emails Styling
+   ======================================================== */
+.invitation-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.session-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.session-card {
+  background: #fff;
+  border: var(--border);
+  box-shadow: var(--shadow);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  transition: transform .12s ease;
+}
+.session-card:hover {
+  transform: translate(-1px, -1px);
+}
+.session-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 10px;
+}
+.session-head h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.session-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.session-progress-wrap {
+  background: #f4efff;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+.session-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 900;
+}
+.session-progress-track {
+  height: 12px;
+  background: #e5daf8;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+.session-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #9d66ff, #6e2cff);
+  border-radius: 999px;
+  transition: width .2s ease;
+}
+.session-progress-fill.full {
+  background: linear-gradient(90deg, #ffd91a, #f59e0b);
+}
+.session-link-box {
+  background: #fafafa;
+  border: 1px dashed var(--ink);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.session-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.session-actions .neo-btn {
+  flex: 1;
+  text-align: center;
+  min-width: 90px;
+  font-size: 12px;
+}
+
+/* Buyer Email Cards */
+.buyer-email-list {
+  display: grid;
+  gap: 12px;
+}
+.buyer-email-card {
+  background: #fff;
+  border: var(--border);
+  box-shadow: var(--shadow);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.buyer-email-select {
+  display: flex;
+  align-items: center;
+}
+.buyer-email-select input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: var(--purple);
+}
+.buyer-email-main strong {
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-wrap: anywhere;
+  color: var(--purple);
+}
+.buyer-email-main small {
+  display: block;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 11px;
+  margin-top: 3px;
+}
+.buyer-email-meta small {
+  display: block;
+  color: var(--muted);
+  font-size: 9px;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+.buyer-email-meta b {
+  display: block;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.buyer-email-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+@media(max-width: 900px) {
+  .session-grid {
+    grid-template-columns: 1fr;
+  }
+  .buyer-email-card {
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+  }
+  .buyer-email-card > div:nth-child(n+3) {
+    grid-column: 2;
+  }
+  .buyer-email-actions {
+    grid-column: 2;
+    flex-wrap: wrap;
+  }
+  .buyer-email-actions .neo-btn {
+    flex: 1;
+    text-align: center;
+  }
+}
+@media(max-width: 640px) {
+  .invitation-kpis {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .buyer-email-card {
+    padding: 10px;
+  }
+  .session-card {
+    padding: 12px;
+  }
+  .session-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .session-actions .neo-btn {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+
 

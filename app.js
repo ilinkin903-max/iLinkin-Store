@@ -1,6 +1,6 @@
 const $=(s)=>document.querySelector(s);const $$=(s)=>[...document.querySelectorAll(s)];
-const state={token:sessionStorage.getItem('ilink_owner_token')||localStorage.getItem('ilink_owner_token')||'',view:'dashboard',cache:{supplierCatalogs:{}},me:null,overview:null,couponTab:'coupon',settingsTab:'',botTab:'',resellerTab:'resellers',resellerFilter:'',report:{type:'monthly'},legacyMigration:null,notifications:[],notificationTimer:null};
-const titles={dashboard:['Dashboard','Ringkasan performa toko hari ini'],products:['Produk','Katalog, varian, deskripsi, SNK, dan stok'],fresh:['Jaspay Fresh','Produk fresh, harga, mode, setting akun, dan perpanjang'],orders:['Pesanan','Pantau seluruh detail transaksi tanpa tabel horizontal'],reports:['Laporan','Omzet, profit, dan performa penjualan'],coupons:['Kupon','Voucher promo dan kode redeem'],settings:['Pengaturan','Toko, referral, TopUp, pembayaran, supplier, dan backup'],bot:['Bot & Notifikasi','Bot, /start, link, transaksi, dan diagnostik'],broadcast:['Broadcast','Kirim dan pantau pesan massal ke pengguna'],users:['User','Data pengguna Telegram, saldo, referral, dan aktivitas'],resellers:['Reseller Bot','Kelola reseller, bot toko white-label, komisi profit, dan penarikan saldo']};
+const state={token:sessionStorage.getItem('ilink_owner_token')||localStorage.getItem('ilink_owner_token')||'',view:'dashboard',cache:{supplierCatalogs:{}},me:null,overview:null,couponTab:'coupon',settingsTab:'',botTab:'',resellerTab:'resellers',resellerFilter:'',invitationTab:'emails',invitationSearch:'',invitationStatus:'',invitationSessionFilter:'',invitationsData:{items:[],sessions:[]},selectedEmailIds:new Set(),report:{type:'monthly'},legacyMigration:null,notifications:[],notificationTimer:null};
+const titles={dashboard:['Dashboard','Ringkasan performa toko hari ini'],products:['Produk','Katalog, varian, deskripsi, SNK, dan stok'],fresh:['Jaspay Fresh','Produk fresh, harga, mode, setting akun, dan perpanjang'],orders:['Pesanan','Pantau seluruh detail transaksi tanpa tabel horizontal'],invitations:['List Email & Sesi Undangan','Daftar email pembeli produk undangan (Canva, Gemini, dsb.) dan kelola sesi tim'],reports:['Laporan','Omzet, profit, dan performa penjualan'],coupons:['Kupon','Voucher promo dan kode redeem'],settings:['Pengaturan','Toko, referral, TopUp, pembayaran, supplier, dan backup'],bot:['Bot & Notifikasi','Bot, /start, link, transaksi, dan diagnostik'],broadcast:['Broadcast','Kirim dan pantau pesan massal ke pengguna'],users:['User','Data pengguna Telegram, saldo, referral, dan aktivitas'],resellers:['Reseller Bot','Kelola reseller, bot toko white-label, komisi profit, dan penarikan saldo']};
 function esc(v=''){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}function money(v){return'Rp '+Number(v||0).toLocaleString('id-ID')}function date(v){if(!v)return'-';try{return new Date(v).toLocaleString('id-ID')}catch{return String(v)}}function bytes(v){const n=Number(v||0);if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(1)+' KB';return(n/1048576).toFixed(1)+' MB'}function toast(msg,bad=false){const t=$('#toast');if(!t)return;const m=$('#modal');if(m&&m.open){if(t.parentElement!==m)m.appendChild(t);}else{if(t.parentElement!==document.body)document.body.appendChild(t);}t.textContent=msg;t.className='toast show'+(bad?' bad':'');clearTimeout(toast.t);toast.t=setTimeout(()=>{t.className='toast';if(!m||!m.open){if(t.parentElement!==document.body)document.body.appendChild(t);}},2800);}function badge(status){const s=String(status||'').toLowerCase();const cls=['completed','paid','success','active','running','waiting_delivery'].includes(s)?'ok':['pending','pending_payment','pending_approval','awaiting_payment','awaiting_token','supplier_pending','fresh_processing','fresh_attention','inactive'].includes(s)?'warn':['failed','blocked','canceled','cancelled','expired','rejected','suspended'].includes(s)?'bad':'purple';const labelMap={pending_approval:'Menunggu Persetujuan',awaiting_payment:'Menunggu Pembayaran',awaiting_token:'Menunggu Bot Token',active:'Aktif',suspended:'Ditangguhkan',rejected:'Ditolak'};const label=labelMap[s]||status||'-';return`<span class="badge ${cls}">${esc(label)}</span>`}function firstLetter(v){return esc(String(v||'?').trim().charAt(0).toUpperCase()||'?')}
 function bulkTiers(value){let rows=value;if(typeof rows==='string'){try{rows=JSON.parse(rows)}catch{rows=[]}}if(!Array.isArray(rows))rows=[];const byQty=new Map();for(const row of rows){const min=Math.max(2,Math.floor(Number(row?.min_qty??row?.minQty??row?.qty??0)||0)),price=Math.max(0,Math.floor(Number(row?.price??row?.unit_price??0)||0));if(min>=2&&price>0)byQty.set(min,{min_qty:min,price})}return[...byQty.values()].sort((a,b)=>a.min_qty-b.min_qty)}
 function bulkUnitPrice(base,tiers,qty=1){let price=Math.max(0,Number(base||0)),q=Math.max(1,Number(qty||1));for(const t of bulkTiers(tiers)){if(q>=t.min_qty)price=t.price;else break}return price}
@@ -52,7 +52,7 @@ function showLogin(){$('#loginView').classList.remove('hidden');$('#appView').cl
 $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginError').textContent='';try{const r=await api('/api/admin/auth/login',{method:'POST',body:{username:$('#loginUsername').value,password:$('#loginPassword').value}});state.token=r.token;sessionStorage.setItem('ilink_owner_token',r.token);localStorage.setItem('ilink_owner_token',r.token);$('#loginPassword').value='';await initialize()}catch(err){$('#loginError').textContent=err.message}};$('#logoutBtn').onclick=()=>logout();$('#refreshBtn').onclick=()=>navigate(state.view,true);$('#notifBtn').onclick=e=>{e.stopPropagation();toggleNotifications()};$('#notificationPanel').onclick=e=>e.stopPropagation();$('#notifMarkAll').onclick=async()=>{try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{all:true}});renderNotifications(r);toast('Semua notifikasi ditandai dibaca')}catch(e){toast(e.message,true)}};$('#notificationList').onclick=async e=>{const b=e.target.closest('[data-notif-key]');if(!b)return;try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{keys:[b.dataset.notifKey]}});renderNotifications(r)}catch{}closeNotifications();if(b.dataset.notifView)navigate(b.dataset.notifView)};document.addEventListener('click',closeNotifications);function closeSidebar(){$('#sidebar').classList.remove('open');$('#sidebarBackdrop')?.classList.remove('show');$('#menuBtn')?.setAttribute('aria-expanded','false')}$('#menuBtn').onclick=e=>{e.stopPropagation();const open=$('#sidebar').classList.toggle('open');$('#sidebarBackdrop')?.classList.toggle('show',open);$('#menuBtn').setAttribute('aria-expanded',open?'true':'false')};$('#sidebarBackdrop').onclick=closeSidebar;document.addEventListener('click',e=>{const side=$('#sidebar'),menu=$('#menuBtn');if(side?.classList.contains('open')&&!side.contains(e.target)&&!menu?.contains(e.target))closeSidebar()});$('#nav').onclick=e=>{const b=e.target.closest('[data-view]');if(b){closeSidebar();navigate(b.dataset.view)}};
 function setHeader(view){const[t,s]=titles[view]||[view,''];$('#pageTitle').textContent=t;$('#pageSubtitle').textContent=s;$$('#nav [data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))}
 async function initialize(){state.me=(await api('/api/admin/me')).user;showApp();await navigate('dashboard');await refreshNotifications();if(!state.notificationTimer)state.notificationTimer=setInterval(()=>refreshNotifications(true),60000)}
-async function navigate(view){if(state.broadcastPollTimer){clearInterval(state.broadcastPollTimer);state.broadcastPollTimer=null;}state.view=view;closeNotifications();setHeader(view);$('#content').innerHTML='<div class="empty-product">Memuat data...</div>';try{await({dashboard:loadDashboard,products:loadProducts,fresh:loadFresh,orders:loadOrders,reports:loadReports,coupons:loadCoupons,settings:loadSettings,bot:loadBot,broadcast:loadBroadcast,users:loadUsers,resellers:loadResellers}[view]||loadDashboard)();$('#lastUpdated').textContent='Terakhir diperbarui: '+new Date().toLocaleString('id-ID');refreshNotifications(true)}catch(e){$('#content').innerHTML=`<div class="empty-product">${esc(e.message)}</div>`;toast(e.message,true)}}
+async function navigate(view){if(state.broadcastPollTimer){clearInterval(state.broadcastPollTimer);state.broadcastPollTimer=null;}state.view=view;closeNotifications();setHeader(view);$('#content').innerHTML='<div class="empty-product">Memuat data...</div>';try{await({dashboard:loadDashboard,products:loadProducts,fresh:loadFresh,orders:loadOrders,invitations:loadInvitations,reports:loadReports,coupons:loadCoupons,settings:loadSettings,bot:loadBot,broadcast:loadBroadcast,users:loadUsers,resellers:loadResellers}[view]||loadDashboard)();$('#lastUpdated').textContent='Terakhir diperbarui: '+new Date().toLocaleString('id-ID');refreshNotifications(true)}catch(e){$('#content').innerHTML=`<div class="empty-product">${esc(e.message)}</div>`;toast(e.message,true)}}
 function applyShell(r){const s=r.settings||{};const o=r.stats||{};state.overview=r;$('#brandName').innerHTML=esc(String(s.store_name||'AUTO ORDER')).replace(/\s+/g,'<br>');$('#brandTagline').textContent=s.store_tagline||'Digital Store';$('#ownerName').textContent=s.owner_display_name||state.me?.display_name||'Owner';$('#ownerUsername').textContent='@'+String(s.owner_username||state.me?.owner_username||'owneradmin').replace(/^@/,'');const metric=String(s.store_balance_metric||o.store_balance_metric||'month_profit');const metricMap={month_profit:['Profit Bulan Ini',o.month_profit],month_revenue:['Omzet Bulan Ini',o.month_revenue],today_profit:['Profit Hari Ini',o.today_profit],today_revenue:['Omzet Hari Ini',o.today_revenue],manual:['Saldo Manual',s.store_balance??o.store_balance]};const selected=metricMap[metric]||metricMap.month_profit;$('#storeBalanceLabel').textContent=selected[0];$('#storeBalance').textContent=money(selected[1]||0);const badgeEl=$('#orderBadge');const pending=Number(o.pending_orders||0);badgeEl.textContent=pending;badgeEl.classList.toggle('hidden',pending<1);const resBadgeEl=$('#resellerBadge');if(resBadgeEl){api('/api/admin/resellers/overview').then(ro=>{const pWd=Number(ro?.stats?.pending_withdrawals||0);const pRes=Number(ro?.stats?.pending_resellers||0);const pTotal=pWd+pRes;resBadgeEl.textContent=pTotal;resBadgeEl.classList.toggle('hidden',pTotal<1);}).catch(()=>null);}const username=state.overview?.bot?.username;$('#telegramBtn').href=username?`https://t.me/${username}`:'#';$('#telegramBtn').textContent='✈ Telegram Mini App';$('#systemSafe').textContent=state.overview?.bot?.running?'Semua sistem berjalan dengan aman':'Dashboard aktif · Bot Telegram offline'}
 function stat(icon,color,label,value,small){return`<div class="stat-card"><div class="stat-icon ${color}">${icon}</div><div><small>${esc(label)}</small><strong>${esc(value)}</strong><em>${esc(small)}</em></div></div>`}
 function productStockState(p={}){const all=Array.isArray(p.variants)?p.variants:[],vars=all.filter(v=>v.active);if(all.length){if(vars.some(v=>v.delivery_mode!=='preorder'&&Number(v.stock||0)>0))return'ready';if(vars.some(v=>v.delivery_mode==='preorder'))return'preorder';return'empty'}if(p.delivery_mode==='preorder'&&Number(p.stock||0)<1)return'preorder';return Number(p.sale_stock??p.stock??0)>0?'ready':'empty'}
@@ -176,6 +176,549 @@ function orderCards(rows){return rows.length?rows.map(o=>{
 function filterOrders(){const q=($('#orderSearch')?.value||'').toLowerCase().trim(),st=$('#orderStatus')?.value||'';const rows=state.cache.orders.filter(o=>(!q||[o.order_ref,o.telegram_id,o.buyer_name,o.product_name,o.variant_name,o.customer_email].some(x=>String(x||'').toLowerCase().includes(q)))&&(!st||o.status===st));$('#orderCards').innerHTML=orderCards(rows);bindOrderActions()}
 function bindOrderActions(){$$('[data-detail-order]').forEach(b=>b.onclick=()=>openOrderDetail(b.dataset.detailOrder));$$('[data-edit-order]').forEach(b=>b.onclick=()=>openOrderEdit(state.cache.orders.find(x=>String(x.id)===b.dataset.editOrder)));$$('[data-fulfill-order]').forEach(b=>b.onclick=()=>openFulfill(state.cache.orders.find(x=>String(x.id)===b.dataset.fulfillOrder)));$$('[data-delete-order]').forEach(b=>b.onclick=()=>remove(`/api/admin/orders/${b.dataset.deleteOrder}`,'Hapus pesanan?',()=>loadOrders(true)))}
 async function openOrderDetail(id){try{const r=await api(`/api/admin/orders/${id}/detail`),o=r.item||{},items=o.purchased_items||[];const emailDisplay=o.require_email?`<dt>Email Pembeli</dt><dd>${o.customer_email?`<b class="mono" style="color:var(--purple);font-size:13px">${esc(o.customer_email)}</b> <button type="button" class="neo-btn white tiny" style="margin-left:6px" onclick="navigator.clipboard.writeText('${esc(o.customer_email)}');toast('Email berhasil disalin')">📋 Salin</button>`:'<span style="color:#b45309;font-weight:700">⏳ Belum diisi pembeli</span>'}</dd>`:(o.customer_email?`<dt>Email Pembeli</dt><dd><b class="mono">${esc(o.customer_email)}</b> <button type="button" class="neo-btn white tiny" style="margin-left:6px" onclick="navigator.clipboard.writeText('${esc(o.customer_email)}');toast('Email berhasil disalin')">📋 Salin</button></dd>`:'');modal('Detail Pesanan · '+(o.order_ref||''),`<div class="detail-grid"><section class="detail-card"><h4>🧾 Pesanan</h4><dl><dt>Invoice</dt><dd class="mono">${esc(o.order_ref||'-')}</dd><dt>Status</dt><dd>${badge(o.status)}</dd>${emailDisplay}<dt>Waktu</dt><dd>${date(o.created_at)}</dd><dt>Pembeli</dt><dd>${esc(o.buyer_name||'-')}<br><span class="mono">${esc(o.telegram_id||'-')}</span></dd></dl></section><section class="detail-card"><h4>📦 Produk Dibeli</h4><dl><dt>Produk</dt><dd>${esc(o.product_name||'-')}</dd><dt>Varian</dt><dd>${esc(o.variant_name||'Default')}</dd><dt>Qty</dt><dd>${Number(o.quantity||0)}</dd><dt>Harga</dt><dd>${money(o.unit_price)} / item</dd><dt>Total</dt><dd>${money(o.total_price)}</dd><dt>Profit</dt><dd>${money(o.profit_amount)}</dd></dl></section><section class="detail-card full"><h4>🔐 Produk / Stok yang Dikirim</h4>${items.length?`<div class="purchased-items">${items.map((x,i)=>`<div class="purchased-item"><span>#${i+1}</span><code>${esc(x.value)}</code>${badge(x.status)}</div>`).join('')}</div>`:o.delivery_text?`<pre class="delivery-box">${esc(o.delivery_text)}</pre>`:'<p class="muted">Belum ada data produk yang dikirim.</p>'}${o.note?`<div class="detail-note"><b>Catatan</b><p>${esc(o.note)}</p></div>`:''}</section></div>`,async()=>{}, {hideSubmit:true})}catch(e){toast(e.message,true)}}
+
+// ==========================================
+// LIST EMAIL PEMBELI & SESI UNDANGAN TIM
+// ==========================================
+
+async function loadInvitations(preserveScroll = false) {
+  const scrollY = preserveScroll ? window.scrollY : 0;
+  try {
+    const res = await api('/api/admin/buyer-emails?limit=1000');
+    state.invitationsData = res || { items: [], sessions: [] };
+    state.selectedEmailIds = state.selectedEmailIds || new Set();
+    renderInvitationsView();
+    if (preserveScroll) window.scrollTo({ top: scrollY, behavior: 'instant' });
+  } catch (e) {
+    $('#content').innerHTML = `<div class="empty-product"><h3>Gagal memuat data undangan tim</h3><p>${esc(e.message)}</p></div>`;
+    toast(e.message, true);
+  }
+}
+
+function renderInvitationsView() {
+  const data = state.invitationsData || { items: [], sessions: [] };
+  const items = data.items || [];
+  const sessions = data.sessions || [];
+  const activeTab = state.invitationTab || 'emails';
+
+  const kpis = `
+    <div class="invitation-kpis">
+      ${stat('📧', 'purple', 'Total Email Pembeli', `${data.totalEmails || items.length}`, 'Terinput otomatis dari checkout bot')}
+      ${stat('⏳', (data.unassignedCount || 0) > 0 ? 'yellow' : 'green', 'Belum Masuk Sesi Tim', `${data.unassignedCount || 0} Email`, (data.unassignedCount || 0) > 0 ? 'Siap dimasukkan ke sesi tim' : 'Semua email telah masuk sesi')}
+      ${stat('👥', 'blue', 'Sesi Undangan Tim', `${sessions.length} Sesi`, `${data.assignedCount || 0} email aktif di sesi`)}
+    </div>
+  `;
+
+  const tabs = `
+    <div class="section-title product-section-title" style="margin-bottom:14px">
+      <div class="tabs">
+        <button class="tab-btn ${activeTab === 'emails' ? 'active' : ''}" data-inv-tab="emails">📧 List Email Pembeli (${items.length})</button>
+        <button class="tab-btn ${activeTab === 'sessions' ? 'active' : ''}" data-inv-tab="sessions">👥 Sesi Undangan Tim (${sessions.length})</button>
+      </div>
+      <span>
+        <button type="button" class="neo-btn purple" id="createNewSessionBtn">＋ Buat Sesi Tim Baru</button>
+      </span>
+    </div>
+  `;
+
+  $('#content').innerHTML = `
+    ${kpis}
+    ${tabs}
+    <div id="invitationTabBody"></div>
+  `;
+
+  $$('[data-inv-tab]').forEach(b => {
+    b.onclick = () => {
+      state.invitationTab = b.dataset.invTab;
+      renderInvitationsView();
+    };
+  });
+
+  const createBtn = $('#createNewSessionBtn');
+  if (createBtn) createBtn.onclick = () => openTeamSessionModal();
+
+  renderInvitationsTab();
+}
+
+function renderInvitationsTab() {
+  const host = $('#invitationTabBody');
+  if (!host) return;
+  const data = state.invitationsData || { items: [], sessions: [] };
+  const items = data.items || [];
+  const sessions = data.sessions || [];
+
+  if (state.invitationTab === 'sessions') {
+    renderSessionsGrid(host, sessions);
+  } else {
+    renderBuyerEmailsList(host, items, sessions);
+  }
+}
+
+function renderSessionsGrid(host, sessions = []) {
+  const q = String(state.invitationSearch || '').toLowerCase().trim();
+  const filtered = sessions.filter(s => {
+    return !q || [s.session_name, s.product_name, s.note, s.invite_link].some(x => String(x || '').toLowerCase().includes(q));
+  });
+
+  const cardsHtml = filtered.length ? filtered.map(s => {
+    const memCount = Number(s.members_count || 0);
+    const maxCap = Number(s.max_capacity || 0);
+    const isFull = maxCap > 0 && memCount >= maxCap;
+    const pct = maxCap > 0 ? Math.min(100, Math.round((memCount / maxCap) * 100)) : (memCount > 0 ? 100 : 0);
+    const capLabel = maxCap > 0 ? `${memCount} / ${maxCap} Anggota` : `${memCount} Anggota (Tanpa Batas)`;
+
+    return `
+      <article class="session-card">
+        <div class="session-head">
+          <div>
+            <h3>${esc(s.session_name)}</h3>
+            <p>${s.product_name ? `🏷️ Produk: <b>${esc(s.product_name)}</b>` : 'Produk Bebas / Undangan Umum'}</p>
+          </div>
+          <div>
+            ${isFull ? '<span class="badge warn" style="margin-right:4px">🟡 Penuh</span>' : ''}
+            ${badge(s.status)}
+          </div>
+        </div>
+
+        <div class="session-progress-wrap">
+          <div class="session-progress-head">
+            <span>Kapasitas Tim</span>
+            <span style="font-weight:950;color:${isFull ? '#b45309' : 'var(--purple)'}">${capLabel}</span>
+          </div>
+          <div class="session-progress-track">
+            <div class="session-progress-fill ${isFull ? 'full' : ''}" style="width:${pct}%"></div>
+          </div>
+        </div>
+
+        ${s.invite_link ? `
+          <div class="session-link-box">
+            <span class="mono" style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.invite_link)}</span>
+            <div style="display:flex;gap:4px">
+              <button type="button" class="neo-btn white tiny" onclick="navigator.clipboard.writeText('${esc(s.invite_link)}');toast('Link undangan disalin')">📋 Salin</button>
+              <a href="${esc(s.invite_link)}" target="_blank" rel="noreferrer" class="neo-btn blue tiny">🔗 Buka</a>
+            </div>
+          </div>
+        ` : ''}
+
+        ${s.note ? `<div style="font-size:11px;color:var(--muted);background:#faf7ff;border:1px solid #ebdfff;border-radius:8px;padding:6px 10px;"><b>Catatan:</b> ${esc(s.note)}</div>` : ''}
+
+        <div style="font-size:10px;color:var(--muted)">Dibuat: ${date(s.created_at)}</div>
+
+        <div class="session-actions">
+          <button type="button" class="neo-btn green small" data-copy-session-emails="${s.id}" ${memCount < 1 ? 'disabled title="Belum ada email anggota"' : ''}>📋 Salin Semua Email (${memCount})</button>
+          <button type="button" class="neo-btn purple small" data-view-session-members="${s.id}">👥 Anggota</button>
+          <button type="button" class="neo-btn yellow small" data-edit-session="${s.id}">✎ Edit</button>
+          <button type="button" class="neo-btn red small" data-delete-session="${s.id}">🗑 Hapus</button>
+        </div>
+      </article>
+    `;
+  }).join('') : '<div class="empty-product full" style="grid-column:1/-1"><h3>Belum ada sesi undangan tim</h3><p>Tekan tombol ＋ Buat Sesi Tim Baru untuk membuat sesi tim Canva, Gemini, dll.</p></div>';
+
+  host.innerHTML = `
+    <div class="toolbar product-toolbar" style="margin-bottom:14px">
+      <div class="searchbox"><input id="sessionSearch" placeholder="Cari nama sesi tim, produk, link..." value="${esc(q)}"></div>
+      <button type="button" class="neo-btn purple" id="createNewSessionBtn2">＋ Tambah Sesi Tim</button>
+    </div>
+    <div class="session-grid">${cardsHtml}</div>
+  `;
+
+  $('#sessionSearch').oninput = e => {
+    state.invitationSearch = e.target.value;
+    renderInvitationsTab();
+  };
+
+  const createBtn2 = $('#createNewSessionBtn2');
+  if (createBtn2) createBtn2.onclick = () => openTeamSessionModal();
+
+  $$('[data-copy-session-emails]').forEach(b => {
+    b.onclick = async () => {
+      const sid = b.dataset.copySessionEmails;
+      try {
+        const res = await api(`/api/admin/team-sessions/${sid}`);
+        const session = res.item || {};
+        const emails = (session.members || []).map(m => m.customer_email).filter(Boolean);
+        if (!emails.length) return toast('Belum ada email pembeli di sesi ini.', true);
+        openCopyEmailsModal(emails, session.session_name);
+      } catch (err) {
+        toast(err.message, true);
+      }
+    };
+  });
+
+  $$('[data-view-session-members]').forEach(b => {
+    b.onclick = () => openSessionMembersModal(b.dataset.viewSessionMembers);
+  });
+
+  $$('[data-edit-session]').forEach(b => {
+    b.onclick = () => {
+      const sid = b.dataset.editSession;
+      const session = sessions.find(x => String(x.id) === String(sid));
+      openTeamSessionModal(session);
+    };
+  });
+
+  $$('[data-delete-session]').forEach(b => {
+    b.onclick = () => {
+      const sid = b.dataset.deleteSession;
+      const s = sessions.find(x => String(x.id) === String(sid));
+      const sName = s?.session_name || 'ini';
+      remove(`/api/admin/team-sessions/${sid}`, `Hapus sesi undangan "${sName}"?\nEmail pembeli di dalamnya akan otomatis dikembalikan ke status 'Belum Masuk Sesi' (data pesanan tetap aman).`, () => loadInvitations(true));
+    };
+  });
+}
+
+function renderBuyerEmailsList(host, items = [], sessions = []) {
+  const q = String(state.invitationSearch || '').toLowerCase().trim();
+  const stFilter = state.invitationStatus || '';
+  const sessFilter = state.invitationSessionFilter || '';
+
+  const filtered = items.filter(o => {
+    const matchQ = !q || [o.customer_email, o.order_ref, o.buyer_name, o.product_name, o.variant_name, o.session_name].some(x => String(x || '').toLowerCase().includes(q));
+    const isAssigned = Boolean(o.team_session_id);
+    const matchSt = !stFilter || (stFilter === 'assigned' ? isAssigned : !isAssigned);
+    const matchSess = !sessFilter || String(o.team_session_id) === String(sessFilter);
+    return matchQ && matchSt && matchSess;
+  });
+
+  const selectedSet = state.selectedEmailIds || new Set();
+  const allFilteredSelected = filtered.length > 0 && filtered.every(o => selectedSet.has(o.id));
+
+  const sessionOptions = sessions.map(s => `<option value="${s.id}" ${String(sessFilter) === String(s.id) ? 'selected' : ''}>${esc(s.session_name)} (${s.members_count || 0})</option>`).join('');
+
+  const bulkBar = selectedSet.size > 0 ? `
+    <div style="background:#f4edff;border:2px solid var(--ink);border-radius:12px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <b style="color:var(--purple);font-size:14px">✓ ${selectedSet.size} email dipilih</b>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="neo-btn green small" id="assignSelectedBtn">➕ Masukkan ke Sesi Tim...</button>
+        <button type="button" class="neo-btn white small" id="copySelectedBtn">📋 Salin Terpilih</button>
+        <button type="button" class="neo-btn red small" id="clearSelectedBtn">✕ Batal Pilih</button>
+      </div>
+    </div>
+  ` : '';
+
+  const cardsHtml = filtered.length ? filtered.map(o => {
+    const isChecked = selectedSet.has(o.id);
+    const hasSession = Boolean(o.team_session_id);
+
+    return `
+      <article class="buyer-email-card">
+        <div class="buyer-email-select">
+          <input type="checkbox" data-select-email="${o.id}" ${isChecked ? 'checked' : ''} aria-label="Pilih ${esc(o.customer_email)}">
+        </div>
+        <div class="buyer-email-main">
+          <strong>
+            ${esc(o.customer_email)}
+            <button type="button" class="neo-btn white tiny" onclick="navigator.clipboard.writeText('${esc(o.customer_email)}');toast('Email disalin')">📋 Salin</button>
+          </strong>
+          <small>👤 ${esc(o.buyer_name || '-')} · Invoice: <code class="mono">${esc(o.order_ref)}</code></small>
+        </div>
+        <div class="buyer-email-meta">
+          <small>Produk Dibeli</small>
+          <b>${esc(o.product_name)}</b>
+          <span style="font-size:11px;color:var(--muted)">${esc(o.variant_name || 'Default')} · Qty ${o.quantity || 1}</span>
+        </div>
+        <div class="buyer-email-meta">
+          <small>Status Sesi Tim</small>
+          ${hasSession ? `
+            <div>
+              <span class="badge ok" style="font-size:11px;padding:3px 7px">👥 ${esc(o.session_name || 'Sesi Tim')}</span>
+            </div>
+          ` : `
+            <div>
+              <span class="badge warn" style="font-size:11px;padding:3px 7px">⏳ Belum Ada Sesi</span>
+            </div>
+          `}
+          <span style="font-size:10px;color:var(--muted);display:block;margin-top:3px">${date(o.created_at)}</span>
+        </div>
+        <div class="buyer-email-actions">
+          ${hasSession ? `
+            <button type="button" class="neo-btn red tiny" data-unassign-email="${o.id}">✕ Keluarkan</button>
+          ` : `
+            <button type="button" class="neo-btn purple tiny" data-assign-single-email="${o.id}">➕ Masukkan Sesi</button>
+          `}
+          <button type="button" class="neo-btn blue tiny" onclick="openOrderDetail(${o.id})">Detail</button>
+        </div>
+      </article>
+    `;
+  }).join('') : '<div class="empty-product"><h3>Belum ada email pembeli yang sesuai filter</h3><p>Email pembeli akan otomatis muncul di sini saat pembeli menginput email setelah checkout di bot.</p></div>';
+
+  host.innerHTML = `
+    <div class="toolbar product-toolbar" style="margin-bottom:14px">
+      <div class="searchbox"><input id="emailSearch" placeholder="Cari email pembeli, invoice, nama, atau produk..." value="${esc(q)}"></div>
+      <select id="emailStatusFilter">
+        <option value="" ${stFilter === '' ? 'selected' : ''}>Semua Status Sesi</option>
+        <option value="unassigned" ${stFilter === 'unassigned' ? 'selected' : ''}>⏳ Belum Masuk Sesi (${state.invitationsData?.unassignedCount || 0})</option>
+        <option value="assigned" ${stFilter === 'assigned' ? 'selected' : ''}>🟢 Sudah Masuk Sesi (${state.invitationsData?.assignedCount || 0})</option>
+      </select>
+      <select id="emailSessionFilter">
+        <option value="">Semua Sesi Tim (${sessions.length})</option>
+        ${sessionOptions}
+      </select>
+    </div>
+
+    ${bulkBar}
+
+    ${filtered.length > 0 ? `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 4px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:900;cursor:pointer">
+          <input type="checkbox" id="selectAllEmailsCheckbox" ${allFilteredSelected ? 'checked' : ''} style="width:18px;height:18px;accent-color:var(--purple)">
+          <span>Pilih Semua yang Tampil (${filtered.length} Email)</span>
+        </label>
+        <button type="button" class="neo-btn white tiny" id="copyAllFilteredEmailsBtn">📋 Salin Semua yang Tampil (${filtered.length})</button>
+      </div>
+    ` : ''}
+
+    <div class="buyer-email-list">${cardsHtml}</div>
+  `;
+
+  $('#emailSearch').oninput = e => {
+    state.invitationSearch = e.target.value;
+    renderInvitationsTab();
+  };
+  $('#emailStatusFilter').onchange = e => {
+    state.invitationStatus = e.target.value;
+    renderInvitationsTab();
+  };
+  $('#emailSessionFilter').onchange = e => {
+    state.invitationSessionFilter = e.target.value;
+    renderInvitationsTab();
+  };
+
+  const selectAll = $('#selectAllEmailsCheckbox');
+  if (selectAll) {
+    selectAll.onchange = () => {
+      if (selectAll.checked) {
+        filtered.forEach(o => state.selectedEmailIds.add(o.id));
+      } else {
+        filtered.forEach(o => state.selectedEmailIds.delete(o.id));
+      }
+      renderInvitationsTab();
+    };
+  }
+
+  $$('[data-select-email]').forEach(cb => {
+    cb.onchange = () => {
+      const id = Number(cb.dataset.selectEmail);
+      if (cb.checked) state.selectedEmailIds.add(id);
+      else state.selectedEmailIds.delete(id);
+      renderInvitationsTab();
+    };
+  });
+
+  const clearBtn = $('#clearSelectedBtn');
+  if (clearBtn) clearBtn.onclick = () => {
+    state.selectedEmailIds.clear();
+    renderInvitationsTab();
+  };
+
+  const assignBtn = $('#assignSelectedBtn');
+  if (assignBtn) assignBtn.onclick = () => {
+    const ids = Array.from(state.selectedEmailIds);
+    if (!ids.length) return toast('Pilih minimal 1 email.', true);
+    openAssignToSessionModal(ids);
+  };
+
+  const copySelected = $('#copySelectedBtn');
+  if (copySelected) copySelected.onclick = () => {
+    const ids = Array.from(state.selectedEmailIds);
+    const emails = items.filter(o => ids.includes(o.id)).map(o => o.customer_email).filter(Boolean);
+    if (!emails.length) return toast('Tidak ada email yang valid.', true);
+    openCopyEmailsModal(emails, `${emails.length} Email Terpilih`);
+  };
+
+  const copyAllBtn = $('#copyAllFilteredEmailsBtn');
+  if (copyAllBtn) copyAllBtn.onclick = () => {
+    const emails = filtered.map(o => o.customer_email).filter(Boolean);
+    if (!emails.length) return toast('Tidak ada email yang tampil.', true);
+    openCopyEmailsModal(emails, `${emails.length} Email Tampil`);
+  };
+
+  $$('[data-assign-single-email]').forEach(b => {
+    b.onclick = () => {
+      const id = Number(b.dataset.assignSingleEmail);
+      openAssignToSessionModal([id]);
+    };
+  });
+
+  $$('[data-unassign-email]').forEach(b => {
+    b.onclick = async () => {
+      const id = Number(b.dataset.unassignEmail);
+      try {
+        await api('/api/admin/team-sessions/unassign', { method: 'POST', body: { order_id: id } });
+        toast('Email berhasil dikeluarkan dari sesi tim');
+        await loadInvitations(true);
+      } catch (err) {
+        toast(err.message, true);
+      }
+    };
+  });
+}
+
+function openTeamSessionModal(session = {}) {
+  const edit = Boolean(session && session.id);
+  modal(edit ? `Edit Sesi Tim · ${esc(session.session_name)}` : '＋ Buat Sesi Undangan Tim Baru', `
+    <div class="form-grid">
+      <label class="full">Nama Sesi Tim<input name="session_name" required value="${esc(session.session_name || '')}" placeholder="Contoh: Canva Pro Team Batch #1, Gemini Advanced VIP 2"></label>
+      <label>Kategori / Nama Produk<input name="product_name" value="${esc(session.product_name || '')}" placeholder="Contoh: Canva Pro, Gemini, Zoom Pro"></label>
+      <label>Kapasitas Tim (Maksimal Anggota)<input name="max_capacity" type="number" min="0" value="${Number(session.max_capacity || 0)}" placeholder="0 = Tanpa Batas"><small class="muted">Isi 0 jika tidak dibatasi (unlimited). Misal tim Canva isi 20/100, Google Family isi 5.</small></label>
+      <label class="full">Link Undangan Tim (Opsional)<input name="invite_link" type="url" value="${esc(session.invite_link || '')}" placeholder="https://www.canva.com/brand/join?..."><small class="muted">Link join team yang bisa disalin atau dibagikan saat memasukkan pembeli.</small></label>
+      <label>Status Sesi<select name="status">
+        <option value="active" ${session.status !== 'full' && session.status !== 'completed' && session.status !== 'archived' ? 'selected' : ''}>🟢 Aktif</option>
+        <option value="full" ${session.status === 'full' ? 'selected' : ''}>🟡 Penuh</option>
+        <option value="completed" ${session.status === 'completed' ? 'selected' : ''}>⚪ Selesai</option>
+        <option value="archived" ${session.status === 'archived' ? 'selected' : ''}>📁 Arsip</option>
+      </select></label>
+      <label class="full">Catatan Internal (Opsional)<textarea name="note" rows="3" placeholder="Contoh: Email admin pemilik tim, tanggal kedaluwarsa tim, aturan garansi tim...">${esc(session.note || '')}</textarea></label>
+    </div>
+  `, async b => {
+    b.session_name = String(b.session_name || '').trim();
+    if (!b.session_name) throw new Error('Nama sesi tim wajib diisi.');
+    b.max_capacity = Number(b.max_capacity || 0);
+    if (edit) {
+      await api(`/api/admin/team-sessions/${session.id}`, { method: 'PATCH', body: b });
+      toast('Sesi tim berhasil diperbarui');
+    } else {
+      await api('/api/admin/team-sessions', { method: 'POST', body: b });
+      toast('Sesi tim baru berhasil dibuat');
+    }
+    await loadInvitations(true);
+  }, { submit: edit ? 'Simpan Perubahan Sesi' : '＋ Buat Sesi Tim' });
+}
+
+function openAssignToSessionModal(orderIds = []) {
+  const sessions = (state.invitationsData?.sessions || []).filter(s => s.status !== 'archived');
+  if (!sessions.length) {
+    if (confirm('Belum ada Sesi Undangan Tim yang dibuat. Buat sesi tim baru sekarang?')) {
+      openTeamSessionModal();
+    }
+    return;
+  }
+
+  const opts = sessions.map(s => {
+    const mem = Number(s.members_count || 0);
+    const max = Number(s.max_capacity || 0);
+    const full = max > 0 && mem >= max;
+    return `<option value="${s.id}">${esc(s.session_name)}${s.product_name ? ` · ${esc(s.product_name)}` : ''} (${mem}${max > 0 ? `/${max}` : ''} anggota)${full ? ' ⚠️ Penuh' : ''}</option>`;
+  }).join('');
+
+  modal(`Masukkan ke Sesi Undangan Tim (${orderIds.length} Email)`, `
+    <div class="form-grid">
+      <div class="full info-note">
+        <b>Pilih Sesi Tim Tujuan:</b> ${orderIds.length} email pembeli terpilih akan dimasukkan ke dalam sesi tim ini.
+      </div>
+      <label class="full">Pilih Sesi Tim
+        <select name="session_id" id="targetAssignSession">${opts}</select>
+      </label>
+    </div>
+  `, async b => {
+    const sid = Number(b.session_id);
+    if (!sid) throw new Error('Pilih sesi tim.');
+    await api('/api/admin/team-sessions/assign', {
+      method: 'POST',
+      body: { session_id: sid, order_ids: orderIds }
+    });
+    toast(`${orderIds.length} email berhasil dimasukkan ke sesi tim!`);
+    state.selectedEmailIds.clear();
+    await loadInvitations(true);
+  }, { submit: 'Masukkan ke Sesi Tim' });
+}
+
+async function openSessionMembersModal(sessionId) {
+  try {
+    const res = await api(`/api/admin/team-sessions/${sessionId}`);
+    const session = res.item || {};
+    const members = session.members || [];
+    const emails = members.map(m => m.customer_email).filter(Boolean);
+
+    const membersListHtml = members.length ? members.map((m, i) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#fafafa;border:2px solid var(--ink);border-radius:10px;gap:8px;margin-bottom:8px;">
+        <span style="font-weight:950;font-size:12px;width:24px;text-align:center">#${i + 1}</span>
+        <div style="flex:1;min-width:0">
+          <strong class="mono" style="color:var(--purple);font-size:13px;display:block;overflow-wrap:anywhere">${esc(m.customer_email)}</strong>
+          <small style="color:var(--muted);font-size:11px">Invoice: ${esc(m.order_ref)} · ${esc(m.buyer_name || '-')} · ${esc(m.product_name)}</small>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button type="button" class="neo-btn white tiny" onclick="navigator.clipboard.writeText('${esc(m.customer_email)}');toast('Email disalin')">📋 Salin</button>
+          <button type="button" class="neo-btn red tiny" data-remove-from-session="${m.order_id}">✕ Keluarkan</button>
+        </div>
+      </div>
+    `).join('') : '<div class="empty compact">Belum ada email pembeli di sesi tim ini.</div>';
+
+    modal(`Anggota Sesi · ${esc(session.session_name)} (${members.length})`, `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+        <button type="button" class="neo-btn green small" id="copyCommaBtn" ${!emails.length ? 'disabled' : ''}>📋 Salin Format Koma (,)</button>
+        <button type="button" class="neo-btn blue small" id="copyNewlineBtn" ${!emails.length ? 'disabled' : ''}>📋 Salin Format Per Baris</button>
+      </div>
+      <div style="max-height:55vh;overflow-y:auto;padding-right:4px;">
+        ${membersListHtml}
+      </div>
+    `, async () => {}, { hideSubmit: true, cancelText: 'Tutup' });
+
+    const commaBtn = $('#copyCommaBtn');
+    if (commaBtn) commaBtn.onclick = () => {
+      const text = emails.join(', ');
+      navigator.clipboard.writeText(text);
+      toast(`${emails.length} email disalin (format koma)!`);
+    };
+
+    const newlineBtn = $('#copyNewlineBtn');
+    if (newlineBtn) newlineBtn.onclick = () => {
+      const text = emails.join('\n');
+      navigator.clipboard.writeText(text);
+      toast(`${emails.length} email disalin (per baris)!`);
+    };
+
+    $$('[data-remove-from-session]').forEach(b => {
+      b.onclick = async () => {
+        const oid = Number(b.dataset.removeFromSession);
+        try {
+          await api('/api/admin/team-sessions/unassign', { method: 'POST', body: { order_id: oid } });
+          toast('Email dikeluarkan dari sesi tim');
+          await openSessionMembersModal(sessionId);
+          await loadInvitations(true);
+        } catch (err) {
+          toast(err.message, true);
+        }
+      };
+    });
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+function openCopyEmailsModal(emails = [], title = 'Salin Email Pembeli') {
+  const commaText = emails.join(', ');
+  const newlineText = emails.join('\n');
+
+  modal(`Salin Email · ${esc(title)} (${emails.length})`, `
+    <div class="form-grid">
+      <div class="full" style="display:flex;gap:8px;margin-bottom:8px;">
+        <button type="button" class="neo-btn purple small" id="copyFormatCommaBtn">📋 Salin Format Koma (a@x.com, b@x.com)</button>
+        <button type="button" class="neo-btn blue small" id="copyFormatNewlineBtn">📋 Salin Format Baris</button>
+      </div>
+      <label class="full">
+        Format Pisah Koma (Cocok langsung paste di Canva / Google Team Invite):
+        <textarea id="copyEmailsArea" rows="8" readonly style="font-family:ui-monospace,monospace;font-size:12px">${esc(commaText)}</textarea>
+      </label>
+    </div>
+  `, async () => {}, { hideSubmit: true, cancelText: 'Tutup' });
+
+  const ta = $('#copyEmailsArea');
+  const btnComma = $('#copyFormatCommaBtn');
+  if (btnComma) btnComma.onclick = () => {
+    if (ta) ta.value = commaText;
+    navigator.clipboard.writeText(commaText);
+    toast(`${emails.length} email disalin (format koma)!`);
+  };
+  const btnNewline = $('#copyFormatNewlineBtn');
+  if (btnNewline) btnNewline.onclick = () => {
+    if (ta) ta.value = newlineText;
+    navigator.clipboard.writeText(newlineText);
+    toast(`${emails.length} email disalin (per baris)!`);
+  };
+}
 async function loadReports(){
   const d=new Date(),r=state.report||{};if(!r.date)r.date=d.toISOString().slice(0,10);if(!r.month)r.month=d.toISOString().slice(0,7);if(!r.year)r.year=String(d.getFullYear());state.report=r;
   $('#content').innerHTML=`<section class="report-filter panel"><div class="section-head"><div><h3>📊 Pilih Laporan</h3><p>Sesuaikan tipe dan periode laporan.</p></div></div><div class="report-filter-grid"><label>Tipe Laporan<select id="reportType"><option value="daily" ${r.type==='daily'?'selected':''}>Harian</option><option value="monthly" ${r.type==='monthly'?'selected':''}>Bulanan</option><option value="yearly" ${r.type==='yearly'?'selected':''}>Tahunan</option></select></label><label id="reportPeriodWrap"></label><button id="applyReport" class="neo-btn purple">Tampilkan Laporan</button></div></section><div id="reportResult"><div class="empty-product">Memuat laporan...</div></div>`;
@@ -1180,7 +1723,7 @@ async function renderResellersList(host) {
         </div>
         <small style="color:var(--muted);font-weight:700">Biaya yang otomatis dipotong dari saldo dompet user saat mendaftarkan bot di Bot Toko Utama.</small>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;margin-left:auto">
+      <div class="reseller-fee-actions">
         <div class="reseller-fee-amount">${regFee > 0 ? money(regFee) : 'GRATIS'}</div>
         <button type="button" class="neo-btn blue" id="editResellerFeeBtn" style="font-size:13px;padding:8px 14px">⚙️ Atur Biaya</button>
       </div>
@@ -1194,7 +1737,7 @@ async function renderResellersList(host) {
         </div>
         <small style="color:var(--muted);font-weight:700">Izinkan mitra reseller menambahkan dan mengelola produk toko mereka sendiri (stok, varian, dan harga custom). Default: Nonaktif.</small>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;margin-left:auto">
+      <div class="reseller-fee-actions">
         <button type="button" class="neo-btn ${canAddProducts ? 'red' : 'green'}" id="toggleResellerAddProductBtn" style="font-size:13px;padding:8px 14px">
           ${canAddProducts ? 'Matikan Izin' : 'Aktifkan Izin'}
         </button>

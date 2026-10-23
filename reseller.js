@@ -106,7 +106,8 @@ function stockStateLabel(state, stock = 0) {
 function variantChip(v = {}) {
   const st = v.delivery_mode === 'preorder' ? 'preorder' : Number(v.stock || 0) > 0 ? 'ready' : 'empty';
   const label = st === 'ready' ? `Ready ${Number(v.stock || 0)}` : st === 'preorder' ? 'PO' : 'Habis';
-  return `<span class="variant-chip stock-${st}" title="${esc(v.name)} · ${label}">${esc(v.name)} · ${label}</span>`;
+  const emailNote = v.require_email ? ' · 📧' : '';
+  return `<span class="variant-chip stock-${st}" title="${esc(v.name)} · ${label}${v.require_email ? ' (Wajib Email)' : ''}">${esc(v.name)} · ${label}${emailNote}</span>`;
 }
 
 function bulkTiers(value) {
@@ -927,6 +928,7 @@ function customProductCard(p, idx = 0) {
             <h3>${esc(p.name)}</h3>
             <p>${esc(p.subtitle || p.category || 'Produk Digital')}</p>
             ${p.tag ? `<span class="tag-chip"># ${esc(String(p.tag).replace(/^#/, '').toUpperCase())}</span>` : ''}
+            ${p.require_email ? '<span class="tag-chip" style="background:rgba(124,58,237,0.15);color:var(--purple);border-color:var(--purple)">📧 BUTUH EMAIL</span>' : ''}
             <span class="tag-chip" style="background:rgba(123,227,20,0.15);color:#7be314;border-color:#7be314"># PRODUK TOKO</span>
           </div>
           <div class="product-head-actions">
@@ -1097,6 +1099,10 @@ function openCustomProduct(item = {}) {
         <option value="true" ${item.active !== 0 ? 'selected' : ''}>Aktif</option>
         <option value="false" ${item.active === 0 ? 'selected' : ''}>Nonaktif</option>
       </select></label>
+      <label>Wajibkan Input Email Pembeli<select name="require_email">
+        <option value="false" ${!item.require_email ? 'selected' : ''}>Tidak (Langsung kirim stok)</option>
+        <option value="true" ${item.require_email ? 'selected' : ''}>Ya (Wajibkan email, misal: Canva / Gemini Undangan)</option>
+      </select><small class="muted">Jika diaktifkan, bot meminta pembeli input email setelah bayar baru stok dikirim.</small></label>
       <label class="full">Deskripsi Produk<textarea name="description" rows="5" placeholder="Deskripsi lengkap produk...">${esc(item.description || '')}</textarea></label>
       <label class="full">Syarat & Ketentuan (SNK)<textarea name="terms" rows="5" placeholder="Syarat garansi, aturan klaim, dsb...">${esc(item.terms || '')}</textarea></label>
     </div>
@@ -1112,6 +1118,7 @@ function openCustomProduct(item = {}) {
       delete b.delivery_mode;
     }
     b.active = b.active === 'true';
+    b.require_email = b.require_email === 'true';
     const saved = await api(edit ? `/api/reseller/custom-products/${item.id}` : '/api/reseller/custom-products', {
       method: edit ? 'PATCH' : 'POST',
       body: b
@@ -1209,6 +1216,10 @@ function openCustomVariant(p, v = {}) {
         <option value="auto" ${v.delivery_mode !== 'preorder' ? 'selected' : ''}>AUTO (Ambil dari stok)</option>
         <option value="preorder" ${v.delivery_mode === 'preorder' ? 'selected' : ''}>PRE-ORDER</option>
       </select></label>
+      <label>Wajibkan Input Email Pembeli<select name="require_email">
+        <option value="false" ${!v.require_email ? 'selected' : ''}>Tidak (Langsung kirim stok)</option>
+        <option value="true" ${v.require_email ? 'selected' : ''}>Ya (Wajibkan email, misal: Canva / Gemini Undangan)</option>
+      </select><small class="muted">Minta email pembeli setelah bayar sebelum stok varian ini dikirim.</small></label>
       <label>Status Toko<select name="active">
         <option value="true" ${v.active !== 0 ? 'selected' : ''}>Aktif</option>
         <option value="false" ${v.active === 0 ? 'selected' : ''}>Nonaktif</option>
@@ -1220,6 +1231,7 @@ function openCustomVariant(p, v = {}) {
     ['price', 'cost'].forEach(k => b[k] = Number(b[k] || 0));
     b.bulk_prices = bulkTiers(b.bulk_prices);
     b.active = b.active === 'true';
+    b.require_email = b.require_email === 'true';
     await api(edit ? `/api/reseller/custom-variants/${v.id}` : `/api/reseller/custom-products/${parentId}/variants`, {
       method: edit ? 'PATCH' : 'POST',
       body: b
@@ -2428,23 +2440,32 @@ function renderOrdersView(filterStatus = '', search = '') {
   const st = filterStatus || ($('#orderStatus')?.value || '');
 
   const rows = state.orders.filter(o => {
-    const matchQ = !q || [o.order_ref, o.product_name, o.variant_name].some(x => String(x || '').toLowerCase().includes(q));
+    const matchQ = !q || [o.order_ref, o.product_name, o.variant_name, o.customer_email].some(x => String(x || '').toLowerCase().includes(q));
     const matchSt = !st || o.status === st;
     return matchQ && matchSt;
   });
 
-  const ordersHtml = rows.map(o => `
+  const ordersHtml = rows.map(o => {
+    const isWaitingEmail = o.status === 'paid' && o.require_email && !o.customer_email;
+    const emailRow = o.customer_email
+      ? `<div><small>📧 Email Pembeli</small><strong class="mono" style="color:var(--purple);font-size:12px">${esc(o.customer_email)}</strong></div>`
+      : (o.require_email ? `<div><small>📧 Email Pembeli</small><span style="color:#b45309;font-weight:700;font-size:11px">⏳ Menunggu input</span></div>` : '');
+    return `
     <article class="order-card">
       <div class="order-head">
         <div>
           <small>Invoice</small>
           <b class="mono">#${esc(o.order_ref || String(o.id))}</b>
         </div>
-        ${badge(o.status)}
+        <div style="display:flex;align-items:center;gap:6px">
+          ${isWaitingEmail ? '<span class="badge warn">⏳ Menunggu Email</span>' : ''}
+          ${badge(o.status)}
+        </div>
       </div>
       <div class="order-grid">
         <div><small>Produk</small><strong>${esc(o.product_name)}</strong><span>${esc(o.variant_name || 'Default')}</span></div>
         <div><small>Qty</small><strong>${o.quantity || 1}</strong></div>
+        ${emailRow}
         <div><small>Harga Jual</small><strong>${money(o.total_price)}</strong></div>
         <div><small>Modal Owner</small><strong>${money(o.cost_amount)}</strong></div>
         <div style="background:#edffdc"><small>Profit Masuk</small><strong style="color:#1a5e00">+${money(o.reseller_profit)}</strong></div>
@@ -2452,7 +2473,8 @@ function renderOrdersView(filterStatus = '', search = '') {
         <div class="wide"><small>Waktu Transaksi</small><strong>${date(o.created_at)}</strong></div>
       </div>
     </article>
-  `).join('');
+  `;
+  }).join('');
 
   const listEl = $('#orderList');
   if (listEl) {

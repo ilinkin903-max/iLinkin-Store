@@ -4,7 +4,7 @@ const $$ = (s) => [...document.querySelectorAll(s)];
 const state = {
   token: sessionStorage.getItem('ilink_reseller_token') || localStorage.getItem('ilink_reseller_token') || '',
   view: 'dashboard',
-  mainProductTab: 'custom',
+  mainProductTab: 'store',
   productTab: 'regular',
   reseller: null,
   bot: null,
@@ -12,6 +12,7 @@ const state = {
   products: [],
   freshProducts: [],
   customProducts: [],
+  canAddProducts: false,
   pendingPricing: {},
   orders: [],
   users: [],
@@ -726,6 +727,7 @@ async function loadPricing(preserveScroll = false, targetKey = null) {
   state.products = res.items || [];
   state.freshProducts = freshRes.items || [];
   state.customProducts = customRes.items || [];
+  state.canAddProducts = customRes.can_add_products !== undefined ? Boolean(customRes.can_add_products) : false;
   state.pendingPricing = {};
   updateSaveBar();
 
@@ -759,8 +761,8 @@ function categories(rows) {
 }
 
 function renderPricingView(searchFilter = '', statusFilter = 'all', categoryFilter = '') {
-  state.mainProductTab = state.mainProductTab || 'custom';
-  if (state.mainProductTab === 'custom') {
+  state.mainProductTab = state.mainProductTab || 'store';
+  if (state.mainProductTab === 'store') {
     renderCustomProductView(searchFilter, statusFilter, categoryFilter);
   } else {
     renderProductCatalogView(searchFilter, statusFilter, categoryFilter);
@@ -783,7 +785,7 @@ function renderCustomProductView(searchFilter = '', statusFilter = 'all', catego
 
   const toolbarHtml = `
     <div class="toolbar product-toolbar">
-      <div class="searchbox"><input id="customProductSearch" placeholder="Cari nama produk, kode, atau varian..." value="${esc(q)}" /></div>
+      <div class="searchbox"><input id="customProductSearch" placeholder="Cari nama produk toko, kode, atau varian..." value="${esc(q)}" /></div>
       <select id="customProductCategory">
         <option value="">Semua Kategori</option>
         ${categories(state.customProducts || [])}
@@ -796,16 +798,20 @@ function renderCustomProductView(searchFilter = '', statusFilter = 'all', catego
     </div>
   `;
 
+  const emptyNote = state.canAddProducts
+    ? 'Anda dapat menambahkan produk digital sendiri dengan menekan tombol <b>＋ Tambah Produk</b> di atas.'
+    : 'Fitur penambahan produk toko sendiri saat ini belum diaktifkan oleh Owner.';
+
   const gridHtml = filtered.length
     ? filtered.map((p, idx) => customProductCard(p, idx)).join('')
     : `<div class="empty-product">
-        <h3>${(state.customProducts || []).length ? 'Tidak ada produk yang cocok' : 'Belum Ada Produk Reseller'}</h3>
-        <p>${(state.customProducts || []).length ? 'Coba ubah kata kunci pencarian atau filter status.' : 'Anda dapat menambahkan produk digital sendiri dengan menekan tombol <b>＋ Tambah Produk</b> di atas.'}</p>
+        <h3>${(state.customProducts || []).length ? 'Tidak ada produk yang cocok' : 'Belum Ada Produk Toko'}</h3>
+        <p>${(state.customProducts || []).length ? 'Coba ubah kata kunci pencarian atau filter status.' : emptyNote}</p>
       </div>`;
 
   const existingGrid = $('#customProductGrid');
   const renderedMainView = $('#content')?.dataset?.mainProductView;
-  if (existingGrid && renderedMainView === 'custom') {
+  if (existingGrid && renderedMainView === 'store') {
     existingGrid.innerHTML = gridHtml;
     bindCustomProductActions();
     return;
@@ -813,24 +819,37 @@ function renderCustomProductView(searchFilter = '', statusFilter = 'all', catego
 
   const contentEl = $('#content');
   if (contentEl) {
-    contentEl.dataset.mainProductView = 'custom';
+    contentEl.dataset.mainProductView = 'store';
     delete contentEl.dataset.activeProductTab;
   }
+
+  const addBtnHtml = state.canAddProducts
+    ? '<button id="addCustomProduct" class="neo-btn purple">＋ Tambah Produk</button>'
+    : '<button id="addCustomProductDisabled" class="neo-btn white small" style="opacity:0.6;cursor:not-allowed;" title="Fitur tambah produk dinonaktifkan oleh Owner">🔒 Tambah Produk Nonaktif</button>';
+
+  const disabledBannerHtml = !state.canAddProducts ? `
+    <div class="info-note" style="margin-bottom:14px;background:#fff1f2;border-color:#f43f5e;color:#881337;">
+      <b>🔒 Fitur Tambah Produk Toko Nonaktif:</b> Owner belum mengaktifkan izin bagi reseller untuk menambahkan produk toko sendiri. Hubungi Owner jika Anda membutuhkan penambahan produk baru. Anda tetap dapat mengaktifkan & menjual produk dari katalog owner pada tab <b>📦 Produk Reseller</b>.
+    </div>
+  ` : '';
+
   $('#content').innerHTML = `
     <div class="section-title product-section-title">
       <div>
-        <h2>📦 Produk Reseller</h2>
-        <p>Tambah dan kelola produk digital Anda sendiri, varian, harga jual, SNK, dan stok penjualan bot Anda.</p>
+        <h2>🏬 Produk Toko</h2>
+        <p>Tambah dan kelola produk digital toko Anda sendiri, varian, harga jual, SNK, dan stok penjualan bot Anda.</p>
       </div>
       <span>
-        <button id="addCustomProduct" class="neo-btn purple">＋ Tambah Produk</button>
+        ${addBtnHtml}
       </span>
     </div>
 
     <div class="tabs main-product-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
-      <button class="tab-btn active" data-main-product-tab="custom" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">📦 Produk Reseller (${(state.customProducts || []).length})</button>
-      <button class="tab-btn" data-main-product-tab="store" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">🏬 Produk Toko (${(state.products || []).length + (state.freshProducts || []).length})</button>
+      <button class="tab-btn active" data-main-product-tab="store" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">🏬 Produk Toko (${(state.customProducts || []).length})</button>
+      <button class="tab-btn" data-main-product-tab="reseller" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">📦 Produk Reseller (${(state.products || []).length + (state.freshProducts || []).length})</button>
     </div>
+
+    ${disabledBannerHtml}
 
     ${toolbarHtml}
 
@@ -848,6 +867,7 @@ function renderCustomProductView(searchFilter = '', statusFilter = 'all', catego
   if ($('#customProductCategory')) $('#customProductCategory').onchange = onFilter;
   if ($('#customProductStatus')) $('#customProductStatus').onchange = onFilter;
   if ($('#addCustomProduct')) $('#addCustomProduct').onclick = () => openCustomProduct();
+  if ($('#addCustomProductDisabled')) $('#addCustomProductDisabled').onclick = () => toast('Fitur tambah produk toko sendiri sedang dinonaktifkan oleh Owner.', true);
 
   $$('[data-main-product-tab]').forEach(btn => {
     btn.onclick = () => {
@@ -882,7 +902,7 @@ function customProductCard(p, idx = 0) {
             <h3>${esc(p.name)}</h3>
             <p>${esc(p.subtitle || p.category || 'Produk Digital')}</p>
             ${p.tag ? `<span class="tag-chip"># ${esc(String(p.tag).replace(/^#/, '').toUpperCase())}</span>` : ''}
-            <span class="tag-chip" style="background:rgba(123,227,20,0.15);color:#7be314;border-color:#7be314"># PRODUK RESELLER</span>
+            <span class="tag-chip" style="background:rgba(123,227,20,0.15);color:#7be314;border-color:#7be314"># PRODUK TOKO</span>
           </div>
           <div class="product-head-actions">
             <span class="stock-state-pill ${stockState}">${stockText}</span>
@@ -928,7 +948,7 @@ function bindCustomProductActions() {
   $$('[data-delete-custom-product]').forEach(b => {
     b.onclick = () => remove(
       `/api/reseller/custom-products/${b.dataset.deleteCustomProduct}`,
-      'Hapus produk reseller beserta varian dan stoknya?',
+      'Hapus produk toko beserta varian dan stoknya?',
       () => reloadCustomProducts()
     );
   });
@@ -959,7 +979,10 @@ async function reloadCustomProducts(targetProductId = null) {
   const statusVal = $('#customProductStatus')?.value || '';
   const r = await api('/api/reseller/custom-products');
   state.customProducts = r.items || [];
-  if (state.view === 'pricing' && state.mainProductTab === 'custom') {
+  if (r.can_add_products !== undefined) {
+    state.canAddProducts = Boolean(r.can_add_products);
+  }
+  if (state.view === 'pricing' && state.mainProductTab === 'store') {
     renderCustomProductView(searchVal, statusVal, catVal);
     if (targetProductId) {
       const targetCard = $(`[data-custom-product-card="${targetProductId}"]`);
@@ -1008,7 +1031,11 @@ function customVariantEditorHtml(item) {
 }
 
 function openCustomProduct(item = {}) {
-  const edit = !!item.id, hasVariants = Array.isArray(item.variants) && item.variants.length > 0;
+  const edit = !!item.id;
+  if (!edit && !state.canAddProducts) {
+    return toast('Fitur tambah produk toko sendiri sedang dinonaktifkan oleh Owner.', true);
+  }
+  const hasVariants = Array.isArray(item.variants) && item.variants.length > 0;
   const defaultSettings = hasVariants ?
     `<div class="full info-note variant-default-hidden-note"><b>Produk memakai varian.</b><br>Harga, modal, harga bulk, mode pengiriman, dan stok Default disembunyikan. Atur seluruh nilai jual melalui masing-masing varian agar tidak ada dua sumber konfigurasi.</div>` :
     `<label>Harga Jual Default<input name="price" type="number" min="0" value="${Number(item.price || 0)}" required></label>
@@ -1019,7 +1046,7 @@ function openCustomProduct(item = {}) {
        <option value="preorder" ${item.delivery_mode === 'preorder' ? 'selected' : ''}>PRE-ORDER</option>
      </select></label>`;
 
-  modal(edit ? 'Edit Produk Reseller' : 'Tambah Produk Reseller', `
+  modal(edit ? 'Edit Produk Toko' : 'Tambah Produk Toko', `
     <div class="form-grid product-form">
       <label>Kode Produk<input name="code" required value="${esc(item.display_code || item.code || '')}" placeholder="Contoh: VIP1"></label>
       <label>Nama Produk<input name="name" required value="${esc(item.name || '')}" placeholder="Contoh: Akun Canva Pro"></label>
@@ -1353,7 +1380,7 @@ function renderProductCatalogView(searchFilter = '', statusFilter = 'all', categ
   }
 
   // In-place update if shell and active tab already exist
-  if (existingGrid && renderedMainView === 'store' && renderedTab === activeTab) {
+  if (existingGrid && renderedMainView === 'reseller' && renderedTab === activeTab) {
     existingGrid.innerHTML = gridHtml;
     bindCatalogActions();
     return;
@@ -1361,23 +1388,21 @@ function renderProductCatalogView(searchFilter = '', statusFilter = 'all', categ
 
   const contentEl = $('#content');
   if (contentEl) {
-    contentEl.dataset.mainProductView = 'store';
+    contentEl.dataset.mainProductView = 'reseller';
     contentEl.dataset.activeProductTab = activeTab;
   }
   $('#content').innerHTML = `
     <div class="section-title product-section-title">
       <div>
-        <h2>🏬 Produk Toko</h2>
+        <h2>📦 Produk Reseller</h2>
         <p>Katalog produk dari toko owner. Sesuaikan margin keuntungan dan aktifkan produk yang ingin dijual di bot Anda.</p>
       </div>
-      <span>
-        <button id="btnOpenBulkModal" class="neo-btn purple">⚡ Markup Massal</button>
-      </span>
+      <span></span>
     </div>
 
     <div class="tabs main-product-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
-      <button class="tab-btn" data-main-product-tab="custom" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">📦 Produk Reseller (${(state.customProducts || []).length})</button>
-      <button class="tab-btn active" data-main-product-tab="store" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">🏬 Produk Toko (${(state.products || []).length + (state.freshProducts || []).length})</button>
+      <button class="tab-btn" data-main-product-tab="store" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">🏬 Produk Toko (${(state.customProducts || []).length})</button>
+      <button class="tab-btn active" data-main-product-tab="reseller" style="width:100%;text-align:center;padding:12px 10px;font-size:14px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:8px;">📦 Produk Reseller (${(state.products || []).length + (state.freshProducts || []).length})</button>
     </div>
 
     <div class="tabs product-tabs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
@@ -1401,7 +1426,6 @@ function renderProductCatalogView(searchFilter = '', statusFilter = 'all', categ
   if ($('#productSearch')) $('#productSearch').oninput = onFilter;
   if ($('#productCategory')) $('#productCategory').onchange = onFilter;
   if ($('#productStatus')) $('#productStatus').onchange = onFilter;
-  if ($('#btnOpenBulkModal')) $('#btnOpenBulkModal').onclick = showBulkMarkupModal;
 
   // Sub-tabs
   $$('[data-product-tab]').forEach(btn => {
@@ -2061,97 +2085,6 @@ function openFreshProductModal(r) {
       };
     }
   }
-}
-
-// Bulk Markup Modal
-function showBulkMarkupModal() {
-  const html = `
-    <div class="form-grid">
-      <label>
-        Target Produk
-        <select name="bulk_target" id="bulkTarget">
-          <option value="all">Semua Produk (Reguler & Fresh)</option>
-          <option value="regular">Hanya Produk Reguler</option>
-          <option value="fresh">Hanya Produk Fresh</option>
-        </select>
-      </label>
-      <label>
-        Mode Markup
-        <select name="bulk_mode" id="bulkMarkupMode">
-          <option value="fixed">Tambah Nominal Tetap (Rp)</option>
-          <option value="percent">Tambah Persentase (%)</option>
-        </select>
-      </label>
-      <label class="full">
-        Nilai Tambahan Margin
-        <input name="bulk_value" id="bulkMarkupVal" type="number" min="0" value="2000" placeholder="Contoh: 2000" required />
-      </label>
-      <div class="full info-note">
-        💡 Nilai margin ini dihitung di atas <b>Modal Owner</b>. Perubahan akan langsung disimpan ke sistem bot toko Anda.
-      </div>
-    </div>
-  `;
-
-  modal('⚡ Markup Margin Massal', html, async (data) => {
-    const target = data.bulk_target || 'all';
-    const mode = data.bulk_mode;
-    const val = Number(data.bulk_value || 0);
-    const patch = {};
-
-    if (target === 'all' || target === 'regular') {
-      state.products.forEach(p => {
-        if (Array.isArray(p.variants) && p.variants.length) {
-          p.variants.forEach(v => {
-            const vKey = `${p.code}:v${v.id}`;
-            const margin = mode === 'percent' ? Math.round(v.owner_price * val / 100) : val;
-            patch[vKey] = {
-              ...(state.bot?.pricing_overrides?.[vKey] || {}),
-              margin,
-              sell_price: v.owner_price + margin
-            };
-          });
-        } else {
-          const margin = mode === 'percent' ? Math.round(p.owner_price * val / 100) : val;
-          patch[p.code] = {
-            ...(state.bot?.pricing_overrides?.[p.code] || {}),
-            margin,
-            sell_price: p.owner_price + margin
-          };
-        }
-      });
-    }
-
-    if (target === 'all' || target === 'fresh') {
-      state.freshProducts.forEach(r => {
-        const itemKey = `FRESH:${r.product_key}`;
-        if (Array.isArray(r.price_options) && r.price_options.length > 1) {
-          r.price_options.forEach(opt => {
-            const margin = mode === 'percent' ? Math.round(opt.owner_price * val / 100) : val;
-            patch[opt.key] = {
-              ...(state.bot?.pricing_overrides?.[opt.key] || {}),
-              margin,
-              sell_price: opt.owner_price + margin
-            };
-          });
-        } else {
-          const margin = mode === 'percent' ? Math.round(r.owner_price * val / 100) : val;
-          patch[itemKey] = {
-            ...(state.bot?.pricing_overrides?.[itemKey] || {}),
-            margin,
-            sell_price: r.owner_price + margin
-          };
-        }
-      });
-    }
-
-    await api('/api/reseller/products/pricing', {
-      method: 'POST',
-      body: { pricing_overrides: patch }
-    });
-
-    toast(`Markup massal berhasil diterapkan dan disimpan!`);
-    await loadPricing(true);
-  }, { submit: 'Terapkan & Simpan' });
 }
 
 // ---------------------------------------------------------------------

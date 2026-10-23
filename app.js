@@ -1147,6 +1147,8 @@ async function renderResellersList(host) {
   const regFee = Math.max(0, Number(s.reseller_registration_fee || 0));
   const regEnabled = s.reseller_registration_enabled !== false;
 
+  const canAddProducts = Boolean(s.reseller_can_add_products);
+
   const oldSearch = $('#resellerSearch')?.value || '';
   const oldStatus = $('#resellerStatusFilter')?.value || '';
 
@@ -1165,7 +1167,22 @@ async function renderResellersList(host) {
       </div>
     </div>
 
-    <div class="toolbar product-toolbar" style="margin-bottom:14px;">
+    <div class="reseller-fee-card" style="margin-top:10px">
+      <div class="reseller-fee-info">
+        <div class="reseller-fee-title">
+          <strong>🏬 Izin Tambah Produk Toko Sendiri (Reseller)</strong>
+          <span class="badge ${canAddProducts ? 'ok' : 'bad'}">${canAddProducts ? '🟢 Aktif' : '🔴 Nonaktif (Default)'}</span>
+        </div>
+        <small style="color:var(--muted);font-weight:700">Izinkan mitra reseller menambahkan dan mengelola produk toko mereka sendiri (stok, varian, dan harga custom). Default: Nonaktif.</small>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-left:auto">
+        <button type="button" class="neo-btn ${canAddProducts ? 'red' : 'green'}" id="toggleResellerAddProductBtn" style="font-size:13px;padding:8px 14px">
+          ${canAddProducts ? 'Matikan Izin' : 'Aktifkan Izin'}
+        </button>
+      </div>
+    </div>
+
+    <div class="toolbar product-toolbar" style="margin-bottom:14px;margin-top:14px;">
       <div class="searchbox"><input id="resellerSearch" placeholder="Cari nama, username, telegram ID..." value="${esc(oldSearch)}"></div>
       <select id="resellerStatusFilter">
         <option value="" ${oldStatus === '' ? 'selected' : ''}>Semua Status</option>
@@ -1180,6 +1197,32 @@ async function renderResellersList(host) {
     </div>
     <div id="resellersCardGrid" class="reseller-grid"></div>
   `;
+
+  const toggleAddBtn = $('#toggleResellerAddProductBtn');
+  if (toggleAddBtn) {
+    toggleAddBtn.onclick = async () => {
+      const nextState = !canAddProducts;
+      toggleAddBtn.disabled = true;
+      try {
+        const res = await api('/api/admin/settings', {
+          method: 'PATCH',
+          body: { reseller_can_add_products: nextState }
+        });
+        if (state.cache) {
+          state.cache.settings = res?.settings || {
+            ...(state.cache.settings || {}),
+            reseller_can_add_products: nextState
+          };
+        }
+        toast(`Fitur tambah produk reseller berhasil ${nextState ? 'diaktifkan' : 'dinonaktifkan'}!`);
+        await loadResellers(true);
+      } catch (e) {
+        toast(e.message, true);
+      } finally {
+        toggleAddBtn.disabled = false;
+      }
+    };
+  }
 
   $('#editResellerFeeBtn').onclick = () => {
     modal('Atur Biaya Pendaftaran Reseller', `

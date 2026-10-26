@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#6c2cff" />
   <title>iLink Auto Order - Dashboard Owner</title>
-  <link rel="stylesheet" href="/app.css?v=2.6.17" />
+  <link rel="stylesheet" href="/app.css?v=2.6.18" />
 </head>
 <body>
   <section id="loginView" class="login-screen">
@@ -59,6 +59,10 @@
         <div class="page-title"><h1 id="pageTitle">Dashboard</h1><p id="pageSubtitle">Kelola produk dan stok toko Anda</p></div>
         <div class="top-actions">
           <a id="telegramBtn" class="telegram-btn" href="#" target="_blank" rel="noreferrer">✈ Telegram Mini App</a>
+                    <button id="vpsTimerBtn" class="vps-timer-btn" type="button" title="Sisa Waktu Masa Aktif VPS (Klik untuk atur)">
+            <span class="vps-timer-icon">🖥️</span>
+            <span id="vpsTimerText" class="vps-timer-text">--h --j --m</span>
+          </button>
           <button id="notifBtn" class="square-btn notify" type="button" aria-label="Notifikasi" aria-expanded="false">🔔<span id="notifCount" class="notif-count hidden">0</span></button>
         </div>
       </header>
@@ -81,6 +85,6 @@
   </dialog>
 
   <div id="toast" class="toast"></div>
-  <script src="/app.js?v=2.6.17" defer></script>
+  <script src="/app.js?v=2.6.18" defer></script>
 </body>
 </html>

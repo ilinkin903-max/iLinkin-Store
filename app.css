@@ -1093,3 +1093,69 @@ body{overflow-x:hidden}.app-shell{min-height:100vh;display:grid;grid-template-co
 
 
 
+
+/* VPS Timer in Header Topbar */
+.vps-timer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  color: var(--ink, #1e1e2f);
+  border: 2px solid var(--ink, #1e1e2f);
+  box-shadow: 2px 2px 0 var(--ink, #1e1e2f);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  font-family: inherit;
+  line-height: 1;
+  transition: transform 0.1s, box-shadow 0.1s, background-color 0.2s;
+}
+.vps-timer-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 3px 3px 0 var(--ink, #1e1e2f);
+}
+.vps-timer-btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--ink, #1e1e2f);
+}
+.vps-timer-btn .vps-timer-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+.vps-timer-btn.normal {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #059669;
+}
+.vps-timer-btn.warning {
+  background: #fffbeb;
+  color: #92400e;
+  border-color: #d97706;
+}
+.vps-timer-btn.urgent,
+.vps-timer-btn.overdue {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #dc2626;
+  animation: vpsTimerPulse 2s infinite ease-in-out;
+}
+.vps-timer-btn.empty {
+  background: #f3f4f6;
+  color: #4b5563;
+  border-color: #9ca3af;
+}
+@keyframes vpsTimerPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+@media (max-width: 640px) {
+  .vps-timer-btn {
+    padding: 7px 9px;
+    font-size: 12px;
+    gap: 4px;
+  }
+}

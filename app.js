@@ -55,14 +55,91 @@ async function refreshNotifications(silent=true){if(!state.token)return;try{cons
 function closeNotifications(){const p=$('#notificationPanel');if(p)p.classList.add('hidden');$('#notifBtn')?.setAttribute('aria-expanded','false')}
 function toggleNotifications(){const p=$('#notificationPanel');if(!p)return;const open=p.classList.contains('hidden');p.classList.toggle('hidden',!open);$('#notifBtn')?.setAttribute('aria-expanded',open?'true':'false');if(open)refreshNotifications(false)}
 function showLogin(){$('#loginView').classList.remove('hidden');$('#appView').classList.add('hidden')}function showApp(){$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden')}function logout(show=true){state.token='';sessionStorage.removeItem('ilink_owner_token');localStorage.removeItem('ilink_owner_token');if(state.notificationTimer){clearInterval(state.notificationTimer);state.notificationTimer=null}closeNotifications();showLogin();if(show)toast('Sesi ditutup')}
-$('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginError').textContent='';try{const r=await api('/api/admin/auth/login',{method:'POST',body:{username:$('#loginUsername').value,password:$('#loginPassword').value}});state.token=r.token;sessionStorage.setItem('ilink_owner_token',r.token);localStorage.setItem('ilink_owner_token',r.token);$('#loginPassword').value='';await initialize()}catch(err){$('#loginError').textContent=err.message}};$('#logoutBtn').onclick=()=>logout();$('#refreshBtn').onclick=()=>navigate(state.view,true);$('#notifBtn').onclick=e=>{e.stopPropagation();toggleNotifications()};$('#notificationPanel').onclick=e=>e.stopPropagation();$('#notifMarkAll').onclick=async()=>{try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{all:true}});renderNotifications(r);toast('Semua notifikasi ditandai dibaca')}catch(e){toast(e.message,true)}};$('#notificationList').onclick=async e=>{const b=e.target.closest('[data-notif-key]');if(!b)return;try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{keys:[b.dataset.notifKey]}});renderNotifications(r)}catch{}closeNotifications();if(b.dataset.notifView){const parts=b.dataset.notifView.split(':');if(parts[0]==='settings'&&parts[1]){state.settingsTab=parts[1];navigate('settings');}else{navigate(b.dataset.notifView);}}};document.addEventListener('click',closeNotifications);function closeSidebar(){$('#sidebar').classList.remove('open');$('#sidebarBackdrop')?.classList.remove('show');$('#menuBtn')?.setAttribute('aria-expanded','false')}$('#menuBtn').onclick=e=>{e.stopPropagation();const open=$('#sidebar').classList.toggle('open');$('#sidebarBackdrop')?.classList.toggle('show',open);$('#menuBtn').setAttribute('aria-expanded',open?'true':'false')};$('#sidebarBackdrop').onclick=closeSidebar;document.addEventListener('click',e=>{const side=$('#sidebar'),menu=$('#menuBtn');if(side?.classList.contains('open')&&!side.contains(e.target)&&!menu?.contains(e.target))closeSidebar()});$('#nav').onclick=e=>{const b=e.target.closest('[data-view]');if(b){closeSidebar();navigate(b.dataset.view)}};
+$('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginError').textContent='';try{const r=await api('/api/admin/auth/login',{method:'POST',body:{username:$('#loginUsername').value,password:$('#loginPassword').value}});state.token=r.token;sessionStorage.setItem('ilink_owner_token',r.token);localStorage.setItem('ilink_owner_token',r.token);$('#loginPassword').value='';await initialize()}catch(err){$('#loginError').textContent=err.message}};$('#logoutBtn').onclick=()=>logout();$('#refreshBtn').onclick=()=>navigate(state.view,true);if($('#vpsTimerBtn'))$('#vpsTimerBtn').onclick=()=>{state.settingsTab='vps';navigate('settings');};
+  startVpsCountdown();
+  $('#notifBtn').onclick=e=>{e.stopPropagation();toggleNotifications()};$('#notificationPanel').onclick=e=>e.stopPropagation();$('#notifMarkAll').onclick=async()=>{try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{all:true}});renderNotifications(r);toast('Semua notifikasi ditandai dibaca')}catch(e){toast(e.message,true)}};$('#notificationList').onclick=async e=>{const b=e.target.closest('[data-notif-key]');if(!b)return;try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{keys:[b.dataset.notifKey]}});renderNotifications(r)}catch{}closeNotifications();if(b.dataset.notifView){const parts=b.dataset.notifView.split(':');if(parts[0]==='settings'&&parts[1]){state.settingsTab=parts[1];navigate('settings');}else{navigate(b.dataset.notifView);}}};document.addEventListener('click',closeNotifications);function closeSidebar(){$('#sidebar').classList.remove('open');$('#sidebarBackdrop')?.classList.remove('show');$('#menuBtn')?.setAttribute('aria-expanded','false')}$('#menuBtn').onclick=e=>{e.stopPropagation();const open=$('#sidebar').classList.toggle('open');$('#sidebarBackdrop')?.classList.toggle('show',open);$('#menuBtn').setAttribute('aria-expanded',open?'true':'false')};$('#sidebarBackdrop').onclick=closeSidebar;document.addEventListener('click',e=>{const side=$('#sidebar'),menu=$('#menuBtn');if(side?.classList.contains('open')&&!side.contains(e.target)&&!menu?.contains(e.target))closeSidebar()});$('#nav').onclick=e=>{const b=e.target.closest('[data-view]');if(b){closeSidebar();navigate(b.dataset.view)}};
 function setHeader(view){const[t,s]=titles[view]||[view,''];$('#pageTitle').textContent=t;$('#pageSubtitle').textContent=s;$$('#nav [data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))}
 async function initialize(){state.me=(await api('/api/admin/me')).user;showApp();await navigate('dashboard');await refreshNotifications();if(!state.notificationTimer)state.notificationTimer=setInterval(()=>refreshNotifications(true),60000)}
-async function vpsRenewalInfo(settings = {}) {
+async function isVpsReminderEnabled(s = {}) {
+  const v = s.vps_reminder_enabled;
+  if (v === false || v === 'false' || v === 0 || v === '0') return false;
+  return true;
+}
+
+function formatVpsDuration(renewalDateStr) {
+  if (!renewalDateStr || typeof renewalDateStr !== 'string') {
+    return { configured: false, text: 'Atur VPS', fullText: 'Jatuh tempo VPS belum diatur', stateClass: 'empty' };
+  }
+  const str = renewalDateStr.trim();
+  if (!str) return { configured: false, text: 'Atur VPS', fullText: 'Jatuh tempo VPS belum diatur', stateClass: 'empty' };
+
+  const parts = str.split('-');
+  if (parts.length < 3) return { configured: false, text: 'Atur VPS', fullText: 'Jatuh tempo VPS belum diatur', stateClass: 'empty' };
+
+  const year = Number(parts[0]);
+  const month = Number(parts[1]) - 1;
+  const day = Number(parts[2]);
+
+  const target = new Date(year, month, day, 23, 59, 59, 999);
+  const now = new Date();
+  const diffMs = target.getTime() - now.getTime();
+
+  if (diffMs < 0) {
+    const overdueMs = Math.abs(diffMs);
+    const d = Math.floor(overdueMs / 86400000);
+    const h = Math.floor((overdueMs % 86400000) / 3600000);
+    const m = Math.floor((overdueMs % 3600000) / 60000);
+    return {
+      configured: true,
+      diffMs,
+      days: -d,
+      text: `Lewat ${d}h ${String(h).padStart(2,'0')}j ${String(m).padStart(2,'0')}m`,
+      fullText: `Jatuh tempo terlewat ${d} hari ${h} jam ${m} menit yang lalu (${str})!`,
+      stateClass: 'overdue'
+    };
+  }
+
+  const d = Math.floor(diffMs / 86400000);
+  const h = Math.floor((diffMs % 86400000) / 3600000);
+  const m = Math.floor((diffMs % 3600000) / 60000);
+
+  let stateClass = 'normal';
+  if (d <= 2) stateClass = 'urgent';
+  else if (d <= 7) stateClass = 'warning';
+
+  return {
+    configured: true,
+    diffMs,
+    days: d,
+    text: `${d}h ${String(h).padStart(2,'0')}j ${String(m).padStart(2,'0')}m`,
+    fullText: `Sisa waktu VPS: ${d} hari ${h} jam ${m} menit (Jatuh tempo ${str})`,
+    stateClass
+  };
+}
+
+let vpsCountdownInterval = null;
+function updateVpsHeaderTimer() {
+  const el = $('#vpsTimerText');
+  const btn = $('#vpsTimerBtn');
+  if (!el || !btn) return;
+  const s = state.overview?.settings || state.cache.settings || {};
+  const info = formatVpsDuration(s.vps_renewal_date);
+  el.textContent = info.text;
+  btn.className = `vps-timer-btn ${info.stateClass}`;
+  btn.title = info.configured ? `${info.fullText} · Provider: ${s.vps_provider_name || 'VPS Server'} (Klik untuk atur)` : 'Tanggal jatuh tempo perpanjangan VPS belum diatur (Klik untuk atur)';
+}
+
+function startVpsCountdown() {
+  updateVpsHeaderTimer();
+  if (vpsCountdownInterval) clearInterval(vpsCountdownInterval);
+  vpsCountdownInterval = setInterval(updateVpsHeaderTimer, 30000);
+}
+
+function vpsRenewalInfo(settings = {}) {
   const vd = String(settings.vps_renewal_date || '').trim();
   const provider = String(settings.vps_provider_name || 'VPS Server').trim() || 'VPS Server';
   const cost = Number(settings.vps_cost || 0);
-  const enabled = settings.vps_reminder_enabled !== false;
+  const enabled = isVpsReminderEnabled(settings);
   if (!vd) {
     return {
       configured: false,
@@ -118,7 +195,7 @@ async function vpsRenewalInfo(settings = {}) {
 }
 async function navigate(view){
   if(view&&typeof view==='string'&&view.startsWith('settings:')){state.settingsTab=view.split(':')[1];view='settings';}if(state.broadcastPollTimer){clearInterval(state.broadcastPollTimer);state.broadcastPollTimer=null;}state.view=view;closeNotifications();setHeader(view);$('#content').innerHTML='<div class="empty-product">Memuat data...</div>';try{await({dashboard:loadDashboard,products:loadProducts,fresh:loadFresh,orders:loadOrders,invitations:loadInvitations,promotions:loadPromotions,reports:loadReports,coupons:loadCoupons,settings:loadSettings,bot:loadBot,broadcast:loadBroadcast,users:loadUsers,resellers:loadResellers}[view]||loadDashboard)();$('#lastUpdated').textContent='Terakhir diperbarui: '+new Date().toLocaleString('id-ID');refreshNotifications(true)}catch(e){$('#content').innerHTML=`<div class="empty-product">${esc(e.message)}</div>`;toast(e.message,true)}}
-function applyShell(r){const s=r.settings||{};const o=r.stats||{};state.overview=r;$('#brandName').innerHTML=esc(String(s.store_name||'AUTO ORDER')).replace(/\s+/g,'<br>');$('#brandTagline').textContent=s.store_tagline||'Digital Store';$('#ownerName').textContent=s.owner_display_name||state.me?.display_name||'Owner';$('#ownerUsername').textContent='@'+String(s.owner_username||state.me?.owner_username||'owneradmin').replace(/^@/,'');const metric=String(s.store_balance_metric||o.store_balance_metric||'month_profit');const metricMap={month_profit:['Profit Bulan Ini',o.month_profit],month_revenue:['Omzet Bulan Ini',o.month_revenue],today_profit:['Profit Hari Ini',o.today_profit],today_revenue:['Omzet Hari Ini',o.today_revenue],manual:['Saldo Manual',s.store_balance??o.store_balance]};const selected=metricMap[metric]||metricMap.month_profit;$('#storeBalanceLabel').textContent=selected[0];$('#storeBalance').textContent=money(selected[1]||0);const badgeEl=$('#orderBadge');const pending=Number(o.pending_orders||0);badgeEl.textContent=pending;badgeEl.classList.toggle('hidden',pending<1);const resBadgeEl=$('#resellerBadge');if(resBadgeEl){api('/api/admin/resellers/overview').then(ro=>{const pWd=Number(ro?.stats?.pending_withdrawals||0);const pRes=Number(ro?.stats?.pending_resellers||0);const pTotal=pWd+pRes;resBadgeEl.textContent=pTotal;resBadgeEl.classList.toggle('hidden',pTotal<1);}).catch(()=>null);}const username=state.overview?.bot?.username;$('#telegramBtn').href=username?`https://t.me/${username}`:'#';$('#telegramBtn').textContent='✈ Telegram Mini App';$('#systemSafe').textContent=state.overview?.bot?.running?'Semua sistem berjalan dengan aman':'Dashboard aktif · Bot Telegram offline'}
+function applyShell(r){const s=r.settings||{};const o=r.stats||{};state.overview=r;if(r.settings)state.cache.settings=Object.assign({},state.cache.settings||{},r.settings);updateVpsHeaderTimer();$('#brandName').innerHTML=esc(String(s.store_name||'AUTO ORDER')).replace(/\s+/g,'<br>');$('#brandTagline').textContent=s.store_tagline||'Digital Store';$('#ownerName').textContent=s.owner_display_name||state.me?.display_name||'Owner';$('#ownerUsername').textContent='@'+String(s.owner_username||state.me?.owner_username||'owneradmin').replace(/^@/,'');const metric=String(s.store_balance_metric||o.store_balance_metric||'month_profit');const metricMap={month_profit:['Profit Bulan Ini',o.month_profit],month_revenue:['Omzet Bulan Ini',o.month_revenue],today_profit:['Profit Hari Ini',o.today_profit],today_revenue:['Omzet Hari Ini',o.today_revenue],manual:['Saldo Manual',s.store_balance??o.store_balance]};const selected=metricMap[metric]||metricMap.month_profit;$('#storeBalanceLabel').textContent=selected[0];$('#storeBalance').textContent=money(selected[1]||0);const badgeEl=$('#orderBadge');const pending=Number(o.pending_orders||0);badgeEl.textContent=pending;badgeEl.classList.toggle('hidden',pending<1);const resBadgeEl=$('#resellerBadge');if(resBadgeEl){api('/api/admin/resellers/overview').then(ro=>{const pWd=Number(ro?.stats?.pending_withdrawals||0);const pRes=Number(ro?.stats?.pending_resellers||0);const pTotal=pWd+pRes;resBadgeEl.textContent=pTotal;resBadgeEl.classList.toggle('hidden',pTotal<1);}).catch(()=>null);}const username=state.overview?.bot?.username;$('#telegramBtn').href=username?`https://t.me/${username}`:'#';$('#telegramBtn').textContent='✈ Telegram Mini App';$('#systemSafe').textContent=state.overview?.bot?.running?'Semua sistem berjalan dengan aman':'Dashboard aktif · Bot Telegram offline'}
 function stat(icon,color,label,value,small){return`<div class="stat-card"><div class="stat-icon ${color}">${icon}</div><div><small>${esc(label)}</small><strong>${esc(value)}</strong><em>${esc(small)}</em></div></div>`}
 function productStockState(p={}){const all=Array.isArray(p.variants)?p.variants:[],vars=all.filter(v=>v.active);if(all.length){if(vars.some(v=>v.delivery_mode!=='preorder'&&Number(v.stock||0)>0))return'ready';if(vars.some(v=>v.delivery_mode==='preorder'))return'preorder';return'empty'}if(p.delivery_mode==='preorder'&&Number(p.stock||0)<1)return'preorder';return Number(p.sale_stock??p.stock??0)>0?'ready':'empty'}
 function stockStateLabel(state,stock=0){return state==='ready'?`READY · ${Number(stock||0)}`:state==='preorder'?'PRE-ORDER':'HABIS'}
@@ -151,7 +228,6 @@ async function loadDashboard(){
   applyShell(overview);
   const d=dash.data||{},t=d.today||{},daily=d.last7||[],top=d.top_products||[];
   const max=Math.max(1,...daily.map(x=>Number(x.revenue||0)));
-  const vps=vpsRenewalInfo(overview.settings||state.cache.settings||{});
   $('#content').innerHTML=`
     <div class="dashboard-kpis">
       ${stat('📈','pink','Omset Hari Ini',money(t.revenue),'Penjualan selesai hari ini')}
@@ -159,38 +235,10 @@ async function loadDashboard(){
       ${stat('🛒','purple','Total Order',t.orders||0,'Order hari ini')}
       ${stat('📦','yellow','Total Stok',d.total_stock||0,'Stok siap kirim')}
     </div>
-    <div class="vps-dashboard-card report-card" style="margin-top:14px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;background:var(--card-bg,#fff);border:2px solid var(--ink);border-radius:14px;box-shadow:3px 3px 0 var(--ink)">
-      <div style="display:flex;align-items:center;gap:12px;min-width:240px">
-        <div style="font-size:26px;line-height:1;width:44px;height:44px;display:grid;place-items:center;background:#f0eaff;border:2px solid var(--ink);border-radius:10px;flex-shrink:0">🖥️</div>
-        <div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <b style="font-size:15px">Pengingat VPS: ${esc(vps.provider)}</b>
-            ${vps.badgeHtml}
-          </div>
-          <small style="display:block;margin-top:3px;color:var(--muted);font-size:12px">
-            ${esc(vps.text)} · Biaya: <b>${vps.cost ? money(vps.cost) : 'Rp 0'}</b> · Pengingat Telegram: <b>${vps.enabled ? 'Aktif' : 'Nonaktif'}</b>
-          </small>
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <button type="button" class="neo-btn white small" id="dashOpenVpsBtn">⚙️ Atur VPS</button>
-        <button type="button" class="neo-btn yellow small" id="dashRenewVpsBtn">✅ +30 Hari</button>
-      </div>
-    </div>
     <div class="dashboard-grid" style="margin-top:14px">
       <section class="report-card chart-card"><div class="card-heading"><div><h3>📊 Grafik 7 Hari Terakhir</h3></div></div><div class="seven-chart">${daily.map(x=>{const h=Math.max(5,Math.round(Number(x.revenue||0)/max*100));const lbl=new Date(x.day+'T00:00:00').toLocaleDateString('id-ID',{day:'2-digit',month:'short'});return `<div class="day-col"><div class="day-value">${Number(x.revenue||0)?money(x.revenue):'Rp 0'}</div><div class="day-track"><div class="day-bar" style="height:${h}%"></div></div><div class="day-label">${esc(lbl)}</div></div>`}).join('')}</div></section>
       <section class="report-card top-products-card"><div class="card-heading"><div><h3>🏆 Produk Terlaris</h3><p>Berdasarkan jumlah item 7 hari terakhir</p></div></div><div class="top-list">${top.length?top.map((x,i)=>`<div class="top-item"><span class="rank">${i+1}</span><div><b>${esc(x.product_name||'-')}</b><small>${x.qty||0} item · ${x.orders||0} order</small></div><strong>${money(x.revenue)}</strong></div>`).join(''):'<div class="empty compact">Belum ada transaksi 7 hari terakhir.</div>'}</div></section>
     </div>`;
-  if($('#dashOpenVpsBtn'))$('#dashOpenVpsBtn').onclick=()=>{state.settingsTab='vps';navigate('settings');};
-  if($('#dashRenewVpsBtn'))$('#dashRenewVpsBtn').onclick=async()=>{
-    try{
-      const res=await api('/api/admin/system/vps-renew-30',{method:'POST'});
-      if(state.cache.settings)state.cache.settings.vps_renewal_date=res.vps_renewal_date;
-      if(state.overview?.settings)state.overview.settings.vps_renewal_date=res.vps_renewal_date;
-      toast(res.message||'Jatuh tempo VPS berhasil diperpanjang +30 hari!');
-      loadDashboard();
-    }catch(err){toast(err.message,true);}
-  };
 }
 function categories(rows){return[...new Set(rows.map(x=>x.category).filter(Boolean))].sort().map(x=>`<option>${esc(x)}</option>`).join('')}function renderProductCards(rows){return rows.length?rows.map(productCard).join(''):'<div class="empty-product"><h3>Belum ada produk</h3><p>Tekan Tambah Produk untuk membuat katalog pertama.</p></div>'}async function loadProducts(){
   const r=await api('/api/admin/products?limit=500');state.cache.products=r.items||[];
@@ -835,7 +883,7 @@ function renderSettings(){
   const qrisCard=(value,icon,title,desc)=>`<label class="qris-mode-card ${qrisMode===value?'selected':''}"><input type="radio" name="autogopay_payment_method" value="${value}" ${qrisMode===value?'checked':''}><span class="qris-mode-icon">${icon}</span><b>${title}</b><small>${desc}</small><button type="button" class="neo-btn white tiny" data-check-qris="${value}">Cek Status</button><div id="qrisStatus-${value}" class="qris-status"></div></label>`;
   let body='';
   if(state.settingsTab==='store')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>🏪 Toko & Owner</h3><p>Identitas toko, owner, dan metrik sidebar.</p></div></div><form id="storeSettingsForm" class="form-grid"><label>Nama Store<input name="store_name" value="${esc(x.store_name||'iLink Auto Order')}"></label><label>Tagline<input name="store_tagline" value="${esc(x.store_tagline||'Digital Store')}"></label><label>Nama Owner<input name="owner_display_name" value="${esc(x.owner_display_name||'Owner')}"></label><label>Username Owner<input name="owner_username" value="${esc(x.owner_username||'owneradmin')}"></label><label>Metrik Sidebar<select name="store_balance_metric"><option value="month_profit" ${metric==='month_profit'?'selected':''}>Profit Bulan Ini</option><option value="month_revenue" ${metric==='month_revenue'?'selected':''}>Omzet Bulan Ini</option><option value="today_profit" ${metric==='today_profit'?'selected':''}>Profit Hari Ini</option><option value="today_revenue" ${metric==='today_revenue'?'selected':''}>Omzet Hari Ini</option><option value="manual" ${metric==='manual'?'selected':''}>Saldo Manual</option></select></label><label>Saldo Manual<input name="store_balance" type="number" value="${Number(x.store_balance||0)}"><small>Hanya dipakai bila Metrik Sidebar = Saldo Manual.</small></label><label>Tampilkan Total User<select name="show_total_users"><option value="true" ${x.show_total_users!==false?'selected':''}>Ya</option><option value="false" ${x.show_total_users===false?'selected':''}>Tidak</option></select></label><label class="full">Catatan Dashboard<textarea name="dashboard_note">${esc(x.dashboard_note||'')}</textarea></label><div class="full form-actions"><button class="neo-btn purple" type="submit">Simpan Toko</button></div></form></section>`;
-  else if(state.settingsTab==='vps'){const v=vpsRenewalInfo(x);body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>🖥️ Pengingat Perpanjangan VPS</h3><p>Catat tanggal jatuh tempo perpanjangan VPS server agar sistem mengirimkan pengingat ke Telegram Owner dan dashboard MiniApp.</p></div>${v.badgeHtml}</div><form id="vpsReminderForm" class="form-grid"><label>Nama Provider VPS<input name="vps_provider_name" value="${esc(x.vps_provider_name||'')}" placeholder="Contoh: Contabo, Hostinger, Biznet, Reviactyl"><small>Penyedia VPS atau server tempat bot aktif.</small></label><label>Tanggal Jatuh Tempo Perpanjangan<input name="vps_renewal_date" type="date" value="${esc(x.vps_renewal_date||'')}"><small>Tanggal batas akhir periode sewa server.</small></label><label>Biaya Perpanjangan (Rp)<input name="vps_cost" type="number" min="0" value="${Number(x.vps_cost||0)}" placeholder="Contoh: 150000"><small>Nominal tagihan perpanjangan.</small></label><label>Pengingat Otomatis ke Telegram<select name="vps_reminder_enabled"><option value="true" ${x.vps_reminder_enabled!==false?'selected':''}>Aktif (H-7, H-5, H-3, H-2, H-1, Hari H)</option><option value="false" ${x.vps_reminder_enabled===false?'selected':''}>Nonaktif</option></select><small>Peringatan berkala otomatis ke Telegram Owner.</small></label><div class="full info-note"><b>💡 Panduan Fitur Pengingat VPS:</b><br>• <b>Telegram Otomatis:</b> Bot memeriksa tanggal jatuh tempo secara berkala dan mengirim peringatan ke Telegram Owner saat H-7, H-5, H-3, H-2, H-1, dan hari H.<br>• <b>MiniApp & Dashboard:</b> Lonceng notifikasi 🔔 dan widget Dashboard otomatis menampilkan status sisa hari & peringatan darurat.<br>• <b>Tombol +30 Hari:</b> Klik tombol kuning <b>✅ Sudah Diperpanjang (+30 Hari)</b> setelah Anda selesai membayar sewa VPS untuk langsung memajukan tanggal jatuh tempo 1 bulan (30 hari) ke depan secara instan.</div><div class="full form-actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="neo-btn purple" type="submit">💾 Simpan Pengaturan VPS</button><button id="renewVps30Btn" class="neo-btn yellow" type="button">✅ Sudah Diperpanjang (+30 Hari)</button></div></form></section>`;}
+  else if(state.settingsTab==='vps'){const v=vpsRenewalInfo(x);body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>🖥️ Pengingat Perpanjangan VPS</h3><p>Catat tanggal jatuh tempo perpanjangan VPS server agar sistem mengirimkan pengingat ke Telegram Owner dan dashboard MiniApp.</p></div>${v.badgeHtml}</div><form id="vpsReminderForm" class="form-grid"><label>Nama Provider VPS<input name="vps_provider_name" value="${esc(x.vps_provider_name||'')}" placeholder="Contoh: Contabo, Hostinger, Biznet, Reviactyl"><small>Penyedia VPS atau server tempat bot aktif.</small></label><label>Tanggal Jatuh Tempo Perpanjangan<input name="vps_renewal_date" type="date" value="${esc(x.vps_renewal_date||'')}"><small>Tanggal batas akhir periode sewa server.</small></label><label>Biaya Perpanjangan (Rp)<input name="vps_cost" type="number" min="0" value="${Number(x.vps_cost||0)}" placeholder="Contoh: 150000"><small>Nominal tagihan perpanjangan.</small></label><label>Pengingat Otomatis ke Telegram<select name="vps_reminder_enabled"><option value="true" ${isVpsReminderEnabled(x)?'selected':''}>🟢 Aktif (H-7, H-5, H-3, H-2, H-1, Hari H)</option><option value="false" ${!isVpsReminderEnabled(x)?'selected':''}>🔴 Nonaktif</option></select><small>Peringatan berkala otomatis ke Telegram Owner.</small></label><div class="full info-note"><b>💡 Panduan Fitur Pengingat VPS:</b><br>• <b>Telegram Otomatis:</b> Bot memeriksa tanggal jatuh tempo secara berkala dan mengirim peringatan ke Telegram Owner saat H-7, H-5, H-3, H-2, H-1, dan hari H.<br>• <b>MiniApp & Dashboard:</b> Lonceng notifikasi 🔔 dan widget Dashboard otomatis menampilkan status sisa hari & peringatan darurat.<br>• <b>Tombol +30 Hari:</b> Klik tombol kuning <b>✅ Sudah Diperpanjang (+30 Hari)</b> setelah Anda selesai membayar sewa VPS untuk langsung memajukan tanggal jatuh tempo 1 bulan (30 hari) ke depan secara instan.</div><div class="full form-actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="neo-btn purple" type="submit">💾 Simpan Pengaturan VPS</button><button id="renewVps30Btn" class="neo-btn yellow" type="button">✅ Sudah Diperpanjang (+30 Hari)</button></div></form></section>`;}
   else if(state.settingsTab==='referral')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>👥 Referral</h3><p>Atur program referral dan bonus saldo untuk pengundang.</p></div></div><form id="referralSettingsForm" class="form-grid"><label>Status Referral<select name="referral_enabled"><option value="true" ${x.referral_enabled!==false?'selected':''}>Aktif</option><option value="false" ${x.referral_enabled===false?'selected':''}>Nonaktif</option></select></label><label>Bonus per Referral<input name="referral_reward_amount" type="number" min="0" value="${Number(x.referral_reward_amount||0)}"></label><div class="full info-note">Bonus diberikan ke saldo referral sesuai mekanisme pendaftaran referral bot. User dapat melihat link referral dari menu Saldo & Referral.</div><div class="full form-actions"><button class="neo-btn purple" type="submit">Simpan Referral</button></div></form></section>`;
   else if(state.settingsTab==='topup')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>➕ TopUp & Saldo</h3><p>Atur TopUp QRIS, pembayaran saldo bot, dan batas nominal.</p></div></div><form id="topupSettingsForm" class="form-grid"><label>Status TopUp<select name="topup_enabled"><option value="true" ${x.topup_enabled!==false?'selected':''}>Aktif</option><option value="false" ${x.topup_enabled===false?'selected':''}>Nonaktif</option></select></label><label>Pembayaran Saldo<select name="wallet_payment_enabled"><option value="true" ${x.wallet_payment_enabled!==false?'selected':''}>Aktif</option><option value="false" ${x.wallet_payment_enabled===false?'selected':''}>Nonaktif</option></select></label><label>Minimal TopUp<input name="topup_min_amount" type="number" min="1000" value="${Number(x.topup_min_amount||1000)}"></label><label>Maksimal TopUp<input name="topup_max_amount" type="number" min="1000" value="${Number(x.topup_max_amount||5000000)}"></label><div class="full info-note">QRIS TopUp mengikuti mode pembayaran pada submenu Pembayaran: GoPay, ShopeePay, ShopeePay GW Sendiri, Auto Rotating, atau Hybrid.</div><div class="full form-actions"><button class="neo-btn purple" type="submit">Simpan TopUp</button></div></form></section>`;
   else if(state.settingsTab==='partnership')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>🤝 Kemitraan Reseller Bot</h3><p>Atur biaya pendaftaran kemitraan, perizinan tambah produk toko sendiri, dan sakelar buka/tutup pendaftaran bot reseller di Bot Toko Utama.</p></div></div><form id="resellerPartnershipSettingsForm" class="form-grid"><label>Status Pendaftaran Reseller<select name="reseller_registration_enabled"><option value="true" ${x.reseller_registration_enabled!==false?'selected':''}>Buka (User Bisa Daftar Kemitraan)</option><option value="false" ${x.reseller_registration_enabled===false?'selected':''}>Tutup (Pendaftaran Dinonaktifkan)</option></select></label><label>Biaya Pendaftaran (Rp)<input name="reseller_registration_fee" type="number" min="0" step="500" value="${Number(x.reseller_registration_fee||0)}"><small>Isi 0 untuk pendaftaran GRATIS. Jika diisi nominal (misal 50.000), user wajib punya saldo dompet cukup saat mendaftarkan bot di Bot Toko Utama.</small></label><label class="full">Izin Tambah Produk Toko Sendiri (Reseller)<select name="reseller_can_add_products"><option value="false" ${!x.reseller_can_add_products?'selected':''}>🔴 Nonaktif (Default) - Reseller hanya menjual produk dari Owner</option><option value="true" ${x.reseller_can_add_products?'selected':''}>🟢 Aktif - Reseller diizinkan menambahkan & menjual produk toko miliknya sendiri</option></select><small>Fitur ini memungkinkan mitra reseller menginput produk digital buatan sendiri, mengatur varian, upload banner produk, dan memasukkan stok toko sendiri.</small></label><div class="full info-note"><b>Sistem Persetujuan Owner:</b> Setiap user yang mendaftarkan token bot akan berstatus <i>Menunggu Persetujuan</i>. Notifikasi verifikasi akan masuk ke Telegram Owner dengan tombol Setujui / Tolak otomatis. Jika ditolak, biaya pendaftaran akan otomatis di-refund kembali ke saldo user.</div><div class="full form-actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="neo-btn purple" type="submit">Simpan Pengaturan Kemitraan</button><button type="button" class="neo-btn blue" id="goToResellersBtn">👥 Buka Halaman Reseller Bot →</button></div></form></section>`;
@@ -851,7 +899,7 @@ function renderSettings(){
   if($('#paymentSettingsForm')){$('#paymentSettingsForm').onsubmit=savePaymentSettings;$$('[data-check-qris]').forEach(b=>b.onclick=()=>testPayment(b.dataset.checkQris));$$('[name="autogopay_payment_method"]').forEach(r=>r.onchange=()=>{$$('.qris-mode-card').forEach(c=>c.classList.toggle('selected',c.querySelector('input')?.checked))});if($('#checkSpayTokenBtn'))$('#checkSpayTokenBtn').onclick=checkShoppepayTokenStatus;if($('#openUpdateSpayTokenModal'))$('#openUpdateSpayTokenModal').onclick=openUpdateShoppepayTokenModal;}
   if($('#supplierSettingsForm'))$('#supplierSettingsForm').onsubmit=async e=>{e.preventDefault();await saveSimpleSettings(e,[],[],'Kunci supplier disimpan');await refreshSupplierHub(true);};
   if($('#refreshSupplierHub')){$('#refreshSupplierHub').onclick=()=>refreshSupplierHub(true);refreshSupplierHub(false)}
-    if($('#vpsReminderForm'))$('#vpsReminderForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target);const payload={vps_provider_name:String(fd.get('vps_provider_name')||'').trim(),vps_renewal_date:String(fd.get('vps_renewal_date')||'').trim(),vps_cost:Number(fd.get('vps_cost')||0),vps_reminder_enabled:fd.get('vps_reminder_enabled')==='true'};try{const res=await api('/api/admin/settings',{method:'PATCH',body:payload});if(res.settings)state.cache.settings=res.settings;else state.cache.settings=Object.assign({},state.cache.settings||{},payload);if(state.overview?.settings)Object.assign(state.overview.settings,state.cache.settings);toast('Pengaturan VPS berhasil disimpan');renderSettings();}catch(err){toast(err.message,true);}};
+    if($('#vpsReminderForm'))$('#vpsReminderForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target);const isEnabled=fd.get('vps_reminder_enabled')==='true';const payload={vps_provider_name:String(fd.get('vps_provider_name')||'').trim(),vps_renewal_date:String(fd.get('vps_renewal_date')||'').trim(),vps_cost:Number(fd.get('vps_cost')||0),vps_reminder_enabled:isEnabled};try{const res=await api('/api/admin/settings',{method:'PATCH',body:payload});const updated=(res&&res.settings)?res.settings:payload;state.cache.settings=Object.assign({},state.cache.settings||{},updated);if(state.overview)state.overview.settings=Object.assign({},state.overview.settings||{},updated);toast('Pengaturan VPS berhasil disimpan');renderSettings();updateVpsHeaderTimer();}catch(err){toast(err.message,true);}};
   if($('#renewVps30Btn'))$('#renewVps30Btn').onclick=async()=>{
     try{
       const res=await api('/api/admin/system/vps-renew-30',{method:'POST'});

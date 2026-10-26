@@ -56,11 +56,10 @@ function closeNotifications(){const p=$('#notificationPanel');if(p)p.classList.a
 function toggleNotifications(){const p=$('#notificationPanel');if(!p)return;const open=p.classList.contains('hidden');p.classList.toggle('hidden',!open);$('#notifBtn')?.setAttribute('aria-expanded',open?'true':'false');if(open)refreshNotifications(false)}
 function showLogin(){$('#loginView').classList.remove('hidden');$('#appView').classList.add('hidden')}function showApp(){$('#loginView').classList.add('hidden');$('#appView').classList.remove('hidden')}function logout(show=true){state.token='';sessionStorage.removeItem('ilink_owner_token');localStorage.removeItem('ilink_owner_token');if(state.notificationTimer){clearInterval(state.notificationTimer);state.notificationTimer=null}closeNotifications();showLogin();if(show)toast('Sesi ditutup')}
 $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginError').textContent='';try{const r=await api('/api/admin/auth/login',{method:'POST',body:{username:$('#loginUsername').value,password:$('#loginPassword').value}});state.token=r.token;sessionStorage.setItem('ilink_owner_token',r.token);localStorage.setItem('ilink_owner_token',r.token);$('#loginPassword').value='';await initialize()}catch(err){$('#loginError').textContent=err.message}};$('#logoutBtn').onclick=()=>logout();$('#refreshBtn').onclick=()=>navigate(state.view,true);if($('#vpsTimerBtn'))$('#vpsTimerBtn').onclick=()=>{state.settingsTab='vps';navigate('settings');};
-  startVpsCountdown();
   $('#notifBtn').onclick=e=>{e.stopPropagation();toggleNotifications()};$('#notificationPanel').onclick=e=>e.stopPropagation();$('#notifMarkAll').onclick=async()=>{try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{all:true}});renderNotifications(r);toast('Semua notifikasi ditandai dibaca')}catch(e){toast(e.message,true)}};$('#notificationList').onclick=async e=>{const b=e.target.closest('[data-notif-key]');if(!b)return;try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{keys:[b.dataset.notifKey]}});renderNotifications(r)}catch{}closeNotifications();if(b.dataset.notifView){const parts=b.dataset.notifView.split(':');if(parts[0]==='settings'&&parts[1]){state.settingsTab=parts[1];navigate('settings');}else{navigate(b.dataset.notifView);}}};document.addEventListener('click',closeNotifications);function closeSidebar(){$('#sidebar').classList.remove('open');$('#sidebarBackdrop')?.classList.remove('show');$('#menuBtn')?.setAttribute('aria-expanded','false')}$('#menuBtn').onclick=e=>{e.stopPropagation();const open=$('#sidebar').classList.toggle('open');$('#sidebarBackdrop')?.classList.toggle('show',open);$('#menuBtn').setAttribute('aria-expanded',open?'true':'false')};$('#sidebarBackdrop').onclick=closeSidebar;document.addEventListener('click',e=>{const side=$('#sidebar'),menu=$('#menuBtn');if(side?.classList.contains('open')&&!side.contains(e.target)&&!menu?.contains(e.target))closeSidebar()});$('#nav').onclick=e=>{const b=e.target.closest('[data-view]');if(b){closeSidebar();navigate(b.dataset.view)}};
 function setHeader(view){const[t,s]=titles[view]||[view,''];$('#pageTitle').textContent=t;$('#pageSubtitle').textContent=s;$$('#nav [data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))}
-async function initialize(){state.me=(await api('/api/admin/me')).user;showApp();await navigate('dashboard');await refreshNotifications();if(!state.notificationTimer)state.notificationTimer=setInterval(()=>refreshNotifications(true),60000)}
-async function isVpsReminderEnabled(s = {}) {
+async function initialize(){state.me=(await api('/api/admin/me')).user;showApp();await navigate('dashboard');await refreshNotifications();if(!state.notificationTimer)state.notificationTimer=setInterval(()=>refreshNotifications(true),60000);startVpsCountdown();}
+function isVpsReminderEnabled(s = {}) {
   const v = s.vps_reminder_enabled;
   if (v === false || v === 'false' || v === 0 || v === '0') return false;
   return true;
@@ -117,7 +116,7 @@ function formatVpsDuration(renewalDateStr) {
   };
 }
 
-let vpsCountdownInterval = null;
+var vpsCountdownInterval = null;
 function updateVpsHeaderTimer() {
   const el = $('#vpsTimerText');
   const btn = $('#vpsTimerBtn');

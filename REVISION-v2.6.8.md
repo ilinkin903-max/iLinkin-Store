@@ -8,3 +8,15 @@
 - Editor Produk Fresh menambah konfigurasi Ready Stok: aktif/nonaktif, label, dan kombinasi harga yang dipakai.
 - Harga Ready Stok tidak disimpan sebagai harga baru; selalu mengikuti pricing/override Produk Fresh yang dipilih.
 - Status Generate API dibuat terpisah dari status Ready Stok Lokal.
+- **Pengaturan Posisi Varian Produk (Sort Order)**:
+  - Tombol kontrol posisi `▲` (pindah ke atas) dan `▼` (pindah ke bawah) serta badge posisi `#1`, `#2`, ... di setiap kartu varian pada editor produk.
+  - Perubahan posisi varian langsung terupdate seketika di layar dan tersinkronisasi ke server melalui endpoint reorder.
+  - Input field `Urutan Posisi` pada modal Edit Varian untuk pengaturan nomor urutan manual.
+  - **Penyempurnaan Tema UI Neobrutalism & Kerapian Layout (v2.6.20)**:
+  - Font modern premium: Memasukkan Google Font **Plus Jakarta Sans** (weights 400-900) dengan tipografi tegas, tajam, dan kontras tinggi.
+  - Standarisasi Neobrutalism sejati: Border tegas gelap `2.5px solid var(--ink)`, hard drop shadow tanpa blur `3px - 5px`, sudut rounded konsisten, dan tactile button feedback (efek lift saat hover dan press saat diklik).
+  - Kelengkapan styling modul baru: Melengkapi seluruh CSS untuk modul **Undangan Tim & Email Pembeli**, **Promosi Stok Ready** (live preview editor, tabs WA/Telegram, filter), dan **Portal Reseller** (kartu reseller, runtime badge bot toko, kartu penarikan dana, serta tabel mutasi profit).
+  - Pembersihan kontradiksi CSS: Menghapus deklarasi `display:none` lama pada tombol lonceng notifikasi di mobile sehingga ikon notifikasi selalu muncul dan sejajar rapi dengan timer VPS di topbar.
+  - Perbaikan layout mobile: Kartu varian, kartu produk, dan topbar dioptimalkan pada layar smartphone agar tidak bergeser atau bertumpuk.
+  - Neobrutalist Toast & Modal: Tampilan toast popup dan dialog modal diperbarui dengan badge kuning kontras dan bayangan tegas sesuai tema.
+

@@ -1,8 +1,12 @@
-/* Original app.css/reseller.css layout, with vivid colors and targeted fixes. */
+/* ==========================================================================
+   iLink MiniApp - Vivid Color Theme
+   HANYA MENGATUR WARNA & TEMA VISUAL (TIDAK MENGUBAH POSISI TOMBOL & LAYOUT)
+   ========================================================================== */
+
 :root {
   --ink: #101015;
   --paper: #f8f8f4;
-  --panel: #fff;
+  --panel: #ffffff;
   --purple: #7025ff;
   --purple2: #8b42ff;
   --green: #b6ff00;
@@ -13,210 +17,221 @@
   --pink: #ff64b2;
   --red: #ff4260;
   --muted: #5f5f69;
-  --border: 3px solid var(--ink);
-  --shadow: 5px 6px 0 var(--ink);
-  --radius: 18px;
-  --ease: cubic-bezier(.22, 1, .36, 1);
 }
 
-/* Keep the original framed shell and purple navigation. */
-.sidebar { background: var(--purple); }
-.brand-icon { background: var(--lime); color: var(--ink); }
-.nav-list button { border: 3px solid transparent; padding: 7px 9px; }
-.nav-list button.active { background: var(--lime); color: var(--ink); }
-.nav-list button:hover:not(.active) { background: #5520c4; }
-.owner-card { background: #5520c4; }
-.owner-avatar, .owner-pill { background: var(--lime); color: var(--ink); }
-.store-balance { background: var(--lime); color: var(--ink); }
-.logout-btn { background: var(--red); color: var(--ink); }
-.square-btn { background: var(--lime); color: var(--ink); }
-.square-btn.notify { background: var(--yellow); }
-.telegram-btn { background: var(--cyan); color: var(--ink); }
-.vps-timer-btn { border-color: var(--ink); }
-.neo-btn.purple { background: var(--purple); color: #fff; }
-.neo-btn.green { background: var(--lime); color: var(--ink); }
-.neo-btn.yellow { background: var(--yellow); color: var(--ink); }
-.neo-btn.blue { background: var(--blue); color: var(--ink); }
-.neo-btn.red { background: var(--red); color: var(--ink); }
-.neo-btn.white { background: #fff; color: var(--ink); }
+/* Sidebar & Navigation Colors */
+.sidebar {
+  background: var(--purple) !important;
+}
+.brand-icon {
+  background: var(--lime) !important;
+  color: var(--ink) !important;
+}
+.nav-list button.active {
+  background: var(--lime) !important;
+  color: var(--ink) !important;
+}
+.nav-list button:hover:not(.active) {
+  background: #5a1ec9 !important;
+}
+.owner-card {
+  background: #5a1ec9 !important;
+}
+.owner-avatar,
+.owner-pill {
+  background: var(--lime) !important;
+  color: var(--ink) !important;
+}
+.store-balance {
+  background: var(--lime) !important;
+  color: var(--ink) !important;
+}
+.logout-btn {
+  background: var(--red) !important;
+  color: #fff !important;
+}
 
-/* Bold, readable color blocks within the existing dashboard grid. */
-.dashboard-kpis > .stat-card:nth-child(4n + 1) { background: var(--purple); color: #fff; }
-.dashboard-kpis > .stat-card:nth-child(4n + 2) { background: var(--lime); color: var(--ink); }
-.dashboard-kpis > .stat-card:nth-child(4n + 3) { background: var(--yellow); color: var(--ink); }
-.dashboard-kpis > .stat-card:nth-child(4n + 4) { background: var(--cyan); color: var(--ink); }
-.dashboard-kpis .stat-card small, .dashboard-kpis .stat-card em { color: inherit; }
-.dashboard-kpis .stat-card > div:last-child { min-width: 0; }
-.dashboard-kpis .stat-card strong { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.2; }
-.stat-icon.green { background: var(--lime); }
-.stat-icon.purple { background: var(--purple); color: #fff; }
-.stat-icon.yellow { background: var(--yellow); }
-.stat-icon.blue { background: var(--blue); }
-.stat-icon.pink { background: var(--pink); }
-.dashboard-kpis .stat-icon { background: #fff; color: var(--ink); }
-.day-bar { background: var(--purple); }
-.day-col:last-child .day-bar { background: var(--lime); }
-.top-products-card .top-item .rank { background: var(--yellow); }
+/* Topbar Buttons Colors */
+.square-btn {
+  background: var(--lime) !important;
+  color: var(--ink) !important;
+}
+.square-btn.notify {
+  background: var(--yellow) !important;
+}
+.telegram-btn {
+  background: var(--cyan) !important;
+  color: var(--ink) !important;
+}
+.vps-timer-btn {
+  border-color: var(--ink) !important;
+}
 
-/* Product layout stays image-left / details-right. Colors carry status. */
-.product-card.stock-ready, .product-card.stock-empty, .product-card.stock-preorder { background: #fff; }
-.product-thumb { background: var(--purple); }
-.product-thumb .thumb-fallback { filter: drop-shadow(1px 2px 0 rgb(0 0 0 / 20%)); }
-.product-index { background: var(--lime); color: var(--ink); }
-.stock-box.ready, .stock-state-pill.ready, .variant-chip.stock-ready { background: var(--lime); color: var(--ink); }
-.stock-box.empty, .stock-state-pill.empty, .variant-chip.stock-empty { background: var(--red); color: var(--ink); }
-.stock-box.preorder, .stock-state-pill.preorder, .variant-chip.stock-preorder { background: var(--yellow); color: var(--ink); }
-.info-box.price { background: var(--yellow); color: var(--ink); }
-.info-box em { color: inherit; }
-.variant-chip:not(.stock-ready):not(.stock-empty):not(.stock-preorder):not(.muted) { background: var(--purple); color: #fff; }
-.tag-chip { background: var(--cyan); color: var(--ink); }
-.toggle { background: var(--lime); color: var(--ink); }
-.toggle.off { background: #ddd; }
-.badge.ok { background: var(--lime); color: var(--ink); }
-.badge.warn { background: var(--yellow); color: var(--ink); }
-.badge.bad { background: var(--red); color: var(--ink); }
+/* Neo-Buttons Palette (Mempertahankan Ukuran & Posisi Asli) */
+.neo-btn.purple {
+  background: var(--purple) !important;
+  color: #fff !important;
+}
+.neo-btn.green {
+  background: var(--lime) !important;
+  color: var(--ink) !important;
+}
+.neo-btn.yellow {
+  background: var(--yellow) !important;
+  color: var(--ink) !important;
+}
+.neo-btn.blue {
+  background: var(--blue) !important;
+  color: var(--ink) !important;
+}
+.neo-btn.red {
+  background: var(--red) !important;
+  color: #fff !important;
+}
+.neo-btn.white {
+  background: #fff !important;
+  color: var(--ink) !important;
+}
 
-.submenu-home:before { background: linear-gradient(90deg, var(--purple) 0 50%, var(--lime) 50%); }
-.submenu-card-icon, .settings-menu-home .submenu-card-icon { background: var(--lime); }
-.submenu-card:nth-child(3n + 2) .submenu-card-icon { background: var(--yellow); }
-.submenu-card:nth-child(3n) .submenu-card-icon { background: var(--cyan); }
-.tab-btn.active, .subnav-btn.active { background: var(--purple); color: #fff; }
-.neo-modal header { background: var(--purple); color: #fff; }
-.neo-modal header > button { background: var(--lime); color: var(--ink); }
-.neo-modal footer { background: #fff; }
-.toast { background: var(--lime); color: var(--ink); }
-.toast.bad { background: var(--red); color: var(--ink); }
+/* Dashboard KPI Card Colors */
+.dashboard-kpis > .stat-card:nth-child(4n + 1) {
+  background: var(--purple) !important;
+  color: #fff !important;
+}
+.dashboard-kpis > .stat-card:nth-child(4n + 2) {
+  background: var(--lime) !important;
+  color: var(--ink) !important;
+}
+.dashboard-kpis > .stat-card:nth-child(4n + 3) {
+  background: var(--yellow) !important;
+  color: var(--ink) !important;
+}
+.dashboard-kpis > .stat-card:nth-child(4n + 4) {
+  background: var(--cyan) !important;
+  color: var(--ink) !important;
+}
+.dashboard-kpis .stat-card small,
+.dashboard-kpis .stat-card em {
+  color: inherit !important;
+}
+.dashboard-kpis .stat-icon {
+  background: #fff !important;
+  color: var(--ink) !important;
+}
+
+/* Stat Icons Colors */
+.stat-icon.green { background: var(--lime) !important; color: var(--ink) !important; }
+.stat-icon.purple { background: var(--purple) !important; color: #fff !important; }
+.stat-icon.yellow { background: var(--yellow) !important; color: var(--ink) !important; }
+.stat-icon.blue { background: var(--blue) !important; color: var(--ink) !important; }
+.stat-icon.pink { background: var(--pink) !important; color: var(--ink) !important; }
+
+/* Chart Bars */
+.day-bar { background: var(--purple) !important; }
+.day-col:last-child .day-bar { background: var(--lime) !important; }
+.top-products-card .top-item .rank { background: var(--yellow) !important; }
+
+/* Product Badges, Pills & Chips Colors (Layout Asli Tetap Utuh) */
+.product-index {
+  background: var(--lime) !important;
+  color: var(--ink) !important;
+}
+.stock-box.ready,
+.stock-state-pill.ready,
+.variant-chip.stock-ready {
+  background: var(--lime) !important;
+  color: var(--ink) !important;
+}
+.stock-box.empty,
+.stock-state-pill.empty,
+.variant-chip.stock-empty {
+  background: var(--red) !important;
+  color: #fff !important;
+}
+.stock-box.preorder,
+.stock-state-pill.preorder,
+.variant-chip.stock-preorder {
+  background: var(--yellow) !important;
+  color: var(--ink) !important;
+}
+.info-box.price {
+  background: var(--yellow) !important;
+  color: var(--ink) !important;
+}
+.variant-chip:not(.stock-ready):not(.stock-empty):not(.stock-preorder):not(.muted) {
+  background: var(--purple) !important;
+  color: #fff !important;
+}
+.tag-chip {
+  background: var(--cyan) !important;
+  color: var(--ink) !important;
+}
+.toggle {
+  background: var(--lime) !important;
+  color: var(--ink) !important;
+}
+.toggle.off {
+  background: #ddd !important;
+}
+.badge.ok {
+  background: var(--lime) !important;
+  color: var(--ink) !important;
+}
+.badge.warn {
+  background: var(--yellow) !important;
+  color: var(--ink) !important;
+}
+.badge.bad {
+  background: var(--red) !important;
+  color: #fff !important;
+}
+
+/* Submenu Cards & Navigation Colors */
+.submenu-home:before {
+  background: linear-gradient(90deg, var(--purple) 0 50%, var(--lime) 50%) !important;
+}
+.submenu-card-icon,
+.settings-menu-home .submenu-card-icon {
+  background: var(--lime) !important;
+}
+.submenu-card:nth-child(3n + 2) .submenu-card-icon {
+  background: var(--yellow) !important;
+}
+.submenu-card:nth-child(3n) .submenu-card-icon {
+  background: var(--cyan) !important;
+}
+.tab-btn.active,
+.subnav-btn.active {
+  background: var(--purple) !important;
+  color: #fff !important;
+}
+
+/* Modal Dialog Colors (Layout Asli Tetap Utuh) */
+.neo-modal header {
+  background: var(--purple) !important;
+  color: #fff !important;
+}
+.neo-modal header > button {
+  background: var(--lime) !important;
+  color: var(--ink) !important;
+}
+.neo-modal footer {
+  background: #fff !important;
+}
+
+/* Toast Notifications */
+.toast {
+  background: var(--lime) !important;
+  color: var(--ink) !important;
+}
+.toast.bad {
+  background: var(--red) !important;
+  color: #fff !important;
+}
+
+/* Login Screen Background */
 .login-screen {
-  background: radial-gradient(circle at 15% 15%,var(--lime) 0 5%,transparent 5.5%),
-    radial-gradient(circle at 85% 75%,var(--yellow) 0 4%,transparent 4.5%),var(--purple);
-}
-
-/* Fix controls and text that were clipped or too small. */
-body { -webkit-text-size-adjust: 100%; }
-button, a { touch-action: manipulation; }
-input, select, textarea { min-width: 0; max-width: 100%; accent-color: var(--purple); }
-:where(button, a, input, select, textarea, [tabindex]):focus-visible { outline: 3px solid var(--ink); outline-offset: 4px; }
-.sidebar :focus-visible { outline-color: var(--yellow); }
-button:disabled { cursor: not-allowed; }
-.topbar { height: auto; min-height: 96px; }
-.page-title h1 { line-height: 1.15; overflow-wrap: anywhere; }
-.top-actions, .square-btn { flex-shrink: 0; }
-.toolbar .searchbox input { padding-left: 40px; }
-.searchbox:before { top: 50%; transform: translateY(-50%); line-height: 1; pointer-events: none; }
-.product-head { flex-wrap: wrap; }
-.product-grid { align-items: stretch; }
-.product-card { align-items: stretch; }
-.product-body { height: 100%; }
-.product-title { flex: 1 1 120px; }
-.product-head-actions { flex-shrink: 0; max-width: 100%; }
-.product-title h3 { line-height: 1.25; }
-.product-title p { line-height: 1.5; }
-.variant-chip, .tag-chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
-.info-box strong { line-height: 1.3; }
-.product-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.product-card .product-actions { margin-top: auto; padding-top: 10px; }
-.product-actions .neo-btn { line-height: 1.4; min-height: 36px; }
-.product-actions > .neo-btn:only-child { grid-column: 1 / -1; }
-.product-title-actions .neo-btn { white-space: normal !important; }
-.product-section-title { flex-wrap: wrap; gap: 12px; }
-.form-grid > *, .section-head > *, .section-title > * { min-width: 0; }
-.form-grid input:not([type=checkbox]):not([type=radio]), .form-grid select, .toolbar input, .toolbar select { min-height: 42px; }
-.form-grid textarea { line-height: 1.6; }
-.submenu-card-copy b { line-height: 1.35; }
-.submenu-card-copy small { line-height: 1.5; }
-.notification-panel { top: var(--ui-header-bottom, 100px); max-height: min(70dvh, 650px); }
-
-/* Long forms scroll inside a dialog with reachable header and actions. */
-.neo-modal { max-height: calc(100dvh - 32px); }
-.neo-modal form { display: flex; flex-direction: column; min-height: 0; max-height: calc(100dvh - 40px); }
-.neo-modal header, .neo-modal footer { flex-shrink: 0; }
-.neo-modal header h2 { min-width: 0; overflow-wrap: anywhere; line-height: 1.35; }
-.neo-modal header > button { flex-shrink: 0; min-width: 40px; min-height: 40px; }
-.modal-body { min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior: contain; }
-.neo-modal footer { flex-wrap: wrap; }
-.floating-save-bar { bottom: max(20px, env(safe-area-inset-bottom)); }
-body:has(.floating-save-bar:not(.hidden)) .content { padding-bottom: 128px; }
-
-/* Motion only on interactive controls and opening surfaces. */
-.neo-btn, .square-btn, .telegram-btn, .toggle, .logout-btn, .tab-btn, .subnav-btn, .submenu-card {
-  transition: transform 180ms var(--ease), box-shadow 180ms var(--ease), background-color 180ms ease;
-}
-@keyframes neo-enter { from { opacity: .5; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-.neo-modal[open], .notification-panel:not(.hidden) { animation: neo-enter 240ms var(--ease); }
-@media (hover: hover) and (pointer: fine) {
-  .neo-btn:hover:not(:disabled), .square-btn:hover:not(:disabled), .telegram-btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 5px 0 var(--ink); }
-}
-.neo-btn:active:not(:disabled), .square-btn:active:not(:disabled), .telegram-btn:active { transform: translate(2px, 2px); box-shadow: 1px 2px 0 var(--ink); }
-
-@media (min-width: 1101px) {
-  .sidebar-backdrop, .sidebar-backdrop.show { display: none; }
-}
-@media (min-width: 1251px) and (max-width: 1600px) {
-  /* Four KPI cards fit without separating 'Rp' from its amount. */
-  .dashboard-kpis .stat-card { grid-template-columns: 42px minmax(0, 1fr); gap: 10px; }
-  .dashboard-kpis .stat-icon { width: 42px; height: 42px; font-size: 21px; }
-  .dashboard-kpis .stat-card strong { font-size: 22px; }
-}
-@media (max-width: 1100px) {
-  .sidebar { z-index: 80; height: calc(100dvh - 16px); min-height: 0; overscroll-behavior: contain; visibility: hidden; transition: transform 280ms var(--ease), visibility 280ms; }
-  .sidebar.open { visibility: visible; }
-  .sidebar-backdrop { z-index: 70; visibility: hidden; transition: opacity 240ms ease, visibility 240ms; }
-  .sidebar-backdrop.show { visibility: visible; }
-  body.ui-menu-open { overflow: hidden; }
-}
-@media (max-width: 900px) {
-  .sidebar { height: 100dvh; padding-top: max(18px, env(safe-area-inset-top)); padding-bottom: max(18px, env(safe-area-inset-bottom)); }
-  .topbar { min-height: 72px; }
-}
-@media (max-width: 640px) {
-  :root { --radius: 15px; --shadow: 4px 5px 0 var(--ink); }
-  .topbar { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; gap: 10px; padding: 10px 12px; }
-  .page-title h1 { font-size: 20px; letter-spacing: -.5px; }
-  .top-actions { gap: 8px; margin-left: 0; }
-  .square-btn { width: 42px; height: 42px; }
-  .content { padding: 14px 12px; gap: 16px; }
-  .product-card { grid-template-columns: 64px minmax(0, 1fr); padding: 12px; gap: 10px; }
-  .product-thumb { width: 64px; height: 64px; }
-  .product-title { flex-basis: 100px; }
-  .product-title h3 { font-size: 16px; }
-  .product-title p { font-size: 12px; }
-  .product-head-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; width: 100%; gap: 8px; }
-  .stock-state-pill { font-size: 10px; }
-  .toggle { min-height: 36px; min-width: 44px; font-size: 11px; }
-  .info-box { padding: 9px; }
-  .info-box small, .info-box.price em, .stock-box em { font-size: 10px; line-height: 1.4; }
-  .info-box strong { font-size: 16px; }
-  .variant-chip, .tag-chip, .fresh-local-stock-meta span { font-size: 10px; padding: 4px 6px; }
-  .product-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
-  .product-actions .neo-btn { min-height: 40px; font-size: 11px; padding: 8px 5px; }
-  .product-title-actions .neo-btn { min-height: 42px; }
-  .order-grid small, .user-meta span { font-size: 10px; }
-  .order-grid span, .user-meta b { font-size: 11px; }
-  .order-actions .neo-btn, .user-actions .neo-btn { min-height: 38px; font-size: 11px; }
-  .submenu-card { padding: 12px; gap: 10px; }
-  .submenu-card-copy b { font-size: 13px; }
-  .submenu-card-copy small, .submenu-home-head p { font-size: 12px; }
-  .fresh-price-card b { font-size: 12px; }
-  .fresh-price-card small, .fresh-price-input em { font-size: 11px; }
-  .form-grid label { font-size: 12px; }
-  .form-grid small { font-size: 11px; line-height: 1.5; }
-  .form-grid input:not([type=checkbox]):not([type=radio]), .form-grid select, .form-grid textarea, .toolbar input, .toolbar select { font-size: 16px; }
-  .neo-modal { width: calc(100vw - 24px); }
-  .neo-modal header h2 { font-size: 18px; }
-  .neo-modal footer .neo-btn { min-height: 42px; }
-  .notification-head { flex-wrap: wrap; gap: 10px; }
-  .floating-save-bar { flex-wrap: wrap; gap: 10px; }
-}
-@media (max-width: 380px) {
-  /* The timer gets a second row only where the original header is too tight. */
-  .topbar { grid-template-columns: 42px minmax(0, 1fr) 42px; }
-  .topbar #menuBtn { grid-column: 1; grid-row: 1; }
-  .topbar .page-title { grid-column: 2; grid-row: 1; }
-  .top-actions { display: contents; }
-  .top-actions .square-btn { grid-column: 3; grid-row: 1; }
-  .vps-timer-btn { grid-column: 2 / -1; grid-row: 2; justify-self: start; }
-  .product-actions { grid-template-columns: minmax(0, 1fr); }
-}
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  background: radial-gradient(circle at 15% 15%, var(--lime) 0 5%, transparent 5.5%),
+    radial-gradient(circle at 85% 75%, var(--yellow) 0 4%, transparent 4.5%),
+    var(--purple) !important;
 }

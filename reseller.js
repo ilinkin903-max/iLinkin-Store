@@ -459,7 +459,6 @@ async function navigate(view, silent = false) {
       withdraw: loadWithdraw,
       bot: loadBot
     }[view] || loadDashboard)();
-    if (!silent) window.ilinkUI?.enter();
     $('#lastUpdated').textContent = 'Terakhir diperbarui: ' + new Date().toLocaleTimeString('id-ID');
   } catch (e) {
     $('#content').innerHTML = `<div class="empty-product">${esc(e.message)}</div>`;

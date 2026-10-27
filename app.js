@@ -935,7 +935,62 @@ function bindBackupActions(){$$('[data-download-backup]').forEach(b=>b.onclick=(
 async function saveSimpleSettings(e,boolKeys=[],numberKeys=[],message='Pengaturan disimpan'){e.preventDefault();const x=Object.fromEntries(new FormData(e.target).entries());for(const k of boolKeys)x[k]=x[k]==='true';for(const k of numberKeys)x[k]=Number(x[k]||0);try{state.cache.settings=await api('/api/admin/settings',{method:'PATCH',body:x}).then(r=>r.settings||x);toast(message)}catch(err){toast(err.message,true)}}
 async function saveStoreSettings(e){e.preventDefault();const x=Object.fromEntries(new FormData(e.target).entries());['store_balance'].forEach(k=>x[k]=Number(x[k]||0));x.show_total_users=x.show_total_users==='true';try{await api('/api/admin/settings',{method:'PATCH',body:x});toast('Pengaturan toko disimpan');applyShell(await api('/api/admin/overview'))}catch(err){toast(err.message,true)}}
 async function savePaymentSettings(e){e.preventDefault();const x=Object.fromEntries(new FormData(e.target).entries());const method=x.autogopay_payment_method||'gopay';const url=String(x.shoppepay_gateway_url||'internal').trim();const key=String(x.shoppepay_gateway_key||'').trim();const qrisStatic=String(x.shoppepay_qris_static||'').trim();const uniqueCode=x.shoppepay_unique_code==='true';try{await api('/api/admin/settings',{method:'PATCH',body:{autogopay_payment_method:method,shoppepay_gateway_url:url,shoppepay_gateway_key:key,shoppepay_qris_static:qrisStatic,shoppepay_unique_code:uniqueCode}});if(state.cache.settings){state.cache.settings.autogopay_payment_method=method;state.cache.settings.shoppepay_gateway_url=url;state.cache.settings.shoppepay_gateway_key=key;state.cache.settings.shoppepay_qris_static=qrisStatic;state.cache.settings.shoppepay_unique_code=uniqueCode;}toast('Pengaturan pembayaran & QRIS disimpan')}catch(err){toast(err.message,true)}}
-function openUpdateShoppepayTokenModal(){const curQris=esc(state.cache.settings?.shoppepay_qris_static||'');modal('Perbarui Token & QRIS ShopeePay Live',`<div class="form-grid"><div class="full info-note">Masukkan token ShopeePay Partner Portal (<code>SHOPEE_TOKEN</code>) dan/atau String QRIS Statis toko Anda. Tersimpan ke database dan aktif seketika tanpa perlu restart server.</div><label class="full">Token ShopeePay Baru (SHOPEE_TOKEN)<textarea id="liveShoppepayToken" rows="3" placeholder="Masukkan token ShopeePay (dari Partner Portal)..." style="font-family:monospace;font-size:12px;"></textarea><small>Diperoleh dari Cookies / Storage / Network request ShopeePay Partner Portal.</small></label><label class="full">String QRIS Statis Merchant (Opsional)<textarea id="liveShoppepayQris" rows="2" placeholder="00020101021126670016ID.CO.SHOPEE.WWW..." style="font-family:monospace;font-size:12px;">${curQris}</textarea><small>String teks dari scan QR code QRIS ShopeePay toko Anda (via Google Lens / QR Scanner).</small></label></div>`,async()=>{const tok=String($('#liveShoppepayToken')?.value||'').trim();const qris=String($('#liveShoppepayQris')?.value||'').trim();if(!tok&&!qris)return toast('Token atau QRIS Statis ShopeePay harus diisi.',true);try{toast('Menyimpan konfigurasi ShopeePay live...');const body={};if(tok)body.token=tok;if(qris)body.qris_static=qris;const res=await api('/api/admin/integrations/shoppepay-update-token',{method:'POST',body});if(state.cache.settings){if(tok)state.cache.settings.shoppepay_token=tok;if(qris)state.cache.settings.shoppepay_qris_static=qris;}toast(res.data?.message||res.message||'Konfigurasi ShopeePay berhasil diperbarui secara live!');testPayment('shoppepay_self');}catch(e){toast('Gagal update: '+e.message,true);}})}
+function openUpdateShoppepayTokenModal(){
+  const curQris=esc(state.cache.settings?.shoppepay_qris_static||'');
+  modal('Perbarui Token & QRIS ShopeePay Live',`<div class="form-grid"><div class="full info-note">Masukkan token ShopeePay Partner Portal (<code>SHOPEE_TOKEN</code>) dan/atau String QRIS Statis toko Anda. Menggunakan sistem Payment Shopee standar EMVCo resmi dengan auto-generate QRIS dinamis + kode unik.</div><label class="full">Token ShopeePay Baru (SHOPEE_TOKEN)<textarea id="liveShoppepayToken" rows="3" placeholder="Masukkan token ShopeePay (dari Partner Portal)..." style="font-family:monospace;font-size:12px;"></textarea><small>Diperoleh dari Cookies / Storage / Network request ShopeePay Partner Portal.</small></label><label class="full">String QRIS Statis Merchant (Opsional)<textarea id="liveShoppepayQris" rows="2" placeholder="00020101021126670016ID.CO.SHOPEE.WWW..." style="font-family:monospace;font-size:12px;">${curQris}</textarea><small>String teks dari scan QR code QRIS ShopeePay toko Anda (via Google Lens / QR Scanner).</small></label><div class="full" id="liveQrisAnalyzeBox" style="display:none;margin-top:2px;"></div></div>`,async()=>{
+    const tok=String($('#liveShoppepayToken')?.value||'').trim();
+    const qris=String($('#liveShoppepayQris')?.value||'').trim();
+    if(!tok&&!qris)return toast('Token atau QRIS Statis ShopeePay harus diisi.',true);
+    try{
+      toast('Menyimpan konfigurasi ShopeePay live...');
+      const body={};
+      if(tok)body.token=tok;
+      if(qris)body.qris_static=qris;
+      const res=await api('/api/admin/integrations/shoppepay-update-token',{method:'POST',body});
+      if(state.cache.settings){
+        if(tok)state.cache.settings.shoppepay_token=tok;
+        if(qris)state.cache.settings.shoppepay_qris_static=qris;
+      }
+      toast(res.data?.message||res.message||'Konfigurasi ShopeePay berhasil diperbarui secara live!');
+      testPayment('shoppepay_self');
+    }catch(e){toast('Gagal update: '+e.message,true);}
+  });
+
+  const qrisInput=$('#liveShoppepayQris');
+  const box=$('#liveQrisAnalyzeBox');
+  if(qrisInput&&box){
+    let debounceTimer;
+    const triggerAnalyze=()=>{
+      clearTimeout(debounceTimer);
+      debounceTimer=setTimeout(async()=>{
+        const val=String(qrisInput.value||'').trim();
+        if(!val){box.style.display='none';box.innerHTML='';return;}
+        if(!val.startsWith('000201')){
+          box.style.display='block';
+          box.innerHTML='<div style="padding:6px 10px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);border-radius:6px;font-size:12px;color:#e74c3c;">⚠️ String bukan format QRIS standar EMV (harus diawali 000201).</div>';
+          return;
+        }
+        try{
+          const res=await api('/api/admin/integrations/qris-analyze',{method:'POST',body:{payload:val}});
+          if(res.ok&&res.data){
+            const d=res.data;
+            box.style.display='block';
+            box.innerHTML=`<div style="padding:8px 10px;background:rgba(46,204,113,0.1);border:1px solid rgba(46,204,113,0.3);border-radius:6px;font-size:12px;color:var(--text-main);">
+              <b>✅ QRIS Terdeteksi:</b> ${esc(d.merchant_name)}<br>
+              <small>NMID: <b>${esc(d.nmid||'-')}</b> · Kota: <b>${esc(d.city||'-')}</b> · Penerbit: <b>${esc(d.acquirer||'-')}</b></small>
+              ${d.is_dynamic?'<div style="color:#e74c3c;font-weight:bold;margin-top:2px;">⚠️ Peringatan: Ini QRIS Dinamis. Masukkan QRIS Statis toko Anda!</div>':''}
+            </div>`;
+          }
+        }catch(err){
+          box.style.display='block';
+          box.innerHTML=`<div style="padding:6px 10px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);border-radius:6px;font-size:12px;color:#e74c3c;">⚠️ ${esc(err.message)}</div>`;
+        }
+      },400);
+    };
+    qrisInput.oninput=triggerAnalyze;
+    if(qrisInput.value)triggerAnalyze();
+  }
+}
 async function checkShoppepayTokenStatus(){const host=$('#spayTokenStatusBox');if(!host)return;host.style.display='block';host.innerHTML='<span class="muted">Mengecek status ShopeePay Gateway & token...</span>';try{const res=await testPayment('shoppepay_self');if(!res)return;const ok=res.ok;const tokStatus=res.token_status||(ok?'valid':'invalid');host.innerHTML=`<div class="supplier-summary" style="margin-top:6px;padding:10px;background:var(--bg-soft);border-radius:8px;border:1px solid var(--border)"><div>Status Gateway: <span class="badge ${ok?'ok':'bad'}">${esc(res.health||(ok?'running':'offline'))}</span></div><div>Status Token: <span class="badge ${tokStatus==='valid'?'ok':'bad'}">${esc(tokStatus)}</span></div><div style="font-size:12px;color:var(--text-muted);margin-top:4px">${esc(res.message||'')}</div></div>`;}catch(err){host.innerHTML=`<span class="badge bad">${esc(err.message)}</span>`;}}
 async function saveBackupSettings(e){e.preventDefault();const x=Object.fromEntries(new FormData(e.target).entries());x.auto_backup_enabled=x.auto_backup_enabled==='true';x.backup_interval_hours=Math.max(1,Number(x.backup_interval_hours||6));x.backup_retention=Math.max(1,Number(x.backup_retention||30));try{await api('/api/admin/settings',{method:'PATCH',body:x});toast('Jadwal backup disimpan');await loadSettings()}catch(err){toast(err.message,true)}}
 async function testPayment(channel){const ch=channel||state.cache.settings?.autogopay_payment_method||'gopay';const host=$(`#qrisStatus-${ch}`);if(host)host.innerHTML='<span class="muted">Mengecek...</span>';try{const r=await api(`/api/admin/integrations/payment-status?channel=${encodeURIComponent(ch)}`);if(host)host.innerHTML=`<span class="badge ${r.data.ok?'ok':'bad'}">${esc(r.data.message)}</span>`;return r.data}catch(e){if(host)host.innerHTML=`<span class="badge bad">${esc(e.message)}</span>`;return null}}

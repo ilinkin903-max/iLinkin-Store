@@ -904,7 +904,7 @@ function renderSettings(){
   else if(state.settingsTab==='referral')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>👥 Referral</h3><p>Atur program referral dan bonus saldo untuk pengundang.</p></div></div><form id="referralSettingsForm" class="form-grid"><label>Status Referral<select name="referral_enabled"><option value="true" ${x.referral_enabled!==false?'selected':''}>Aktif</option><option value="false" ${x.referral_enabled===false?'selected':''}>Nonaktif</option></select></label><label>Bonus per Referral<input name="referral_reward_amount" type="number" min="0" value="${Number(x.referral_reward_amount||0)}"></label><div class="full info-note">Bonus diberikan ke saldo referral sesuai mekanisme pendaftaran referral bot. User dapat melihat link referral dari menu Saldo & Referral.</div><div class="full form-actions"><button class="neo-btn purple" type="submit">Simpan Referral</button></div></form></section>`;
   else if(state.settingsTab==='topup')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>➕ TopUp & Saldo</h3><p>Atur TopUp QRIS, pembayaran saldo bot, dan batas nominal.</p></div></div><form id="topupSettingsForm" class="form-grid"><label>Status TopUp<select name="topup_enabled"><option value="true" ${x.topup_enabled!==false?'selected':''}>Aktif</option><option value="false" ${x.topup_enabled===false?'selected':''}>Nonaktif</option></select></label><label>Pembayaran Saldo<select name="wallet_payment_enabled"><option value="true" ${x.wallet_payment_enabled!==false?'selected':''}>Aktif</option><option value="false" ${x.wallet_payment_enabled===false?'selected':''}>Nonaktif</option></select></label><label>Minimal TopUp<input name="topup_min_amount" type="number" min="1000" value="${Number(x.topup_min_amount||1000)}"></label><label>Maksimal TopUp<input name="topup_max_amount" type="number" min="1000" value="${Number(x.topup_max_amount||5000000)}"></label><div class="full info-note">QRIS TopUp mengikuti mode pembayaran pada submenu Pembayaran: GoPay, ShopeePay, ShopeePay GW Sendiri, Auto Rotating, atau Hybrid.</div><div class="full form-actions"><button class="neo-btn purple" type="submit">Simpan TopUp</button></div></form></section>`;
   else if(state.settingsTab==='partnership')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>🤝 Kemitraan Reseller Bot</h3><p>Atur biaya pendaftaran kemitraan, perizinan tambah produk toko sendiri, dan sakelar buka/tutup pendaftaran bot reseller di Bot Toko Utama.</p></div></div><form id="resellerPartnershipSettingsForm" class="form-grid"><label>Status Pendaftaran Reseller<select name="reseller_registration_enabled"><option value="true" ${x.reseller_registration_enabled!==false?'selected':''}>Buka (User Bisa Daftar Kemitraan)</option><option value="false" ${x.reseller_registration_enabled===false?'selected':''}>Tutup (Pendaftaran Dinonaktifkan)</option></select></label><label>Biaya Pendaftaran (Rp)<input name="reseller_registration_fee" type="number" min="0" step="500" value="${Number(x.reseller_registration_fee||0)}"><small>Isi 0 untuk pendaftaran GRATIS. Jika diisi nominal (misal 50.000), user wajib punya saldo dompet cukup saat mendaftarkan bot di Bot Toko Utama.</small></label><label class="full">Izin Tambah Produk Toko Sendiri (Reseller)<select name="reseller_can_add_products"><option value="false" ${!x.reseller_can_add_products?'selected':''}>🔴 Nonaktif (Default) - Reseller hanya menjual produk dari Owner</option><option value="true" ${x.reseller_can_add_products?'selected':''}>🟢 Aktif - Reseller diizinkan menambahkan & menjual produk toko miliknya sendiri</option></select><small>Fitur ini memungkinkan mitra reseller menginput produk digital buatan sendiri, mengatur varian, upload banner produk, dan memasukkan stok toko sendiri.</small></label><div class="full info-note"><b>Sistem Persetujuan Owner:</b> Setiap user yang mendaftarkan token bot akan berstatus <i>Menunggu Persetujuan</i>. Notifikasi verifikasi akan masuk ke Telegram Owner dengan tombol Setujui / Tolak otomatis. Jika ditolak, biaya pendaftaran akan otomatis di-refund kembali ke saldo user.</div><div class="full form-actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="neo-btn purple" type="submit">Simpan Pengaturan Kemitraan</button><button type="button" class="neo-btn blue" id="goToResellersBtn">👥 Buka Halaman Reseller Bot →</button></div></form></section>`;
-  else if(state.settingsTab==='payment')body=`<section class="settings-section single-panel payment-section"><div class="section-head"><div><h3>💳 Pembayaran & QRIS Multi-Gateway</h3><p>Pilih gateway AutoGoPay, ShopeePay Gateway Sendiri (Direct Native Bawaan / Unofficial Gateway), atau mode rotasi Hybrid. QRIS transaksi akan dihapus otomatis setelah pembayaran selesai atau expired.</p></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span title="Status AutoGoPay">${badge(i.autogopay?.configured?'AutoGoPay: ON':'AutoGoPay: OFF')}</span><span title="Status ShopeePay Gateway">${badge(i.shoppepay_gateway?.configured?'ShopeePay GW: ON':'ShopeePay GW: OFF')}</span></div></div><form id="paymentSettingsForm"><div class="qris-mode-grid">${qrisCard('gopay','📱','AutoGoPay · GoPay','Semua QRIS menggunakan merchant GoPay via AutoGoPay.')}${qrisCard('shopeepay','🛍️','AutoGoPay · ShopeePay','Semua QRIS menggunakan merchant ShopeePay via AutoGoPay.')}${qrisCard('auto_rotate','🔄','AutoGoPay Rotating','Bergantian GoPay ↔ ShopeePay (AutoGoPay) dengan fallback.')}${qrisCard('shoppepay_self','⚡','ShopeePay GW Sendiri','Direct native bawaan tanpa port 4000 (ahmadzakiyox). Tanpa platform fee.')}${qrisCard('hybrid_rotate','🔀','Hybrid Rotating','Bergantian AutoGoPay GoPay ↔ ShopeePay Gateway Sendiri.')}</div><div class="form-grid" style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)"><div class="full" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><h4 style="margin:0 0 4px 0">⚙️ Konfigurasi ShopeePay Gateway Sendiri (Direct Native)</h4><small class="muted">Tersedia Direct Engine bawaan langsung di server iLink (tanpa butuh port 4000 terpisah), atau gunakan gateway eksternal jika diinginkan.</small></div><button type="button" class="neo-btn white small" id="checkSpayTokenBtn">🔍 Cek Status Token</button></div><label>URL ShopeePay Gateway<input name="shoppepay_gateway_url" value="${esc(x.shoppepay_gateway_url||'internal')}" placeholder="internal"><small>Isi <code>internal</code> untuk Direct Native bawaan bot (rekomendasi VPS/Pterodactyl), atau isi URL jika memakai server gateway eksternal.</small></label><label>API Key Gateway (Opsional)<input type="password" autocomplete="off" name="shoppepay_gateway_key" value="${esc(x.shoppepay_gateway_key||'')}" placeholder="Kosongkan jika tidak pakai key"><small>Header X-API-Key jika menggunakan gateway server terpisah.</small></label><label class="full">String / Payload QRIS Statis ShopeePay<textarea name="shoppepay_qris_static" rows="2" placeholder="00020101021126670016ID.CO.SHOPEE.WWW..." style="font-family:monospace;font-size:12px;">${esc(x.shoppepay_qris_static||'')}</textarea><small>String EMVCo QRIS Merchant ShopeePay toko Anda (didapat dari scan gambar QRIS ShopeePay toko Anda menggunakan Google Lens/QR Scanner, lalu salin teksnya ke sini).</small></label><label>Kode Unik Otomatis (Rp 1 - 99)<select name="shoppepay_unique_code"><option value="true" ${x.shoppepay_unique_code!==false?'selected':''}>Aktif (+Rp 1 - 99 acak per invoice)</option><option value="false" ${x.shoppepay_unique_code===false?'selected':''}>Nonaktif (Nominal murni)</option></select><small>Mencegah tabrakan nominal order kembar saat verifikasi mutasi.</small></label><div class="full" id="spayTokenStatusBox" style="display:none;margin-top:8px"></div></div><div class="qris-footer"><span>Rotasi berikutnya: <b>${esc(x.qris_rotation_next==='shopeepay'?'ShopeePay':'GoPay')}</b></span><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="neo-btn blue small" id="openUpdateSpayTokenModal">🔑 Update Token Live</button><button class="neo-btn purple" type="submit">Simpan Pengaturan Pembayaran</button></div></div></form></section>`;
+  else if(state.settingsTab==='payment')body=`<section class="settings-section single-panel payment-section"><div class="section-head"><div><h3>💳 Pembayaran & QRIS Multi-Gateway</h3><p>Pilih gateway AutoGoPay, ShopeePay Gateway Sendiri (Direct Native Bawaan / Unofficial Gateway), atau mode rotasi Hybrid. QRIS transaksi akan dihapus otomatis setelah pembayaran selesai atau expired.</p></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span title="Status AutoGoPay">${badge(i.autogopay?.configured?'AutoGoPay: ON':'AutoGoPay: OFF')}</span><span title="Status ShopeePay Gateway">${badge(i.shoppepay_gateway?.configured?'ShopeePay GW: ON':'ShopeePay GW: OFF')}</span></div></div><form id="paymentSettingsForm"><div class="qris-mode-grid">${qrisCard('gopay','📱','AutoGoPay · GoPay','Semua QRIS menggunakan merchant GoPay via AutoGoPay.')}${qrisCard('shopeepay','🛍️','AutoGoPay · ShopeePay','Semua QRIS menggunakan merchant ShopeePay via AutoGoPay.')}${qrisCard('auto_rotate','🔄','AutoGoPay Rotating','Bergantian GoPay ↔ ShopeePay (AutoGoPay) dengan fallback.')}${qrisCard('shoppepay_self','⚡','ShopeePay GW Sendiri','Direct native bawaan tanpa port 4000 (ahmadzakiyox). Tanpa platform fee.')}${qrisCard('hybrid_rotate','🔀','Hybrid Rotating','Bergantian AutoGoPay GoPay ↔ ShopeePay Gateway Sendiri.')}</div><div class="form-grid" style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)"><div class="full" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><h4 style="margin:0 0 4px 0">⚙️ Konfigurasi ShopeePay Gateway Sendiri (Direct Native)</h4><small class="muted">Tersedia Direct Engine bawaan langsung di server iLink (tanpa butuh port 4000 terpisah), atau gunakan gateway eksternal jika diinginkan.</small></div><button type="button" class="neo-btn white small" id="checkSpayTokenBtn">🔍 Cek Status Token</button></div><label>URL ShopeePay Gateway<input name="shoppepay_gateway_url" value="${esc(x.shoppepay_gateway_url||'internal')}" placeholder="internal"><small>Isi <code>internal</code> untuk Direct Native bawaan bot (rekomendasi VPS/Pterodactyl), atau isi URL jika memakai server gateway eksternal.</small></label><label>API Key Gateway (Opsional)<input type="password" autocomplete="off" name="shoppepay_gateway_key" value="${esc(x.shoppepay_gateway_key||'')}" placeholder="Kosongkan jika tidak pakai key"><small>Header X-API-Key jika menggunakan gateway server terpisah.</small></label><div class="full" style="background:var(--bg-soft);padding:10px 12px;border-radius:8px;border:1px dashed var(--border);margin-bottom:6px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><div><b style="font-size:13px;">📷 Upload Gambar QRIS Toko (Auto-Scan)</b><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Pilih foto QRIS toko Anda (PNG, JPG, WEBP). String teks akan otomatis terisi dan diperiksa validitasnya.</div></div><button type="button" class="neo-btn blue small" id="pickQrisImgSettingsBtn" style="white-space:nowrap;padding:6px 14px;">📁 Pilih Foto QRIS</button><input type="file" id="qrisImageSettingsFileInput" accept="image/*" style="display:none;" /></div><div id="qrisSettingsScanStatus" style="display:none;margin-top:6px;font-size:12px;"></div></div><label class="full">String / Payload QRIS Statis ShopeePay<textarea name="shoppepay_qris_static" rows="2" placeholder="00020101021126670016ID.CO.SHOPEE.WWW..." style="font-family:monospace;font-size:12px;">${esc(x.shoppepay_qris_static||'')}</textarea><small>String EMVCo QRIS Merchant ShopeePay toko Anda (didapat dari scan gambar QRIS ShopeePay toko Anda atau upload foto di atas).</small></label><div class="full" id="paymentQrisAnalyzeBox" style="display:none;margin-top:2px;"></div><label>Kode Unik Otomatis (Rp 1 - 99)<select name="shoppepay_unique_code"><option value="true" ${x.shoppepay_unique_code!==false?'selected':''}>Aktif (+Rp 1 - 99 acak per invoice)</option><option value="false" ${x.shoppepay_unique_code===false?'selected':''}>Nonaktif (Nominal murni)</option></select><small>Mencegah tabrakan nominal order kembar saat verifikasi mutasi.</small></label><div class="full" id="spayTokenStatusBox" style="display:none;margin-top:8px"></div></div><div class="qris-footer"><span>Rotasi berikutnya: <b>${esc(x.qris_rotation_next==='shopeepay'?'ShopeePay':'GoPay')}</b></span><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="neo-btn blue small" id="openUpdateSpayTokenModal">🔑 Update Token Live</button><button class="neo-btn purple" type="submit">Simpan Pengaturan Pembayaran</button></div></div></form></section>`;
   else if(state.settingsTab==='supplier')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>🔌 Reseller Supplier API</h3><p>Balance, katalog, dan import produk/varian ProdSeller serta Storebat.</p></div><button id="refreshSupplierHub" class="neo-btn yellow small">↻ Refresh Supplier</button></div><form id="supplierSettingsForm" class="form-grid" style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)"><label>Storebat API Key (X-Reseller-Key)<input type="password" autocomplete="off" name="storebat_api_key" value="${esc(x.storebat_api_key||'')}" placeholder="Masukkan API Key Storebat"><small>Key reseller dari Storebat / VenteBot API.</small></label><label>Storebat Base URL<input name="storebat_base_url" value="${esc(x.storebat_base_url||'https://web-production-1c7b1.up.railway.app')}" placeholder="https://web-production-1c7b1.up.railway.app"><small>Default: https://web-production-1c7b1.up.railway.app</small></label><label class="full">ProdSeller API Key<input type="password" autocomplete="off" name="prodseller_api_key" value="${esc(x.prodseller_api_key||'')}" placeholder="API Key ProdSeller"></label><div class="full form-actions"><button class="neo-btn purple small" type="submit">Simpan Kunci Supplier</button></div></form><div id="supplierStatus"></div><div id="supplierHub"><div class="empty compact">Memuat data supplier...</div></div></section>`;
   else if(state.settingsTab==='backup')body=`<div class="settings-stack"><section class="settings-section single-panel"><div class="section-head"><div><h3>💾 Backup & Restore SQLite</h3><p>Backup manual, upload/restore SQLite, dan jadwal backup otomatis.</p></div><button id="createBackup" class="neo-btn green small">＋ Buat Backup</button></div><form id="backupSettingsForm" class="backup-settings-grid"><label>Backup Otomatis<select name="auto_backup_enabled"><option value="true" ${(bs.enabled??x.auto_backup_enabled)!==false?'selected':''}>Aktif</option><option value="false" ${(bs.enabled??x.auto_backup_enabled)===false?'selected':''}>Nonaktif</option></select></label><label>Interval (jam)<input name="backup_interval_hours" type="number" min="1" max="168" value="${Number(bs.intervalHours||x.backup_interval_hours||6)}"></label><label>Simpan Maksimal<input name="backup_retention" type="number" min="1" max="365" value="${Number(bs.retention||x.backup_retention||30)}"></label><button class="neo-btn purple" type="submit">Simpan Jadwal</button></form><div class="backup-upload"><input id="backupFile" type="file" accept=".sqlite,application/x-sqlite3"><button id="uploadBackup" class="neo-btn blue">Upload Backup</button><span id="uploadProgress" class="muted">Maksimal 50 MB.</span></div><div class="backup-list">${backupCards(state.cache.backups||[])}</div></section><section class="settings-section single-panel legacy-import-section"><div class="section-head"><div><h3>📥 Migrasi Backup JSON Bot Lama</h3><p>Import backup JSON bot iLink lama ke SQLite tanpa Supabase.</p></div></div><div class="legacy-upload-row"><input id="legacyJsonFile" type="file" accept=".json,application/json"><button id="analyzeLegacyJson" class="neo-btn blue" type="button">Analisis JSON</button><span id="legacyUploadProgress" class="muted">Mendukung backup-bot-*.json, Produk.json, User.json, Trx.json, dan Voucher.json.</span></div><div id="legacyPreview" class="legacy-preview-host">${state.legacyMigration?.preview?legacyPreviewHtml(state.legacyMigration.preview):'<div class="empty compact">Pilih file JSON lama lalu tekan Analisis JSON.</div>'}</div><div id="legacyImportOptions" class="legacy-options ${state.legacyMigration?'':'hidden'}"><label><input type="checkbox" id="legacyUsers" checked> User + saldo/referral</label><label><input type="checkbox" id="legacyProducts" checked> Produk + varian + stok</label><label><input type="checkbox" id="legacyVouchers" checked> Voucher</label><label><input type="checkbox" id="legacyRedeem" checked> Redeem code</label><label><input type="checkbox" id="legacyStats" checked> Statistik historis</label><label><input type="checkbox" id="legacySettings"> Setting toko/bot lama</label><label class="legacy-danger"><input type="checkbox" id="legacyTransactions"> Riwayat transaksi lama</label><p class="muted full">Statistik historis aman diimpor ulang dan tidak membuat detail transaksi ganda. Transaksi dan setting tetap tidak dicentang otomatis untuk mencegah duplikasi atau menimpa konfigurasi baru. Sebelum import, sistem membuat rollback backup SQLite otomatis.</p><button id="applyLegacyImport" type="button" class="neo-btn purple full">Import ke SQLite</button></div><div id="legacyImportResult"></div></section><section class="settings-section single-panel"><div class="section-head"><div><h3>🧮 Perbaiki Counter Historis</h3><p>Gunakan jika angka Total Transaksi / Stok Terjual turun setelah migrasi dari bot lama.</p></div></div>${(()=>{const z=state.cache.historicalStats||{},e=z.effective||{},l=z.live||{},h=z.historical||{};return`<div class="legacy-count-grid"><span>Live Order Detail <b>${Number(l.orders_total||0)}</b></span><span>Live Qty Detail <b>${Number(l.quantity_sold||0)}</b></span><span>Total Tampil <b>${Number(e.orders_total||0)}</b></span><span>Terjual Tampil <b>${Number(e.quantity_sold||0)}</b></span></div><form id="statsRepairForm" class="form-grid" style="margin-top:16px"><label>Total Transaksi Historis<input name="orders_total" type="number" min="0" value="${Number(h.orders_total||e.orders_total||0)}"></label><label>Stok Terjual Historis<input name="quantity_sold" type="number" min="0" value="${Number(h.quantity_sold||e.quantity_sold||0)}"></label><div class="full warning-note">Fitur ini hanya memperbaiki counter historis. Tidak membuat order palsu dan tidak mengubah stok ready. Sistem membuat rollback backup otomatis sebelum menyimpan.</div><div class="full form-actions"><button class="neo-btn yellow" type="submit">Simpan Counter Historis</button></div></form>`})()}</section></div>`;
   else body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>🖥 Status Sistem</h3><p>Ringkasan koneksi dan database.</p></div></div><div class="integration-grid"><div class="integration-card"><div class="integration-status"><b>🤖 Telegram</b>${badge(i.telegram?.running?'running':i.telegram?.configured?'configured':'offline')}</div><p>${esc(i.telegram?.username?'@'+i.telegram.username:'BOT_TOKEN belum terdeteksi')}</p><small>${i.telegram?.last_api_latency_ms?`Latency ${Number(i.telegram.last_api_latency_ms)} ms`:''}</small></div><div class="integration-card"><div class="integration-status"><b>📱 AutoGoPay</b>${badge(i.autogopay?.configured?'configured':'offline')}</div><p>Mode: <b>${esc(qrisMode==='auto_rotate'?'Auto Rotating':qrisMode==='shopeepay'?'ShopeePay':qrisMode==='shoppepay_self'?'ShopeePay GW Sendiri':qrisMode==='hybrid_rotate'?'Hybrid Rotating':'GoPay')}</b></p></div><div class="integration-card"><div class="integration-status"><b>⚡ ShopeePay GW</b>${badge(i.shoppepay_gateway?.configured?'configured':'offline')}</div><p>${esc(x.shoppepay_gateway_url && x.shoppepay_gateway_url !== 'internal' ? x.shoppepay_gateway_url : 'Direct Native (Bawaan)')}</p><div class="integration-actions"><button class="neo-btn yellow small" data-check-qris="shoppepay_self">Cek Gateway</button></div><div id="qrisStatus-shoppepay_self"></div></div><div class="integration-card"><div class="integration-status"><b>🔌 Supplier</b><span>${badge(i.prodseller?.configured?'ProdSeller':'OFF')} ${badge(i.storebat?.configured?'Storebat':'OFF')}</span></div><div class="integration-actions"><button class="neo-btn yellow small" data-test-supplier="prodseller">ProdSeller</button><button class="neo-btn yellow small" data-test-supplier="storebat">Storebat</button></div><div id="supplierStatus"></div></div><div class="integration-card"><div class="integration-status"><b>🖥️ VPS Server</b><span>${vpsRenewalInfo(x).badgeHtml}</span></div><p>${esc(x.vps_provider_name||'VPS Server')} · Jatuh tempo: <b>${esc(x.vps_renewal_date||'Belum diatur')}</b></p><div class="integration-actions"><button type="button" class="neo-btn purple small" id="sysOpenVpsBtn">⚙️ Atur VPS</button><button type="button" class="neo-btn yellow small" id="renewVps30Btn">✅ +30 Hari</button></div></div><div class="integration-card"><div class="integration-status"><b>🗄️ Database</b><span>${bytes(sys.database?.size_bytes)}</span></div><p>SQLite · ${(state.cache.backups||[]).length} file backup</p></div></div></section>`;
@@ -913,7 +913,7 @@ function renderSettings(){
   if($('#storeSettingsForm'))$('#storeSettingsForm').onsubmit=saveStoreSettings;if($('#referralSettingsForm'))$('#referralSettingsForm').onsubmit=e=>saveSimpleSettings(e,['referral_enabled'],['referral_reward_amount'],'Referral disimpan');if($('#topupSettingsForm'))$('#topupSettingsForm').onsubmit=e=>saveSimpleSettings(e,['topup_enabled','wallet_payment_enabled'],['topup_min_amount','topup_max_amount'],'TopUp disimpan');
   if($('#resellerPartnershipSettingsForm'))$('#resellerPartnershipSettingsForm').onsubmit=e=>saveSimpleSettings(e,['reseller_registration_enabled','reseller_can_add_products'],['reseller_registration_fee'],'Pengaturan kemitraan reseller disimpan');
   if($('#goToResellersBtn'))$('#goToResellersBtn').onclick=()=>navigate('resellers');
-  if($('#paymentSettingsForm')){$('#paymentSettingsForm').onsubmit=savePaymentSettings;$$('[data-check-qris]').forEach(b=>b.onclick=()=>testPayment(b.dataset.checkQris));$$('[name="autogopay_payment_method"]').forEach(r=>r.onchange=()=>{$$('.qris-mode-card').forEach(c=>c.classList.toggle('selected',c.querySelector('input')?.checked))});if($('#checkSpayTokenBtn'))$('#checkSpayTokenBtn').onclick=checkShoppepayTokenStatus;if($('#openUpdateSpayTokenModal'))$('#openUpdateSpayTokenModal').onclick=openUpdateShoppepayTokenModal;}
+  if($('#paymentSettingsForm')){$('#paymentSettingsForm').onsubmit=savePaymentSettings;$$('[data-check-qris]').forEach(b=>b.onclick=()=>testPayment(b.dataset.checkQris));$$('[name="autogopay_payment_method"]').forEach(r=>r.onchange=()=>{$$('.qris-mode-card').forEach(c=>c.classList.toggle('selected',c.querySelector('input')?.checked))});if($('#checkSpayTokenBtn'))$('#checkSpayTokenBtn').onclick=checkShoppepayTokenStatus;if($('#openUpdateSpayTokenModal'))$('#openUpdateSpayTokenModal').onclick=openUpdateShoppepayTokenModal;bindPaymentQrisAutoScan();}
   if($('#supplierSettingsForm'))$('#supplierSettingsForm').onsubmit=async e=>{e.preventDefault();await saveSimpleSettings(e,[],[],'Kunci supplier disimpan');await refreshSupplierHub(true);};
   if($('#refreshSupplierHub')){$('#refreshSupplierHub').onclick=()=>refreshSupplierHub(true);refreshSupplierHub(false)}
     if($('#vpsReminderForm'))$('#vpsReminderForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.target);const isEnabled=fd.get('vps_reminder_enabled')==='true';const payload={vps_provider_name:String(fd.get('vps_provider_name')||'').trim(),vps_renewal_date:String(fd.get('vps_renewal_date')||'').trim(),vps_cost:Number(fd.get('vps_cost')||0),vps_reminder_enabled:isEnabled};try{const res=await api('/api/admin/settings',{method:'PATCH',body:payload});const updated=(res&&res.settings)?res.settings:payload;state.cache.settings=Object.assign({},state.cache.settings||{},updated);if(state.overview)state.overview.settings=Object.assign({},state.overview.settings||{},updated);toast('Pengaturan VPS berhasil disimpan');renderSettings();updateVpsHeaderTimer();}catch(err){toast(err.message,true);}};
@@ -935,9 +935,154 @@ function bindBackupActions(){$$('[data-download-backup]').forEach(b=>b.onclick=(
 async function saveSimpleSettings(e,boolKeys=[],numberKeys=[],message='Pengaturan disimpan'){e.preventDefault();const x=Object.fromEntries(new FormData(e.target).entries());for(const k of boolKeys)x[k]=x[k]==='true';for(const k of numberKeys)x[k]=Number(x[k]||0);try{state.cache.settings=await api('/api/admin/settings',{method:'PATCH',body:x}).then(r=>r.settings||x);toast(message)}catch(err){toast(err.message,true)}}
 async function saveStoreSettings(e){e.preventDefault();const x=Object.fromEntries(new FormData(e.target).entries());['store_balance'].forEach(k=>x[k]=Number(x[k]||0));x.show_total_users=x.show_total_users==='true';try{await api('/api/admin/settings',{method:'PATCH',body:x});toast('Pengaturan toko disimpan');applyShell(await api('/api/admin/overview'))}catch(err){toast(err.message,true)}}
 async function savePaymentSettings(e){e.preventDefault();const x=Object.fromEntries(new FormData(e.target).entries());const method=x.autogopay_payment_method||'gopay';const url=String(x.shoppepay_gateway_url||'internal').trim();const key=String(x.shoppepay_gateway_key||'').trim();const qrisStatic=String(x.shoppepay_qris_static||'').trim();const uniqueCode=x.shoppepay_unique_code==='true';try{await api('/api/admin/settings',{method:'PATCH',body:{autogopay_payment_method:method,shoppepay_gateway_url:url,shoppepay_gateway_key:key,shoppepay_qris_static:qrisStatic,shoppepay_unique_code:uniqueCode}});if(state.cache.settings){state.cache.settings.autogopay_payment_method=method;state.cache.settings.shoppepay_gateway_url=url;state.cache.settings.shoppepay_gateway_key=key;state.cache.settings.shoppepay_qris_static=qrisStatic;state.cache.settings.shoppepay_unique_code=uniqueCode;}toast('Pengaturan pembayaran & QRIS disimpan')}catch(err){toast(err.message,true)}}
+async function scanQrCodeFromFile(file) {
+  if (!file) return null;
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          if (typeof BarcodeDetector !== 'undefined') {
+            try {
+              const detector = new BarcodeDetector({ formats: ['qr_code'] });
+              const results = await detector.detect(img);
+              if (results && results.length > 0 && results[0].rawValue) {
+                return resolve(results[0].rawValue);
+              }
+            } catch {}
+          }
+
+          if (typeof jsQR !== 'undefined') {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            const origW = img.naturalWidth || img.width;
+            const origH = img.naturalHeight || img.height;
+            canvas.width = origW;
+            canvas.height = origH;
+            ctx.drawImage(img, 0, 0);
+
+            let imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            let code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
+            if (code && code.data) return resolve(code.data);
+
+            const maxDim = Math.max(origW, origH);
+            if (maxDim > 1000) {
+              const scale = 1000 / maxDim;
+              canvas.width = Math.round(origW * scale);
+              canvas.height = Math.round(origH * scale);
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
+              if (code && code.data) return resolve(code.data);
+            }
+
+            for (let i = 0; i < imgData.data.length; i += 4) {
+              const avg = (imgData.data[i] + imgData.data[i + 1] + imgData.data[i + 2]) / 3;
+              const val = avg > 125 ? 255 : 0;
+              imgData.data[i] = val;
+              imgData.data[i + 1] = val;
+              imgData.data[i + 2] = val;
+            }
+            code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
+            if (code && code.data) return resolve(code.data);
+          }
+
+          resolve(null);
+        } catch {
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
+function bindPaymentQrisAutoScan(){
+  const qrisInput=$('[name="shoppepay_qris_static"]');
+  const box=$('#paymentQrisAnalyzeBox');
+  const pickBtn=$('#pickQrisImgSettingsBtn');
+  const fileInput=$('#qrisImageSettingsFileInput');
+  const scanStatus=$('#qrisSettingsScanStatus');
+
+  let debounceTimer;
+  const triggerAnalyze=()=>{
+    clearTimeout(debounceTimer);
+    debounceTimer=setTimeout(async()=>{
+      const val=String(qrisInput?.value||'').trim();
+      if(!val){if(box){box.style.display='none';box.innerHTML='';}return;}
+      if(!val.includes('000201')){
+        if(box){
+          box.style.display='block';
+          box.innerHTML='<div style="padding:6px 10px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);border-radius:6px;font-size:12px;color:#e74c3c;">⚠️ String bukan format QRIS standar EMV (harus memuat 000201).</div>';
+        }
+        return;
+      }
+      try{
+        const res=await api('/api/admin/integrations/qris-analyze',{method:'POST',body:{payload:val}});
+        if(res.ok&&res.data&&box){
+          const d=res.data;
+          if(d.cleaned_payload&&qrisInput.value!==d.cleaned_payload){
+            qrisInput.value=d.cleaned_payload;
+          }
+          const crcNote=d.crc_repaired?' <span class="badge ok" style="font-size:10px;margin-left:4px;">CRC Auto-Repaired</span>':'';
+          box.style.display='block';
+          box.innerHTML=`<div style="padding:8px 10px;background:rgba(46,204,113,0.1);border:1px solid rgba(46,204,113,0.3);border-radius:6px;font-size:12px;color:var(--text-main);">
+            <b>✅ QRIS Terdeteksi:</b> ${esc(d.merchant_name)}${crcNote}<br>
+            <small>NMID: <b>${esc(d.nmid||'-')}</b> · Kota: <b>${esc(d.city||'-')}</b> · Penerbit: <b>${esc(d.acquirer||'-')}</b></small>
+            ${d.is_dynamic?'<div style="color:#e74c3c;font-weight:bold;margin-top:2px;">⚠️ Peringatan: Ini QRIS Dinamis. Masukkan QRIS Statis toko Anda!</div>':''}
+          </div>`;
+        }
+      }catch(err){
+        if(box){
+          box.style.display='block';
+          box.innerHTML=`<div style="padding:6px 10px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);border-radius:6px;font-size:12px;color:#e74c3c;">⚠️ ${esc(err.message)}</div>`;
+        }
+      }
+    },300);
+  };
+
+  if(qrisInput&&box){
+    qrisInput.oninput=triggerAnalyze;
+    if(qrisInput.value)triggerAnalyze();
+  }
+
+  if(pickBtn&&fileInput){
+    pickBtn.onclick=()=>fileInput.click();
+    fileInput.onchange=async()=>{
+      const file=fileInput.files?.[0];
+      if(!file)return;
+      if(scanStatus){
+        scanStatus.style.display='block';
+        scanStatus.innerHTML='<span style="color:var(--primary);">⏳ Sedang membaca QR Code dari foto...</span>';
+      }
+      try{
+        const decoded=await scanQrCodeFromFile(file);
+        if(decoded){
+          if(scanStatus)scanStatus.innerHTML='<span style="color:#2ecc71;font-weight:bold;">✅ QR Code berhasil terbaca dari gambar!</span>';
+          toast('✅ QR Code berhasil dibaca dari gambar!');
+          if(qrisInput){
+            qrisInput.value=decoded;
+            triggerAnalyze();
+          }
+        }else{
+          if(scanStatus)scanStatus.innerHTML='<span style="color:#e74c3c;">⚠️ QR Code tidak terdeteksi pada gambar. Pastikan gambar jelas, terang, dan tidak buram.</span>';
+          toast('QR Code tidak terdeteksi pada gambar.',true);
+        }
+      }catch(err){
+        if(scanStatus)scanStatus.innerHTML=`<span style="color:#e74c3c;">⚠️ Gagal membaca foto: ${esc(err.message)}</span>`;
+        toast('Gagal membaca foto: '+err.message,true);
+      }
+    };
+  }
+}
+
 function openUpdateShoppepayTokenModal(){
   const curQris=esc(state.cache.settings?.shoppepay_qris_static||'');
-  modal('Perbarui Token & QRIS ShopeePay Live',`<div class="form-grid"><div class="full info-note">Masukkan token ShopeePay Partner Portal (<code>SHOPEE_TOKEN</code>) dan/atau String QRIS Statis toko Anda. Menggunakan sistem Payment Shopee standar EMVCo resmi dengan auto-generate QRIS dinamis + kode unik.</div><label class="full">Token ShopeePay Baru (SHOPEE_TOKEN)<textarea id="liveShoppepayToken" rows="3" placeholder="Masukkan token ShopeePay (dari Partner Portal)..." style="font-family:monospace;font-size:12px;"></textarea><small>Diperoleh dari Cookies / Storage / Network request ShopeePay Partner Portal.</small></label><label class="full">String QRIS Statis Merchant (Opsional)<textarea id="liveShoppepayQris" rows="2" placeholder="00020101021126670016ID.CO.SHOPEE.WWW..." style="font-family:monospace;font-size:12px;">${curQris}</textarea><small>String teks dari scan QR code QRIS ShopeePay toko Anda (via Google Lens / QR Scanner).</small></label><div class="full" id="liveQrisAnalyzeBox" style="display:none;margin-top:2px;"></div></div>`,async()=>{
+  modal('Perbarui Token & QRIS ShopeePay Live',`<div class="form-grid"><div class="full info-note">Masukkan token ShopeePay Partner Portal (<code>SHOPEE_TOKEN</code>) dan String QRIS Statis toko Anda.<br><b>Fitur Praktis:</b> Anda bisa langsung klik <b>Upload Foto QRIS</b> di bawah agar sistem otomatis membaca QR code tanpa perlu scan manual.</div><label class="full">Token ShopeePay Baru (SHOPEE_TOKEN)<textarea id="liveShoppepayToken" rows="3" placeholder="Masukkan token ShopeePay (dari Partner Portal)..." style="font-family:monospace;font-size:12px;"></textarea><small>Diperoleh dari Cookies / Storage / Network request ShopeePay Partner Portal.</small></label><div class="full" style="background:var(--bg-soft);padding:10px 12px;border-radius:8px;border:1px dashed var(--border);margin-bottom:6px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><div><b style="font-size:13px;">📷 Upload Gambar QRIS Toko (Auto-Scan)</b><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Pilih foto QRIS toko Anda (PNG, JPG, WEBP). String teks akan otomatis terisi.</div></div><button type="button" class="neo-btn blue small" id="pickQrisImgBtn" style="white-space:nowrap;padding:6px 14px;">📁 Pilih Foto QRIS</button><input type="file" id="qrisImageFileInput" accept="image/*" style="display:none;" /></div><div id="qrisImgScanStatus" style="display:none;margin-top:6px;font-size:12px;"></div></div><label class="full">String QRIS Statis Merchant (Opsional)<textarea id="liveShoppepayQris" rows="2" placeholder="00020101021126670016ID.CO.SHOPEE.WWW..." style="font-family:monospace;font-size:12px;">${curQris}</textarea><small>String teks dari scan QR code QRIS toko Anda (terisi otomatis saat Anda upload foto di atas).</small></label><div class="full" id="liveQrisAnalyzeBox" style="display:none;margin-top:2px;"></div></div>`,async()=>{
     const tok=String($('#liveShoppepayToken')?.value||'').trim();
     const qris=String($('#liveShoppepayQris')?.value||'').trim();
     if(!tok&&!qris)return toast('Token atau QRIS Statis ShopeePay harus diisi.',true);
@@ -949,7 +1094,7 @@ function openUpdateShoppepayTokenModal(){
       const res=await api('/api/admin/integrations/shoppepay-update-token',{method:'POST',body});
       if(state.cache.settings){
         if(tok)state.cache.settings.shoppepay_token=tok;
-        if(qris)state.cache.settings.shoppepay_qris_static=qris;
+        if(qris)state.cache.settings.shoppepay_qris_static=res.data?.qris_info?.cleaned_payload||qris;
       }
       toast(res.data?.message||res.message||'Konfigurasi ShopeePay berhasil diperbarui secara live!');
       testPayment('shoppepay_self');
@@ -958,37 +1103,79 @@ function openUpdateShoppepayTokenModal(){
 
   const qrisInput=$('#liveShoppepayQris');
   const box=$('#liveQrisAnalyzeBox');
-  if(qrisInput&&box){
-    let debounceTimer;
-    const triggerAnalyze=()=>{
-      clearTimeout(debounceTimer);
-      debounceTimer=setTimeout(async()=>{
-        const val=String(qrisInput.value||'').trim();
-        if(!val){box.style.display='none';box.innerHTML='';return;}
-        if(!val.startsWith('000201')){
-          box.style.display='block';
-          box.innerHTML='<div style="padding:6px 10px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);border-radius:6px;font-size:12px;color:#e74c3c;">⚠️ String bukan format QRIS standar EMV (harus diawali 000201).</div>';
-          return;
-        }
-        try{
-          const res=await api('/api/admin/integrations/qris-analyze',{method:'POST',body:{payload:val}});
-          if(res.ok&&res.data){
-            const d=res.data;
-            box.style.display='block';
-            box.innerHTML=`<div style="padding:8px 10px;background:rgba(46,204,113,0.1);border:1px solid rgba(46,204,113,0.3);border-radius:6px;font-size:12px;color:var(--text-main);">
-              <b>✅ QRIS Terdeteksi:</b> ${esc(d.merchant_name)}<br>
-              <small>NMID: <b>${esc(d.nmid||'-')}</b> · Kota: <b>${esc(d.city||'-')}</b> · Penerbit: <b>${esc(d.acquirer||'-')}</b></small>
-              ${d.is_dynamic?'<div style="color:#e74c3c;font-weight:bold;margin-top:2px;">⚠️ Peringatan: Ini QRIS Dinamis. Masukkan QRIS Statis toko Anda!</div>':''}
-            </div>`;
+  const pickBtn=$('#pickQrisImgBtn');
+  const fileInput=$('#qrisImageFileInput');
+  const scanStatus=$('#qrisImgScanStatus');
+
+  let debounceTimer;
+  const triggerAnalyze=()=>{
+    clearTimeout(debounceTimer);
+    debounceTimer=setTimeout(async()=>{
+      const val=String(qrisInput.value||'').trim();
+      if(!val){box.style.display='none';box.innerHTML='';return;}
+      if(!val.includes('000201')){
+        box.style.display='block';
+        box.innerHTML='<div style="padding:6px 10px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);border-radius:6px;font-size:12px;color:#e74c3c;">⚠️ String bukan format QRIS standar EMV (harus memuat 000201).</div>';
+        return;
+      }
+      try{
+        const res=await api('/api/admin/integrations/qris-analyze',{method:'POST',body:{payload:val}});
+        if(res.ok&&res.data){
+          const d=res.data;
+          if(d.cleaned_payload&&qrisInput.value!==d.cleaned_payload){
+            qrisInput.value=d.cleaned_payload;
           }
-        }catch(err){
+          const crcNote=d.crc_repaired?' <span class="badge ok" style="font-size:10px;margin-left:4px;">CRC Auto-Repaired</span>':'';
           box.style.display='block';
-          box.innerHTML=`<div style="padding:6px 10px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);border-radius:6px;font-size:12px;color:#e74c3c;">⚠️ ${esc(err.message)}</div>`;
+          box.innerHTML=`<div style="padding:8px 10px;background:rgba(46,204,113,0.1);border:1px solid rgba(46,204,113,0.3);border-radius:6px;font-size:12px;color:var(--text-main);">
+            <b>✅ QRIS Terdeteksi:</b> ${esc(d.merchant_name)}${crcNote}<br>
+            <small>NMID: <b>${esc(d.nmid||'-')}</b> · Kota: <b>${esc(d.city||'-')}</b> · Penerbit: <b>${esc(d.acquirer||'-')}</b></small>
+            ${d.is_dynamic?'<div style="color:#e74c3c;font-weight:bold;margin-top:2px;">⚠️ Peringatan: Ini QRIS Dinamis. Masukkan QRIS Statis toko Anda!</div>':''}
+          </div>`;
         }
-      },400);
-    };
+      }catch(err){
+        box.style.display='block';
+        box.innerHTML=`<div style="padding:6px 10px;background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.3);border-radius:6px;font-size:12px;color:#e74c3c;">⚠️ ${esc(err.message)}</div>`;
+      }
+    },300);
+  };
+
+  if(qrisInput&&box){
     qrisInput.oninput=triggerAnalyze;
     if(qrisInput.value)triggerAnalyze();
+  }
+
+  if(pickBtn&&fileInput){
+    pickBtn.onclick=()=>fileInput.click();
+    fileInput.onchange=async()=>{
+      const file=fileInput.files?.[0];
+      if(!file)return;
+      if(scanStatus){
+        scanStatus.style.display='block';
+        scanStatus.innerHTML='<span style="color:var(--primary);">⏳ Sedang membaca QR Code dari foto...</span>';
+      }
+      try{
+        const decoded=await scanQrCodeFromFile(file);
+        if(decoded){
+          if(scanStatus){
+            scanStatus.innerHTML='<span style="color:#2ecc71;font-weight:bold;">✅ QR Code berhasil terbaca dari gambar!</span>';
+          }
+          toast('✅ QR Code berhasil dibaca dari gambar!');
+          if(qrisInput){
+            qrisInput.value=decoded;
+            triggerAnalyze();
+          }
+        }else{
+          if(scanStatus){
+            scanStatus.innerHTML='<span style="color:#e74c3c;">⚠️ QR Code tidak terdeteksi pada gambar. Pastikan gambar jelas, terang, dan QR tidak terpotong.</span>';
+          }
+          toast('QR Code tidak terdeteksi pada gambar.',true);
+        }
+      }catch(err){
+        if(scanStatus)scanStatus.innerHTML=`<span style="color:#e74c3c;">⚠️ Gagal membaca foto: ${esc(err.message)}</span>`;
+        toast('Gagal membaca foto: '+err.message,true);
+      }
+    };
   }
 }
 async function checkShoppepayTokenStatus(){const host=$('#spayTokenStatusBox');if(!host)return;host.style.display='block';host.innerHTML='<span class="muted">Mengecek status ShopeePay Gateway & token...</span>';try{const res=await testPayment('shoppepay_self');if(!res)return;const ok=res.ok;const tokStatus=res.token_status||(ok?'valid':'invalid');host.innerHTML=`<div class="supplier-summary" style="margin-top:6px;padding:10px;background:var(--bg-soft);border-radius:8px;border:1px solid var(--border)"><div>Status Gateway: <span class="badge ${ok?'ok':'bad'}">${esc(res.health||(ok?'running':'offline'))}</span></div><div>Status Token: <span class="badge ${tokStatus==='valid'?'ok':'bad'}">${esc(tokStatus)}</span></div><div style="font-size:12px;color:var(--text-muted);margin-top:4px">${esc(res.message||'')}</div></div>`;}catch(err){host.innerHTML=`<span class="badge bad">${esc(err.message)}</span>`;}}

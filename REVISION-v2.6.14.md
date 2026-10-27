@@ -2,7 +2,7 @@
 
 ## Perbaikan Form Atur Produk Fresh & Tampilan Saldo Jaspay di Dashboard
 
-1. **Penyederhanaan Form Modal "Atur Produk Fresh" (`app.js`)**:
+1. **Penyederhanaan Form Modal "Atur Produk Fresh" (`app.js` & `index.html`)**:
    - Menghapus input ganda di bagian atas form modal (`reseller_price`, `pricing_mode`, `pricing_value`, dan `sell_price_min`) yang sebelumnya membingungkan owner karena di bawahnya juga ada input per varian.
    - Bagian atas form kini bersih, hanya menampilkan:
      - Status Generate API (`Aktif / Nonaktif`)
@@ -15,6 +15,10 @@
        - `🏷️ Harga Jual Owner (Customer)`
        - `🤝 Harga Modal Reseller`
      - Placeholder input otomatis menampilkan nominal aktif saat ini (`Saat ini: Rp X.XXX`).
+   - **Perbaikan Validasi Browser Step Constraint**:
+     - Mengubah atribut `min="1" step="100"` menjadi `min="0" step="any"` pada input harga override.
+     - Menambahkan atribut `novalidate` pada form dialog modal di `index.html`.
+     - Masalah browser memunculkan *"Please enter a valid value. The two nearest valid values are 6401 and 6501"* saat input 6500 atau 10000 telah terselesaikan sepenuhnya. Owner kini dapat menginput nominal Rupiah bulat berapapun tanpa batasan step.
 
 2. **Indikator Saldo API Jaspay Cerdas & Informatif (`app.js`)**:
    - Saldo API Jaspay tidak lagi menampilkan `-` tanpa kejelasan.

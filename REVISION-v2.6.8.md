@@ -18,5 +18,7 @@
   - Kelengkapan styling modul baru: Melengkapi seluruh CSS untuk modul **Undangan Tim & Email Pembeli**, **Promosi Stok Ready** (live preview editor, tabs WA/Telegram, filter), dan **Portal Reseller** (kartu reseller, runtime badge bot toko, kartu penarikan dana, serta tabel mutasi profit).
   - Pembersihan kontradiksi CSS: Menghapus deklarasi `display:none` lama pada tombol lonceng notifikasi di mobile sehingga ikon notifikasi selalu muncul dan sejajar rapi dengan timer VPS di topbar.
   - Perbaikan layout mobile: Kartu varian, kartu produk, dan topbar dioptimalkan pada layar smartphone agar tidak bergeser atau bertumpuk.
-  - Neobrutalist Toast & Modal: Tampilan toast popup dan dialog modal diperbarui dengan badge kuning kontras dan bayangan tegas sesuai tema.
+- **Pemulihan Navigasi Menu Sidebar (v2.6.21)**:
+  - Memasukkan kembali tombol menu **👥 Reseller Bot** (lengkap dengan badge notifikasi approval `<em id="resellerBadge">`), **📢 Promosi Ready**, dan **📧 Undangan Tim** ke dalam daftar navigasi sidebar [index.html](file:///c:/Users/LENOVO/Downloads/iLink.in%20Store%20Bot%20New/iLink-AutoOrder-Vercel-v2.6.8/index.html).
+  - Merapikan padding dan jarak vertikal antar tombol menu di sidebar agar seluruh 13 menu navigasi tampil rapi, proporsional, dan nyaman diakses tanpa perlu scroll berlebih.
 

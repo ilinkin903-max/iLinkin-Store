@@ -21,6 +21,8 @@ const state = {
 };
 
 const titles = {
+  nokos: ['Nokos', 'Katalog nomor virtual, OTP dan pesanan toko Anda'],
+  smm: ['SMM', 'Katalog layanan media sosial dan pesanan toko Anda'],
   dashboard: ['Dashboard', 'Ringkasan performa toko dan komisi profit Anda'],
   pricing: ['Produk', 'Kelola produk toko Anda sendiri dan katalog produk reseller dari owner'],
   orders: ['Pesanan', 'Daftar riwayat transaksi pembeli yang masuk melalui bot Anda'],
@@ -451,6 +453,8 @@ async function navigate(view, silent = false) {
   }
   try {
     await ({
+      nokos: () => loadZyrexMenu('otp'),
+      smm: () => loadZyrexMenu('smm'),
       dashboard: loadDashboard,
       pricing: loadPricing,
       orders: loadOrders,
@@ -3325,3 +3329,8 @@ $('#membershipTimerBtn').onclick=openMembership;
 setInterval(()=>{if(!document.hidden)renderMembershipClock();},1000);
 setInterval(refreshMembership,60000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshMembership();});
+
+async function loadZyrexMenu(kind){
+  const view=kind==='otp'?'nokos':'smm';
+  return window.ilinkZyrex.render({api,base:'/api/reseller/zyrex',host:$('#content'),kind,isCurrent:()=>state.view===view,onSettings:()=>navigate('bot')});
+}

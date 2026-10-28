@@ -346,6 +346,7 @@ async function apiRequest(path, options = {}, requestToken = state.token) {
   if (!res.ok || data.ok === false) {
     throw new Error(data.message || data.error || `HTTP ${res.status}`);
   }
+  if(data.membership)applyMembership(data.membership);
   return data;
 }
 
@@ -3267,3 +3268,60 @@ async function initialize() {
     `;
   }
 })();
+
+// Server-authoritative membership; the one-second display does not send requests.
+let membershipOffset=0,membershipQrTimer;
+function applyMembership(value){
+  state.membership=value;membershipOffset=(Date.parse(value.server_time)||Date.now())-Date.now();
+  state.canAddProducts=Boolean(value.can_add_products);renderMembershipClock();
+}
+function renderMembershipClock(){
+  const m=state.membership,el=$('#membershipTimerText'),button=$('#membershipTimerBtn');if(!m||!el)return;
+  const remaining=Date.parse(m.active_until)-(Date.now()+membershipOffset);
+  const expired=!m.free&&(!m.active||remaining<=0);
+  button.classList.toggle('expired',expired);
+  if(m.free)el.textContent='⏱ Bulanan Gratis';
+  else if(expired)el.textContent='⏱ Habis · Perpanjang';
+  else{const sec=Math.max(0,Math.floor(remaining/1000)),d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),min=Math.floor(sec%3600/60),ss=sec%60;el.textContent=`⏱ ${d} hari ${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;}
+  button.title=m.label+' · '+(m.free?'Bulanan gratis':'Aktif sampai '+date(m.active_until));
+}
+async function refreshMembership(){if(!state.token||document.hidden)return;try{await api('/api/reseller/membership');}catch{}}
+async function openMembership(){
+  try{
+    const data=await api('/api/reseller/membership'),m=data.membership;
+    modal('⏱ Paket & Masa Aktif',`<div class="membership-detail"><p><b>${esc(m.label)}</b><br>Pendaftaran: ${money(m.registration_fee)}<br>Bulanan: <b>${m.free?'Gratis':money(m.monthly_fee)+' / 30 hari'}</b></p><div class="info-note">${m.free?'Tidak ada tagihan bulanan.':`Aktif sampai: <b>${date(m.active_until)}</b><br>Perpanjangan menambah 30 hari dari akhir masa aktif, atau mulai hari ini jika sudah habis.`}</div>${m.free?'':`<p>Saldo profit: <b>${money(data.profit_balance)}</b></p><div class="form-actions"><button type="button" id="renewProfitBtn" class="neo-btn purple">Bayar dengan Profit</button><button type="button" id="renewQrisBtn" class="neo-btn green">Bayar QRIS</button></div>`}</div>`,null,{noSubmit:true});
+    const requestId=crypto.randomUUID();
+    const renew=async(method,btn)=>{
+      btn.disabled=true;
+      try{
+        const result=await api('/api/reseller/membership/renew',{method:'POST',body:{method,request_id:requestId,expected_fee:m.monthly_fee}});
+        if(method==='profit'){toast('Masa aktif diperpanjang 30 hari');await openMembership();}
+        else showMembershipQris(result.payment);
+      }catch(e){toast(e.message,true);}finally{btn.disabled=false;}
+    };
+    if($('#renewProfitBtn'))$('#renewProfitBtn').onclick=e=>renew('profit',e.currentTarget);
+    if($('#renewQrisBtn'))$('#renewQrisBtn').onclick=e=>renew('qris',e.currentTarget);
+  }catch(e){toast(e.message,true);}
+}
+function showMembershipQris(payment){
+  clearInterval(membershipQrTimer);
+  modal('QRIS Perpanjangan',`<div class="membership-detail membership-qr"><strong>${money(payment.amount)}</strong><p>Bayar tepat sesuai nominal termasuk kode unik.</p><div id="membershipQrImage"><img src="${esc(payment.qr_image)}" alt="QRIS perpanjangan reseller"></div><p id="membershipQrTime"></p><button type="button" id="checkMembershipBtn" class="neo-btn purple">Cek Pembayaran</button><p id="membershipQrStatus" role="status"></p></div>`,null,{noSubmit:true});
+  const tick=()=>{
+    if(!$('#membershipQrTime')||!$('#modal').open){clearInterval(membershipQrTimer);return;}
+    const left=Date.parse(payment.expires_at)-Date.now()-membershipOffset;
+    if(left<=0){$('#membershipQrImage').innerHTML='<div class="info-note">QRIS expired. Ada toleransi 2 menit untuk pembayaran yang sudah dilakukan.</div>';$('#membershipQrTime').textContent='Waktu pembayaran habis';}
+    else{const sec=Math.ceil(left/1000);$('#membershipQrTime').textContent=`Sisa waktu ${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;}
+  };tick();membershipQrTimer=setInterval(tick,1000);
+  $('#checkMembershipBtn').onclick=async e=>{
+    const btn=e.currentTarget;btn.disabled=true;
+    try{const data=await api('/api/reseller/membership/payments/'+encodeURIComponent(payment.ref)+'/check',{method:'POST'});
+      if(!$('#membershipQrStatus')||!$('#modal').open)return;
+      if(data.payment.status==='completed'){clearInterval(membershipQrTimer);toast('Perpanjangan berhasil');await openMembership();}
+      else $('#membershipQrStatus').textContent=data.payment.status==='pending'?'Pembayaran belum terdeteksi. Silakan cek kembali.':'Invoice '+data.payment.status+'. Tutup lalu buat QRIS baru.';
+    }catch(e){if($('#membershipQrStatus'))$('#membershipQrStatus').textContent=e.message;else toast(e.message,true);}finally{btn.disabled=false;}
+  };
+}
+$('#membershipTimerBtn').onclick=openMembership;
+setInterval(()=>{if(!document.hidden)renderMembershipClock();},1000);
+setInterval(refreshMembership,60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshMembership();});

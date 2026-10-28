@@ -369,3 +369,12 @@
 
 
 
+
+/* Membership status shares the compact top action area on mobile. */
+.membership-timer{border:2px solid #171717;box-shadow:3px 3px 0 #171717;border-radius:8px;background:#c5ff38;color:#171717;font:inherit;font-size:12px;font-weight:800;padding:9px 11px;cursor:pointer;white-space:nowrap;transition:transform .18s,box-shadow .18s}
+.membership-timer:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 #171717}
+.membership-timer.expired{background:#ffb3cd}.membership-timer:focus-visible{outline:3px solid #a271ff;outline-offset:4px}
+.membership-detail{display:grid;gap:14px}.membership-detail p{margin:0;line-height:1.6}.membership-detail .form-actions{display:flex;gap:10px;flex-wrap:wrap}.membership-detail .info-note{padding:14px;border:2px solid #171717;border-radius:8px;background:#f0e4ff}
+.membership-qr{text-align:center}.membership-qr img{display:block;width:min(100%,340px);height:auto;margin:12px auto;background:#fff;border:2px solid #171717}.membership-qr strong{font-size:24px}
+@media(max-width:640px){.topbar{flex-wrap:wrap}.topbar .page-title{flex:1;min-width:0}.topbar .top-actions{width:100%;justify-content:flex-end;gap:8px}.membership-timer{margin-right:auto;font-size:11px;padding:8px}.topbar .telegram-btn{font-size:11px;padding:8px}}
+@media(prefers-reduced-motion:reduce){.membership-timer{transition:none}}

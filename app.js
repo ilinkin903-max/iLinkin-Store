@@ -915,7 +915,7 @@ function renderSettings(){
   else if(state.settingsTab==='vps'){const v=vpsRenewalInfo(x);body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>🖥️ Pengingat Perpanjangan VPS</h3><p>Catat tanggal jatuh tempo perpanjangan VPS server agar sistem mengirimkan pengingat ke Telegram Owner dan dashboard MiniApp.</p></div>${v.badgeHtml}</div><form id="vpsReminderForm" class="form-grid"><label>Nama Provider VPS<input name="vps_provider_name" value="${esc(x.vps_provider_name||'')}" placeholder="Contoh: Contabo, Hostinger, Biznet, Reviactyl"><small>Penyedia VPS atau server tempat bot aktif.</small></label><label>Tanggal Jatuh Tempo Perpanjangan<input name="vps_renewal_date" type="date" value="${esc(x.vps_renewal_date||'')}"><small>Tanggal batas akhir periode sewa server.</small></label><label>Biaya Perpanjangan (Rp)<input name="vps_cost" type="number" min="0" value="${Number(x.vps_cost||0)}" placeholder="Contoh: 150000"><small>Nominal tagihan perpanjangan.</small></label><label>Pengingat Otomatis ke Telegram<select name="vps_reminder_enabled"><option value="true" ${isVpsReminderEnabled(x)?'selected':''}>🟢 Aktif (H-7, H-5, H-3, H-2, H-1, Hari H)</option><option value="false" ${!isVpsReminderEnabled(x)?'selected':''}>🔴 Nonaktif</option></select><small>Peringatan berkala otomatis ke Telegram Owner.</small></label><div class="full info-note"><b>💡 Panduan Fitur Pengingat VPS:</b><br>• <b>Telegram Otomatis:</b> Bot memeriksa tanggal jatuh tempo secara berkala dan mengirim peringatan ke Telegram Owner saat H-7, H-5, H-3, H-2, H-1, dan hari H.<br>• <b>MiniApp & Dashboard:</b> Lonceng notifikasi 🔔 dan widget Dashboard otomatis menampilkan status sisa hari & peringatan darurat.<br>• <b>Tombol +30 Hari:</b> Klik tombol kuning <b>✅ Sudah Diperpanjang (+30 Hari)</b> setelah Anda selesai membayar sewa VPS untuk langsung memajukan tanggal jatuh tempo 1 bulan (30 hari) ke depan secara instan.</div><div class="full form-actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="neo-btn purple" type="submit">💾 Simpan Pengaturan VPS</button><button id="renewVps30Btn" class="neo-btn yellow" type="button">✅ Sudah Diperpanjang (+30 Hari)</button></div></form></section>`;}
   else if(state.settingsTab==='referral')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>👥 Referral</h3><p>Atur program referral dan bonus saldo untuk pengundang.</p></div></div><form id="referralSettingsForm" class="form-grid"><label>Status Referral<select name="referral_enabled"><option value="true" ${x.referral_enabled!==false?'selected':''}>Aktif</option><option value="false" ${x.referral_enabled===false?'selected':''}>Nonaktif</option></select></label><label>Bonus per Referral<input name="referral_reward_amount" type="number" min="0" value="${Number(x.referral_reward_amount||0)}"></label><div class="full info-note">Bonus diberikan ke saldo referral sesuai mekanisme pendaftaran referral bot. User dapat melihat link referral dari menu Saldo & Referral.</div><div class="full form-actions"><button class="neo-btn purple" type="submit">Simpan Referral</button></div></form></section>`;
   else if(state.settingsTab==='topup')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>➕ TopUp & Saldo</h3><p>Atur TopUp QRIS, pembayaran saldo bot, dan batas nominal.</p></div></div><form id="topupSettingsForm" class="form-grid"><label>Status TopUp<select name="topup_enabled"><option value="true" ${x.topup_enabled!==false?'selected':''}>Aktif</option><option value="false" ${x.topup_enabled===false?'selected':''}>Nonaktif</option></select></label><label>Pembayaran Saldo<select name="wallet_payment_enabled"><option value="true" ${x.wallet_payment_enabled!==false?'selected':''}>Aktif</option><option value="false" ${x.wallet_payment_enabled===false?'selected':''}>Nonaktif</option></select></label><label>Minimal TopUp<input name="topup_min_amount" type="number" min="1000" value="${Number(x.topup_min_amount||1000)}"></label><label>Maksimal TopUp<input name="topup_max_amount" type="number" min="1000" value="${Number(x.topup_max_amount||5000000)}"></label><div class="full info-note">QRIS TopUp mengikuti mode pembayaran pada submenu Pembayaran: GoPay, ShopeePay, ShopeePay GW Sendiri, Auto Rotating, atau Hybrid.</div><div class="full form-actions"><button class="neo-btn purple" type="submit">Simpan TopUp</button></div></form></section>`;
-  else if(state.settingsTab==='partnership')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>🤝 Kemitraan Reseller Bot</h3><p>Atur biaya pendaftaran kemitraan, perizinan tambah produk toko sendiri, dan sakelar buka/tutup pendaftaran bot reseller di Bot Toko Utama.</p></div></div><form id="resellerPartnershipSettingsForm" class="form-grid"><label>Status Pendaftaran Reseller<select name="reseller_registration_enabled"><option value="true" ${x.reseller_registration_enabled!==false?'selected':''}>Buka (User Bisa Daftar Kemitraan)</option><option value="false" ${x.reseller_registration_enabled===false?'selected':''}>Tutup (Pendaftaran Dinonaktifkan)</option></select></label><label>Biaya Pendaftaran (Rp)<input name="reseller_registration_fee" type="number" min="0" step="500" value="${Number(x.reseller_registration_fee||0)}"><small>Isi 0 untuk pendaftaran GRATIS. Jika diisi nominal (misal 50.000), user wajib punya saldo dompet cukup saat mendaftarkan bot di Bot Toko Utama.</small></label><label class="full">Izin Tambah Produk Toko Sendiri (Reseller)<select name="reseller_can_add_products"><option value="false" ${!x.reseller_can_add_products?'selected':''}>🔴 Nonaktif (Default) - Reseller hanya menjual produk dari Owner</option><option value="true" ${x.reseller_can_add_products?'selected':''}>🟢 Aktif - Reseller diizinkan menambahkan & menjual produk toko miliknya sendiri</option></select><small>Fitur ini memungkinkan mitra reseller menginput produk digital buatan sendiri, mengatur varian, upload banner produk, dan memasukkan stok toko sendiri.</small></label><div class="full info-note"><b>Sistem Persetujuan Owner:</b> Setiap user yang mendaftarkan token bot akan berstatus <i>Menunggu Persetujuan</i>. Notifikasi verifikasi akan masuk ke Telegram Owner dengan tombol Setujui / Tolak otomatis. Jika ditolak, biaya pendaftaran akan otomatis di-refund kembali ke saldo user.</div><div class="full form-actions" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="neo-btn purple" type="submit">Simpan Pengaturan Kemitraan</button><button type="button" class="neo-btn blue" id="goToResellersBtn">👥 Buka Halaman Reseller Bot →</button></div></form></section>`;
+  else if(state.settingsTab==='partnership')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>🤝 Paket Reseller</h3><p>Dua paket pendaftaran dengan biaya bulanan terpisah. Satu periode aktif adalah 30 hari.</p></div></div><form id="resellerPartnershipSettingsForm" class="form-grid"><label class="full">Pendaftaran<select name="reseller_registration_enabled"><option value="true" ${x.reseller_registration_enabled!==false?'selected':''}>Buka Pendaftaran</option><option value="false" ${x.reseller_registration_enabled===false?'selected':''}>Tutup Pendaftaran</option></select></label><label>🛍 Reseller Katalog · Rp10.000<input name="reseller_monthly_catalog" type="number" min="0" max="1000000000" step="1" required value="${Number(x.reseller_monthly_catalog||0)}"><small>Biaya per 30 hari. Isi 0 agar gratis. Paket ini menjual katalog owner.</small></label><label>🏬 Produk Sendiri · Rp15.000<input name="reseller_monthly_custom" type="number" min="0" max="1000000000" step="1" required value="${Number(x.reseller_monthly_custom||0)}"><small>Biaya per 30 hari. Isi 0 agar gratis. Termasuk izin mengelola produk, varian dan stok sendiri.</small></label><div class="full info-note">Pendaftaran mencakup 30 hari pertama sejak bot diaktifkan. Mengubah tarif gratis menjadi berbayar memberikan masa aktif 30 hari untuk reseller yang sudah aktif. Perubahan nominal berbayar berlaku pada invoice berikutnya; invoice yang sudah dibuat tetap memakai tarif saat dibuat. Reseller dapat memperpanjang melalui QRIS atau saldo profit. Saat kedaluwarsa, pesanan baru dihentikan dan dashboard tetap dapat dibuka.</div><div class="full form-actions"><button class="neo-btn purple" type="submit">Simpan Pengaturan Paket</button><button type="button" class="neo-btn blue" id="goToResellersBtn">Buka Reseller →</button></div></form></section>`;
   else if(state.settingsTab==='payment')body=`<section class="settings-section single-panel payment-section"><div class="section-head"><div><h3>💳 Pembayaran & QRIS Multi-Gateway</h3><p>Pilih gateway AutoGoPay, ShopeePay Gateway Sendiri (Direct Native Bawaan / Unofficial Gateway), atau mode rotasi Hybrid. QRIS transaksi akan dihapus otomatis setelah pembayaran selesai atau expired.</p></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span title="Status AutoGoPay">${badge(i.autogopay?.configured?'AutoGoPay: ON':'AutoGoPay: OFF')}</span><span title="Status ShopeePay Gateway">${badge(i.shoppepay_gateway?.configured?'ShopeePay GW: ON':'ShopeePay GW: OFF')}</span></div></div><form id="paymentSettingsForm"><div class="qris-mode-grid">${qrisCard('gopay','📱','AutoGoPay · GoPay','Semua QRIS menggunakan merchant GoPay via AutoGoPay.')}${qrisCard('shopeepay','🛍️','AutoGoPay · ShopeePay','Semua QRIS menggunakan merchant ShopeePay via AutoGoPay.')}${qrisCard('auto_rotate','🔄','AutoGoPay Rotating','Bergantian GoPay ↔ ShopeePay (AutoGoPay) dengan fallback.')}${qrisCard('shoppepay_self','⚡','ShopeePay GW Sendiri','Direct native bawaan tanpa port 4000 (ahmadzakiyox). Tanpa platform fee.')}${qrisCard('hybrid_rotate','🔀','Hybrid Rotating','Bergantian AutoGoPay GoPay ↔ ShopeePay Gateway Sendiri.')}</div><div class="form-grid" style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)"><div class="full" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><h4 style="margin:0 0 4px 0">⚙️ Konfigurasi ShopeePay Gateway Sendiri (Direct Native)</h4><small class="muted">Tersedia Direct Engine bawaan langsung di server iLink (tanpa butuh port 4000 terpisah), atau gunakan gateway eksternal jika diinginkan.</small></div><button type="button" class="neo-btn white small" id="checkSpayTokenBtn">🔍 Cek Status Token</button></div><label>URL ShopeePay Gateway<input name="shoppepay_gateway_url" value="${esc(x.shoppepay_gateway_url||'internal')}" placeholder="internal"><small>Isi <code>internal</code> untuk Direct Native bawaan bot (rekomendasi VPS/Pterodactyl), atau isi URL jika memakai server gateway eksternal.</small></label><label>API Key Gateway (Opsional)<input type="password" autocomplete="off" name="shoppepay_gateway_key" value="${esc(x.shoppepay_gateway_key||'')}" placeholder="Kosongkan jika tidak pakai key"><small>Header X-API-Key jika menggunakan gateway server terpisah.</small></label><div class="full" style="background:var(--bg-soft);padding:10px 12px;border-radius:8px;border:1px dashed var(--border);margin-bottom:6px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;"><div><b style="font-size:13px;">📷 Upload Gambar QRIS Toko (Auto-Scan)</b><div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Pilih foto QRIS toko Anda (PNG, JPG, WEBP). String teks akan otomatis terisi dan diperiksa validitasnya.</div></div><button type="button" class="neo-btn blue small" id="pickQrisImgSettingsBtn" style="white-space:nowrap;padding:6px 14px;">📁 Pilih Foto QRIS</button><input type="file" id="qrisImageSettingsFileInput" accept="image/*" style="display:none;" /></div><div id="qrisSettingsScanStatus" style="display:none;margin-top:6px;font-size:12px;"></div></div><label class="full">String / Payload QRIS Statis ShopeePay<textarea name="shoppepay_qris_static" rows="2" placeholder="00020101021126670016ID.CO.SHOPEE.WWW..." style="font-family:monospace;font-size:12px;">${esc(x.shoppepay_qris_static||'')}</textarea><small>String EMVCo QRIS Merchant ShopeePay toko Anda (didapat dari scan gambar QRIS ShopeePay toko Anda atau upload foto di atas).</small></label><div class="full" id="paymentQrisAnalyzeBox" style="display:none;margin-top:2px;"></div><label>Kode Unik Otomatis (Rp 1 - 99)<select name="shoppepay_unique_code"><option value="true" ${x.shoppepay_unique_code!==false?'selected':''}>Aktif (+Rp 1 - 99 acak per invoice)</option><option value="false" ${x.shoppepay_unique_code===false?'selected':''}>Nonaktif (Nominal murni)</option></select><small>Mencegah tabrakan nominal order kembar saat verifikasi mutasi.</small></label><div class="full" id="spayTokenStatusBox" style="display:none;margin-top:8px"></div></div><div class="qris-footer"><span>Rotasi berikutnya: <b>${esc(x.qris_rotation_next==='shopeepay'?'ShopeePay':'GoPay')}</b></span><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="neo-btn blue small" id="openUpdateSpayTokenModal">🔑 Update Token Live</button><button class="neo-btn purple" type="submit">Simpan Pengaturan Pembayaran</button></div></div></form></section>`;
   else if(state.settingsTab==='supplier')body=`<section class="settings-section single-panel"><div class="section-head"><div><h3>🔌 Reseller Supplier API</h3><p>Balance, katalog, dan import produk/varian ProdSeller serta Storebat.</p></div><button id="refreshSupplierHub" class="neo-btn yellow small">↻ Refresh Supplier</button></div><form id="supplierSettingsForm" class="form-grid" style="margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)"><label>Storebat API Key (X-Reseller-Key)<input type="password" autocomplete="off" name="storebat_api_key" value="${esc(x.storebat_api_key||'')}" placeholder="Masukkan API Key Storebat"><small>Key reseller dari Storebat / VenteBot API.</small></label><label>Storebat Base URL<input name="storebat_base_url" value="${esc(x.storebat_base_url||'https://web-production-1c7b1.up.railway.app')}" placeholder="https://web-production-1c7b1.up.railway.app"><small>Default: https://web-production-1c7b1.up.railway.app</small></label><label class="full">ProdSeller API Key<input type="password" autocomplete="off" name="prodseller_api_key" value="${esc(x.prodseller_api_key||'')}" placeholder="API Key ProdSeller"></label><div class="full form-actions"><button class="neo-btn purple small" type="submit">Simpan Kunci Supplier</button></div></form><div id="supplierStatus"></div><div id="supplierHub"><div class="empty compact">Memuat data supplier...</div></div></section>`;
   else if(state.settingsTab==='backup')body=`<div class="settings-stack"><section class="settings-section single-panel"><div class="section-head"><div><h3>💾 Backup & Restore SQLite</h3><p>Backup manual, upload/restore SQLite, dan jadwal backup otomatis.</p></div><button id="createBackup" class="neo-btn green small">＋ Buat Backup</button></div><form id="backupSettingsForm" class="backup-settings-grid"><label>Backup Otomatis<select name="auto_backup_enabled"><option value="true" ${(bs.enabled??x.auto_backup_enabled)!==false?'selected':''}>Aktif</option><option value="false" ${(bs.enabled??x.auto_backup_enabled)===false?'selected':''}>Nonaktif</option></select></label><label>Interval (jam)<input name="backup_interval_hours" type="number" min="1" max="168" value="${Number(bs.intervalHours||x.backup_interval_hours||6)}"></label><label>Simpan Maksimal<input name="backup_retention" type="number" min="1" max="365" value="${Number(bs.retention||x.backup_retention||30)}"></label><button class="neo-btn purple" type="submit">Simpan Jadwal</button></form><div class="backup-upload"><input id="backupFile" type="file" accept=".sqlite,application/x-sqlite3"><button id="uploadBackup" class="neo-btn blue">Upload Backup</button><span id="uploadProgress" class="muted">Maksimal 50 MB.</span></div><div class="backup-list">${backupCards(state.cache.backups||[])}</div></section><section class="settings-section single-panel legacy-import-section"><div class="section-head"><div><h3>📥 Migrasi Backup JSON Bot Lama</h3><p>Import backup JSON bot iLink lama ke SQLite tanpa Supabase.</p></div></div><div class="legacy-upload-row"><input id="legacyJsonFile" type="file" accept=".json,application/json"><button id="analyzeLegacyJson" class="neo-btn blue" type="button">Analisis JSON</button><span id="legacyUploadProgress" class="muted">Mendukung backup-bot-*.json, Produk.json, User.json, Trx.json, dan Voucher.json.</span></div><div id="legacyPreview" class="legacy-preview-host">${state.legacyMigration?.preview?legacyPreviewHtml(state.legacyMigration.preview):'<div class="empty compact">Pilih file JSON lama lalu tekan Analisis JSON.</div>'}</div><div id="legacyImportOptions" class="legacy-options ${state.legacyMigration?'':'hidden'}"><label><input type="checkbox" id="legacyUsers" checked> User + saldo/referral</label><label><input type="checkbox" id="legacyProducts" checked> Produk + varian + stok</label><label><input type="checkbox" id="legacyVouchers" checked> Voucher</label><label><input type="checkbox" id="legacyRedeem" checked> Redeem code</label><label><input type="checkbox" id="legacyStats" checked> Statistik historis</label><label><input type="checkbox" id="legacySettings"> Setting toko/bot lama</label><label class="legacy-danger"><input type="checkbox" id="legacyTransactions"> Riwayat transaksi lama</label><p class="muted full">Statistik historis aman diimpor ulang dan tidak membuat detail transaksi ganda. Transaksi dan setting tetap tidak dicentang otomatis untuk mencegah duplikasi atau menimpa konfigurasi baru. Sebelum import, sistem membuat rollback backup SQLite otomatis.</p><button id="applyLegacyImport" type="button" class="neo-btn purple full">Import ke SQLite</button></div><div id="legacyImportResult"></div></section><section class="settings-section single-panel"><div class="section-head"><div><h3>🧮 Perbaiki Counter Historis</h3><p>Gunakan jika angka Total Transaksi / Stok Terjual turun setelah migrasi dari bot lama.</p></div></div>${(()=>{const z=state.cache.historicalStats||{},e=z.effective||{},l=z.live||{},h=z.historical||{};return`<div class="legacy-count-grid"><span>Live Order Detail <b>${Number(l.orders_total||0)}</b></span><span>Live Qty Detail <b>${Number(l.quantity_sold||0)}</b></span><span>Total Tampil <b>${Number(e.orders_total||0)}</b></span><span>Terjual Tampil <b>${Number(e.quantity_sold||0)}</b></span></div><form id="statsRepairForm" class="form-grid" style="margin-top:16px"><label>Total Transaksi Historis<input name="orders_total" type="number" min="0" value="${Number(h.orders_total||e.orders_total||0)}"></label><label>Stok Terjual Historis<input name="quantity_sold" type="number" min="0" value="${Number(h.quantity_sold||e.quantity_sold||0)}"></label><div class="full warning-note">Fitur ini hanya memperbaiki counter historis. Tidak membuat order palsu dan tidak mengubah stok ready. Sistem membuat rollback backup otomatis sebelum menyimpan.</div><div class="full form-actions"><button class="neo-btn yellow" type="submit">Simpan Counter Historis</button></div></form>`})()}</section></div>`;
@@ -923,7 +923,7 @@ function renderSettings(){
   $('#content').innerHTML=`<div class="submenu-detail"><div class="submenu-detail-top"><button type="button" class="neo-btn white submenu-back" id="settingsMenuBack">← Kembali ke Pengaturan</button></div><div class="settings-tab-body">${body}</div></div>`;
   $('#settingsMenuBack').onclick=()=>{state.settingsTab='';renderSettings()};
   if($('#storeSettingsForm'))$('#storeSettingsForm').onsubmit=saveStoreSettings;if($('#referralSettingsForm'))$('#referralSettingsForm').onsubmit=e=>saveSimpleSettings(e,['referral_enabled'],['referral_reward_amount'],'Referral disimpan');if($('#topupSettingsForm'))$('#topupSettingsForm').onsubmit=e=>saveSimpleSettings(e,['topup_enabled','wallet_payment_enabled'],['topup_min_amount','topup_max_amount'],'TopUp disimpan');
-  if($('#resellerPartnershipSettingsForm'))$('#resellerPartnershipSettingsForm').onsubmit=e=>saveSimpleSettings(e,['reseller_registration_enabled','reseller_can_add_products'],['reseller_registration_fee'],'Pengaturan kemitraan reseller disimpan');
+  if($('#resellerPartnershipSettingsForm'))$('#resellerPartnershipSettingsForm').onsubmit=e=>saveSimpleSettings(e,['reseller_registration_enabled'],['reseller_monthly_catalog','reseller_monthly_custom'],'Pengaturan kemitraan reseller disimpan');
   if($('#goToResellersBtn'))$('#goToResellersBtn').onclick=()=>navigate('resellers');
   if($('#paymentSettingsForm')){$('#paymentSettingsForm').onsubmit=savePaymentSettings;$$('[data-check-qris]').forEach(b=>b.onclick=()=>testPayment(b.dataset.checkQris));$$('[name="autogopay_payment_method"]').forEach(r=>r.onchange=()=>{$$('.qris-mode-card').forEach(c=>c.classList.toggle('selected',c.querySelector('input')?.checked))});if($('#checkSpayTokenBtn'))$('#checkSpayTokenBtn').onclick=checkShoppepayTokenStatus;if($('#openUpdateSpayTokenModal'))$('#openUpdateSpayTokenModal').onclick=openUpdateShoppepayTokenModal;bindPaymentQrisAutoScan();}
   if($('#supplierSettingsForm'))$('#supplierSettingsForm').onsubmit=async e=>{e.preventDefault();await saveSimpleSettings(e,[],[],'Kunci supplier disimpan');await refreshSupplierHub(true);};
@@ -2328,44 +2328,13 @@ async function renderResellersList(host) {
   const items = res.items || [];
   state.cache.resellers = items;
   const s = setRes.settings || state.overview?.settings || {};
-  const regFee = Math.max(0, Number(s.reseller_registration_fee || 0));
   const regEnabled = s.reseller_registration_enabled !== false;
-
-  const canAddProducts = Boolean(s.reseller_can_add_products);
 
   const oldSearch = $('#resellerSearch')?.value || '';
   const oldStatus = $('#resellerStatusFilter')?.value || '';
 
   host.innerHTML = `
-    <div class="reseller-fee-card">
-      <div class="reseller-fee-info">
-        <div class="reseller-fee-title">
-          <strong>💰 Biaya Pendaftaran Kemitraan Reseller</strong>
-          <span class="badge ${regEnabled ? 'ok' : 'bad'}">${regEnabled ? '🟢 Pendaftaran Buka' : '🔴 Pendaftaran Tutup'}</span>
-        </div>
-        <small style="color:var(--muted);font-weight:700">Biaya yang otomatis dipotong dari saldo dompet user saat mendaftarkan bot di Bot Toko Utama.</small>
-      </div>
-      <div class="reseller-fee-actions">
-        <div class="reseller-fee-amount">${regFee > 0 ? money(regFee) : 'GRATIS'}</div>
-        <button type="button" class="neo-btn blue" id="editResellerFeeBtn" style="font-size:13px;padding:8px 14px">⚙️ Atur Biaya</button>
-      </div>
-    </div>
-
-    <div class="reseller-fee-card" style="margin-top:10px">
-      <div class="reseller-fee-info">
-        <div class="reseller-fee-title">
-          <strong>🏬 Izin Tambah Produk Toko Sendiri (Reseller)</strong>
-          <span class="badge ${canAddProducts ? 'ok' : 'bad'}">${canAddProducts ? '🟢 Aktif' : '🔴 Nonaktif (Default)'}</span>
-        </div>
-        <small style="color:var(--muted);font-weight:700">Izinkan mitra reseller menambahkan dan mengelola produk toko mereka sendiri (stok, varian, dan harga custom). Default: Nonaktif.</small>
-      </div>
-      <div class="reseller-fee-actions">
-        <button type="button" class="neo-btn ${canAddProducts ? 'red' : 'green'}" id="toggleResellerAddProductBtn" style="font-size:13px;padding:8px 14px">
-          ${canAddProducts ? 'Matikan Izin' : 'Aktifkan Izin'}
-        </button>
-      </div>
-    </div>
-
+    <div class="reseller-fee-card"><div class="reseller-fee-info"><div class="reseller-fee-title"><strong>🤝 Dua Paket Reseller</strong><span class="badge ${regEnabled?'ok':'bad'}">${regEnabled?'Pendaftaran Buka':'Pendaftaran Tutup'}</span></div><small>Katalog Rp10.000 · bulanan ${Number(s.reseller_monthly_catalog)?money(s.reseller_monthly_catalog):'Gratis'}<br>Produk Sendiri Rp15.000 · bulanan ${Number(s.reseller_monthly_custom)?money(s.reseller_monthly_custom):'Gratis'}</small></div><button type="button" class="neo-btn purple" id="editResellerFeeBtn">Atur Paket & Bulanan</button></div>
     <div class="toolbar product-toolbar" style="margin-bottom:14px;margin-top:14px;">
       <div class="searchbox"><input id="resellerSearch" placeholder="Cari nama, username, telegram ID..." value="${esc(oldSearch)}"></div>
       <select id="resellerStatusFilter">
@@ -2382,67 +2351,7 @@ async function renderResellersList(host) {
     <div id="resellersCardGrid" class="reseller-grid"></div>
   `;
 
-  const toggleAddBtn = $('#toggleResellerAddProductBtn');
-  if (toggleAddBtn) {
-    toggleAddBtn.onclick = async () => {
-      const nextState = !canAddProducts;
-      toggleAddBtn.disabled = true;
-      try {
-        const res = await api('/api/admin/settings', {
-          method: 'PATCH',
-          body: { reseller_can_add_products: nextState }
-        });
-        if (state.cache) {
-          state.cache.settings = res?.settings || {
-            ...(state.cache.settings || {}),
-            reseller_can_add_products: nextState
-          };
-        }
-        toast(`Fitur tambah produk reseller berhasil ${nextState ? 'diaktifkan' : 'dinonaktifkan'}!`);
-        await loadResellers(true);
-      } catch (e) {
-        toast(e.message, true);
-      } finally {
-        toggleAddBtn.disabled = false;
-      }
-    };
-  }
-
-  $('#editResellerFeeBtn').onclick = () => {
-    modal('Atur Biaya Pendaftaran Reseller', `
-      <div class="field">
-        <label>Biaya Pendaftaran Kemitraan (Rp)</label>
-        <input type="number" name="reseller_registration_fee" value="${regFee}" min="0" step="500" placeholder="0 = Gratis">
-        <small class="muted">Isi 0 jika pendaftaran gratis. Jika diisi nominal (misal 50.000), user akan diminta pembayaran via QRIS / Saldo setelah permohonan disetujui Owner.</small>
-      </div>
-      <div class="field">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" name="reseller_registration_enabled" ${regEnabled ? 'checked' : ''}>
-          <b>Buka Pendaftaran Reseller di Bot Utama</b>
-        </label>
-        <small class="muted">Jika dinonaktifkan, tombol dan perintah pendaftaran kemitraan di bot utama akan ditutup.</small>
-      </div>
-    `, async (data) => {
-      const fee = Math.max(0, Number(data.reseller_registration_fee || 0));
-      const enabled = Boolean(data.reseller_registration_enabled === 'on' || data.reseller_registration_enabled === 'true' || data.reseller_registration_enabled === true);
-      const res = await api('/api/admin/settings', {
-        method: 'PATCH',
-        body: {
-          reseller_registration_fee: fee,
-          reseller_registration_enabled: enabled
-        }
-      });
-      if (state.cache) {
-        state.cache.settings = res?.settings || {
-          ...(state.cache.settings || {}),
-          reseller_registration_fee: fee,
-          reseller_registration_enabled: enabled
-        };
-      }
-      toast('Pengaturan pendaftaran reseller berhasil disimpan!');
-      await loadResellers(true);
-    }, { submit: 'Simpan Pengaturan' });
-  };
+  $('#editResellerFeeBtn').onclick=()=>{state.settingsTab='partnership';navigate('settings');};
 
   $('#addResellerBtn').onclick = () => openResellerModal();
 
@@ -2479,6 +2388,7 @@ async function renderResellersList(host) {
             <div>${badge(r.status)}</div>
           </div>
           <div class="reseller-meta">
+            ${r.membership?`<div><small>📦 Paket Reseller</small><strong>${esc(r.membership.label)}</strong></div><div><small>⏱ Masa Aktif</small><strong>${r.membership.free?'Bulanan Gratis':r.membership.active_until?date(r.membership.active_until):'Mulai saat aktivasi'}</strong><small>${r.membership.free?'':money(r.membership.monthly_fee)+' / 30 hari'}</small></div>`:''}
             <div>
               <small>📈 Markup Harga</small>
               <strong>${esc(markupText)}</strong>
@@ -2511,7 +2421,7 @@ async function renderResellersList(host) {
               <button class="neo-btn green small" data-approve-reseller="${r.id}">✅ Setujui</button>
               <button class="neo-btn red small" data-reject-reseller="${r.id}">❌ Tolak</button>
             ` : ''}
-            <button class="neo-btn ${r.can_add_products ? 'red' : 'green'} small" data-toggle-reseller-products="${r.id}" title="${r.can_add_products ? 'Klik untuk mematikan izin tambah produk toko' : 'Klik untuk mengizinkan tambah produk toko'}">
+            <button ${r.membership?.plan==='catalog'?'disabled':''} class="neo-btn ${r.can_add_products ? 'red' : 'green'} small" data-toggle-reseller-products="${r.id}" title="${r.membership?.plan==='catalog'?'Paket katalog tidak termasuk produk sendiri':r.can_add_products ? 'Klik untuk mematikan izin tambah produk toko' : 'Klik untuk mengizinkan tambah produk toko'}">
               ${r.can_add_products ? '🏬 Matikan Produk Toko' : '🏬 Izinkan Produk Toko'}
             </button>
             <button class="neo-btn blue small" data-edit-reseller="${r.id}">✎ Edit</button>

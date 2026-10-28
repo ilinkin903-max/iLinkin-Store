@@ -453,8 +453,8 @@ async function navigate(view, silent = false) {
   }
   try {
     await ({
-      nokos: () => loadZyrexMenu('otp'),
-      smm: () => loadZyrexMenu('smm'),
+      nokos: () => loadServiceMenu('otp'),
+      smm: () => loadServiceMenu('smm'),
       dashboard: loadDashboard,
       pricing: loadPricing,
       orders: loadOrders,
@@ -3330,7 +3330,7 @@ setInterval(()=>{if(!document.hidden)renderMembershipClock();},1000);
 setInterval(refreshMembership,60000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshMembership();});
 
-async function loadZyrexMenu(kind){
+async function loadServiceMenu(kind){
   const view=kind==='otp'?'nokos':'smm';
-  return window.ilinkZyrex.render({api,base:'/api/reseller/zyrex',host:$('#content'),kind,isCurrent:()=>state.view===view,onSettings:()=>navigate('bot')});
+  return window.ilinkServices.render({api,base:'/api/reseller/services',host:$('#content'),kind,isCurrent:()=>state.view===view,onSettings:()=>navigate('bot')});
 }

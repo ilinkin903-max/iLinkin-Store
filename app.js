@@ -3863,8 +3863,16 @@ async function renderServiceSettings(){
     };
     $('#serviceDiagnosticsBtn').onclick=async event=>{
       const button=event.currentTarget;button.disabled=true;$('#serviceDiagnostics').textContent='Memeriksa akses API dan katalog server...';
-      try{const result=await api('/api/admin/services/diagnostics');$('#serviceDiagnostics').innerHTML='<b>Hasil Pemeriksaan Nokos</b>'+result.report.checks.map(item=>`<div class="info-note" style="margin-top:10px;overflow-wrap:anywhere"><b>${item.ok?'✅':'⚠️'} ${esc(item.endpoint)}</b><p>HTTP ${item.http_status??'-'} · ${esc(item.code)}</p><p>${esc(item.message)}${item.items!=null?' · '+Number(item.items)+' pilihan':''}</p></div>`).join('');}
-      catch(error){$('#serviceDiagnostics').textContent=error.message;}finally{button.disabled=false;}
+      const panel=$('#serviceDiagnostics'),checks=[],targets=['balance','server1','server2','server3','server4','server5','summary'];
+      const paint=progress=>{panel.innerHTML='<b>Hasil Pemeriksaan Nokos</b><p>'+esc(progress)+'</p>'+checks.map(item=>`<div class="info-note" style="margin-top:10px;overflow-wrap:anywhere"><b>${item.ok?'✅':'⚠️'} ${esc(item.endpoint)}</b><p>HTTP ${item.http_status??'-'} · ${esc(item.code)}${item.duration_ms!=null?' · '+(item.duration_ms/1000).toFixed(1)+' detik':''}</p><p>${esc(item.message)}${item.items!=null?' · '+Number(item.items)+' pilihan':''}</p>${item.shape?'<small>Struktur: '+esc(Object.entries(item.shape).map(([key,value])=>key+'='+value).join(', '))+'</small>':''}</div>`).join('');};
+      try{
+        for(const [index,target] of targets.entries()){
+          if(!panel.isConnected)return;paint('Memeriksa '+(index+1)+' / '+targets.length+' — '+(target==='summary'?'ringkasan (opsional)':target==='balance'?'koneksi saldo':target.replace('server','Server '))+'...');
+          const result=await api('/api/admin/services/diagnostics?target='+target);if(!panel.isConnected)return;
+          checks.push(...result.report.checks);if(target==='balance'&&checks.some(item=>!item.ok))break;
+        }
+        if(panel.isConnected)paint('Pemeriksaan selesai. Ringkasan bersifat opsional; pemesanan memakai katalog masing-masing server.');
+      }catch(error){if(panel.isConnected)paint(error.message);}finally{button.disabled=false;}
     };
     let items=orders.items||[];
     const render=()=>{

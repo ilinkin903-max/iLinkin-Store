@@ -904,8 +904,8 @@ async function loadSettings(){
   state.cache.settings=s.settings||{};state.cache.system=sys;state.cache.backups=bk.items||[];state.cache.backupSettings=bk.settings||{};state.cache.historicalStats=hs||{};if(!state.settingsTab)state.settingsTab='';
   renderSettings();
 }
-function settingsTabsHtml(){const tabs=[['store','🏪','PENGATURAN TOKO','Nama toko, owner, tampilan user, dan metrik dashboard.'],['vps','🖥️','PENGINGAT PERPANJANGAN VPS','Atur provider, tanggal jatuh tempo, biaya perpanjangan, dan pengingat Telegram.'],['referral','👥','REFERRAL','Atur program referral dan hadiah saldo pengguna.'],['topup','💰','SALDO & TOP UP','Atur isi saldo, batas nominal, dan pembayaran saldo bot.'],['partnership','🤝','KEMITRAAN RESELLER BOT','Atur biaya pendaftaran reseller dan status pembukaan kemitraan bot.'],['payment','🧮','METODE PEMBAYARAN','AutoGoPay, ShopeePay Gateway Sendiri, & rotasi hybrid.'],['supplier','🔄','SUPPLIER / RESELLER API','Kelola ProdSeller, Storebat, saldo, katalog, dan import produk.'],['backup','💾','BACKUP & RESTORE','Backup SQLite, restore data, dan migrasi backup lama.'],['system','🖥️','SISTEM','Status layanan, koneksi integrasi, dan database.']];return`<section class="submenu-home settings-menu-home"><div class="submenu-home-head"><h2>Pengaturan</h2><p>Pilih bagian yang ingin dikelola.</p></div><nav class="submenu-card-list" aria-label="Submenu Pengaturan">${tabs.map(([k,icon,title,desc])=>`<button class="submenu-card" data-settings-tab="${k}"><span class="submenu-card-icon">${icon}</span><span class="submenu-card-copy"><b>${title}</b><small>${desc}</small></span><span class="submenu-card-arrow">›</span></button>`).join('')}</nav></section>`}
-function renderSettings(){
+function settingsTabsHtml(){const tabs=[['store','🏪','PENGATURAN TOKO','Nama toko, owner, tampilan user, dan metrik dashboard.'],['vps','🖥️','PENGINGAT PERPANJANGAN VPS','Atur provider, tanggal jatuh tempo, biaya perpanjangan, dan pengingat Telegram.'],['referral','👥','REFERRAL','Atur program referral dan hadiah saldo pengguna.'],['topup','💰','SALDO & TOP UP','Atur isi saldo, batas nominal, dan pembayaran saldo bot.'],['zyrex','📱','NOKOS & SMM','Hubungkan Zyrex, atur margin dan pantau pesanan Nokos/SMM.'],['partnership','🤝','KEMITRAAN RESELLER BOT','Atur biaya pendaftaran reseller dan status pembukaan kemitraan bot.'],['payment','🧮','METODE PEMBAYARAN','AutoGoPay, ShopeePay Gateway Sendiri, & rotasi hybrid.'],['supplier','🔄','SUPPLIER / RESELLER API','Kelola ProdSeller, Storebat, saldo, katalog, dan import produk.'],['backup','💾','BACKUP & RESTORE','Backup SQLite, restore data, dan migrasi backup lama.'],['system','🖥️','SISTEM','Status layanan, koneksi integrasi, dan database.']];return`<section class="submenu-home settings-menu-home"><div class="submenu-home-head"><h2>Pengaturan</h2><p>Pilih bagian yang ingin dikelola.</p></div><nav class="submenu-card-list" aria-label="Submenu Pengaturan">${tabs.map(([k,icon,title,desc])=>`<button class="submenu-card" data-settings-tab="${k}"><span class="submenu-card-icon">${icon}</span><span class="submenu-card-copy"><b>${title}</b><small>${desc}</small></span><span class="submenu-card-arrow">›</span></button>`).join('')}</nav></section>`}
+function renderSettings(){if(state.settingsTab==='zyrex'){renderZyrexSettings();return;}
   const x=state.cache.settings||{},sys=state.cache.system||{},i=sys.integrations||{},bs=state.cache.backupSettings||{};
   const metric=String(x.store_balance_metric||'month_profit');const qrisMode=String(x.autogopay_payment_method||'gopay');
   if(!state.settingsTab){$('#content').innerHTML=settingsTabsHtml();$$('[data-settings-tab]').forEach(b=>b.onclick=()=>{state.settingsTab=b.dataset.settingsTab;renderSettings()});return;}
@@ -3830,3 +3830,44 @@ function renderPromotionsView() {
   }
 })();
 
+
+async function renderZyrexSettings(){
+  $('#content').innerHTML='<div class="empty-product">Memuat pengaturan Nokos & SMM...</div>';
+  try{
+    const [response,orders]=await Promise.all([api('/api/admin/zyrex/config'),api('/api/admin/zyrex/orders')]);
+    if(state.view!=='settings'||state.settingsTab!=='zyrex')return;
+    const x=response.config;
+    $('#content').innerHTML=`<div class="submenu-detail"><div class="submenu-detail-top"><button type="button" class="neo-btn white submenu-back" id="zyrexSettingsBack">← Kembali ke Pengaturan</button></div>
+    <section class="settings-section single-panel"><div class="section-head"><div><h3>📱 Nokos & 📣 SMM</h3><p>Hubungkan layanan Zyrex ke bot utama dan bot reseller. Pembeli membayar dengan saldo bot; top-up QRIS tersedia di menu.</p></div></div>
+    <form id="zyrexSettingsForm" class="form-grid"><label class="full">URL API<input name="api_url" type="url" required value="${esc(x.api_url||'https://zyrexotp.com/api/v1')}" placeholder="https://zyrexotp.com/api/v1"></label>
+    <label class="full">API Key<input name="api_key" type="password" autocomplete="new-password" placeholder="${x.has_key?'Sudah tersimpan · kosongkan agar tetap memakai key lama':'Masukkan API key reseller Zyrex'}"><small>Key disimpan di backend. Nilainya tidak ditampilkan kembali. Simpan pengaturan sebelum mengecek koneksi.</small></label>
+    <label>📱 Nokos<select name="nokos_enabled"><option value="false" ${!x.nokos_enabled?'selected':''}>Nonaktif</option><option value="true" ${x.nokos_enabled?'selected':''}>Aktif · 5 server</option></select></label>
+    <label>📣 SMM<select name="smm_enabled"><option value="false" ${!x.smm_enabled?'selected':''}>Nonaktif</option><option value="true" ${x.smm_enabled?'selected':''}>Aktif</option></select></label>
+    <label>Margin Nokos per Nomor (Rp)<input name="nokos_markup" type="number" min="0" max="100000000" step="1" required value="${Number(x.nokos_markup)}"><small>Ditambahkan ke harga akhir supplier, termasuk harga promo.</small></label>
+    <label>Margin SMM (%)<input name="smm_markup_percent" type="number" min="0" max="1000" step="0.01" required value="${Number(x.smm_markup_percent)}"><small>Harga mengikuti jumlah pesanan. Harga jual dibulatkan ke atas dalam rupiah.</small></label>
+    <div class="full info-note">Margin reseller mengikuti pengaturan markup akun reseller. Untuk SMM, markup tetap dihitung per 1.000 unit. Nomor dan OTP dikirim otomatis; pembatalan Nokos tersedia setelah 3 menit. Refund menunggu konfirmasi supplier.</div>
+    <div class="full form-actions"><button type="submit" class="neo-btn purple">Simpan Pengaturan</button><button type="button" class="neo-btn green" id="testZyrexBtn">Cek Koneksi & Saldo</button></div><div id="zyrexConnectionStatus" class="full" role="status"></div></form></section>
+    <section class="settings-section single-panel"><div class="section-head"><div><h3>📋 Pesanan Nokos & SMM</h3><p>Pantau pesanan dan periksa ulang hasil yang belum pasti dengan referensi yang sama.</p></div><button type="button" class="neo-btn blue small" id="refreshZyrexOrders">⟳ Refresh</button></div><div class="form-grid"><label class="full">Tampilkan<select id="zyrexOrderFilter"><option value="all">Semua pesanan terbaru</option><option value="attention">Perlu diperiksa</option><option value="otp">Nokos</option><option value="smm">SMM</option></select></label></div><div id="zyrexOrderList"></div></section></div>`;
+    $('#zyrexSettingsBack').onclick=()=>{state.settingsTab='';renderSettings();};
+    $('#zyrexSettingsForm').onsubmit=async e=>{
+      e.preventDefault();const submit=e.target.querySelector('[type=submit]'),input=Object.fromEntries(new FormData(e.target));
+      input.nokos_enabled=input.nokos_enabled==='true';input.smm_enabled=input.smm_enabled==='true';input.nokos_markup=Number(input.nokos_markup);input.smm_markup_percent=Number(input.smm_markup_percent);
+      submit.disabled=true;
+      try{await api('/api/admin/zyrex/config',{method:'POST',body:input});e.target.elements.api_key.value='';e.target.elements.api_key.placeholder='Sudah tersimpan · kosongkan agar tetap memakai key lama';toast('Pengaturan Nokos & SMM disimpan');}
+      catch(err){toast(err.message,true);}finally{submit.disabled=false;}
+    };
+    $('#testZyrexBtn').onclick=async e=>{
+      e.target.disabled=true;$('#zyrexConnectionStatus').textContent='Memeriksa koneksi...';
+      try{const result=await api('/api/admin/zyrex/test',{method:'POST'});$('#zyrexConnectionStatus').textContent='✅ '+result.message+(result.balance!=null?' Saldo supplier: '+money(result.balance):'');}
+      catch(err){$('#zyrexConnectionStatus').textContent='⚠️ '+err.message;}finally{e.target.disabled=false;}
+    };
+    let items=orders.items||[];
+    const render=()=>{
+      const filter=$('#zyrexOrderFilter').value,chosen=items.filter(item=>filter==='all'||(filter==='attention'?!['completed','canceled','failed'].includes(item.status)||(['canceled','failed','partial'].includes(item.status)&&item.refund_total<item.price):item.kind===filter));
+      $('#zyrexOrderList').innerHTML=chosen.length?chosen.map(item=>`<article class="settings-section" style="margin-top:12px"><div class="section-head"><div><h4>${esc(item.kind==='otp'?'📱 Nokos':'📣 SMM')} · ${esc(item.title)}</h4><p><code>${esc(item.ref)}</code> · ${esc({submitting:"Memesan",uncertain:"Perlu Diperiksa",pending:"Diproses",completed:"Selesai",partial:"Selesai Sebagian",canceled:"Dibatalkan",failed:"Gagal"}[item.status]||item.status)} · ${date(item.created_at)}</p></div></div><p>Pembeli: <code>${esc(item.telegram_id)}</code> · ${item.bot_id?'Bot reseller #'+Number(item.bot_id):'Bot utama'}</p><p>Bayar: <b>${money(item.price)}</b> · Refund: <b>${money(item.refund_total)}</b></p><details><summary>Detail supplier</summary><p style="overflow-wrap:anywhere">Order / Reservasi: <code>${esc(item.provider_order_id||item.reservation_ref||"Belum tersedia")}</code><br>Referensi permintaan: <code>${esc(item.idempotency_key||"-")}</code>${item.error_code?"<br>Kode supplier: "+esc(item.error_code):""}</p></details><button type="button" class="neo-btn purple small" data-zyrex-check="${esc(item.ref)}">🔄 Periksa Pesanan</button></article>`).join(''):'<div class="empty compact">Belum ada pesanan yang cocok.</div>';
+      $$('[data-zyrex-check]').forEach(button=>button.onclick=async()=>{button.disabled=true;try{const result=await api('/api/admin/zyrex/orders/'+encodeURIComponent(button.dataset.zyrexCheck)+'/check',{method:'POST'});items=result.items||[];render();toast('Status pesanan diperbarui');}catch(err){toast(err.message,true);}finally{button.disabled=false;}});
+    };
+    $('#zyrexOrderFilter').onchange=render;
+    $('#refreshZyrexOrders').onclick=async()=>{try{items=(await api('/api/admin/zyrex/orders')).items||[];render();}catch(err){toast(err.message,true);}};render();
+  }catch(e){if(state.view==='settings'&&state.settingsTab==='zyrex')$('#content').innerHTML=`<div class="empty-product">${esc(e.message)}<p><button type="button" class="neo-btn purple" id="retryZyrexSettings">Coba Lagi</button></p></div>`;if($('#retryZyrexSettings'))$('#retryZyrexSettings').onclick=renderZyrexSettings;}
+}

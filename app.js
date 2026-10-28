@@ -42,7 +42,8 @@ function freshPriceMatrixHtml(r,{editable=false}={}){
 }
 function freshPriceRange(r){const min=Number(r.api_price_min??r.api_unit_price??0),max=Number(r.api_price_max??r.api_unit_price??0);return min===max?money(min):`${money(min)} – ${money(max)}`;}
 async function loadSupplierCatalog(source,force=false){if(!source)return[];state.cache.supplierCatalogs=state.cache.supplierCatalogs||{};if(!force&&Array.isArray(state.cache.supplierCatalogs[source]))return state.cache.supplierCatalogs[source];const r=await api(`/api/admin/integrations/supplier-products?source=${encodeURIComponent(source)}${force?'&force=1':''}`);state.cache.supplierCatalogs[source]=r.items||[];return state.cache.supplierCatalogs[source];}
-async function api(path,options={}){const url='/api/gateway?path='+encodeURIComponent(path);const headers={...(options.headers||{})};if(state.token)headers.authorization='Bearer '+state.token;if(options.body&&typeof options.body!=='string'&&!(options.body instanceof Blob)){headers['content-type']='application/json';options.body=JSON.stringify(options.body)}const res=await fetch(url,{...options,headers});if(options.raw){if(!res.ok)throw new Error(`HTTP ${res.status}`);return res}const ct=res.headers.get('content-type')||'';const data=ct.includes('json')?await res.json():{ok:res.ok,message:await res.text()};if(res.status===401){logout(false);throw new Error('Sesi berakhir. Silakan login kembali.')}if(!res.ok||data.ok===false)throw new Error(data.message||data.error||`HTTP ${res.status}`);return data}
+function api(path,options={}){const copy={...options};const token=state.token;return window.ilinkRequests.run(path,copy,token,()=>apiRequest(path,copy,token));}
+async function apiRequest(path,options={},requestToken=state.token){const url='/api/gateway?path='+encodeURIComponent(path);const headers={...(options.headers||{})};if(requestToken)headers.authorization='Bearer '+requestToken;if(options.body&&typeof options.body!=='string'&&!(options.body instanceof Blob)){headers['content-type']='application/json';options.body=JSON.stringify(options.body)}const res=await fetch(url,{...options,headers,cache:'no-store'});if(options.raw){if(!res.ok)throw new Error(`HTTP ${res.status}`);return res}const ct=res.headers.get('content-type')||'';const data=ct.includes('json')?await res.json():{ok:res.ok,message:await res.text()};if(res.status===401){if(state.token===requestToken)logout(false);throw new Error('Sesi berakhir. Silakan login kembali.')}if(!res.ok||data.ok===false)throw new Error(data.message||data.error||`HTTP ${res.status}`);return data}
 async function remove(url,confirmText,callback){if(confirmText&&!confirm(confirmText))return;try{await api(url,{method:'DELETE'});toast('Berhasil dihapus');if(typeof callback==='function')await callback();}catch(err){toast(err.message||'Gagal menghapus',true);}}
 function notificationIcon(level){return level==='bad'?'⛔':level==='warn'?'⚠️':level==='ok'?'✅':'ℹ️';}
 function renderNotifications(data={}){
@@ -58,7 +59,15 @@ function showLogin(){$('#loginView').classList.remove('hidden');$('#appView').cl
 $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginError').textContent='';try{const r=await api('/api/admin/auth/login',{method:'POST',body:{username:$('#loginUsername').value,password:$('#loginPassword').value}});state.token=r.token;sessionStorage.setItem('ilink_owner_token',r.token);localStorage.setItem('ilink_owner_token',r.token);$('#loginPassword').value='';await initialize()}catch(err){$('#loginError').textContent=err.message}};$('#logoutBtn').onclick=()=>logout();$('#refreshBtn').onclick=()=>navigate(state.view,true);if($('#vpsTimerBtn'))$('#vpsTimerBtn').onclick=()=>{state.settingsTab='vps';navigate('settings');};
   $('#notifBtn').onclick=e=>{e.stopPropagation();toggleNotifications()};$('#notificationPanel').onclick=e=>e.stopPropagation();$('#notifMarkAll').onclick=async()=>{try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{all:true}});renderNotifications(r);toast('Semua notifikasi ditandai dibaca')}catch(e){toast(e.message,true)}};$('#notificationList').onclick=async e=>{const b=e.target.closest('[data-notif-key]');if(!b)return;try{const r=await api('/api/admin/notifications/read',{method:'POST',body:{keys:[b.dataset.notifKey]}});renderNotifications(r)}catch{}closeNotifications();if(b.dataset.notifView){const parts=b.dataset.notifView.split(':');if(parts[0]==='settings'&&parts[1]){state.settingsTab=parts[1];navigate('settings');}else{navigate(b.dataset.notifView);}}};document.addEventListener('click',closeNotifications);function closeSidebar(){$('#sidebar').classList.remove('open');$('#sidebarBackdrop')?.classList.remove('show');$('#menuBtn')?.setAttribute('aria-expanded','false')}$('#menuBtn').onclick=e=>{e.stopPropagation();const open=$('#sidebar').classList.toggle('open');$('#sidebarBackdrop')?.classList.toggle('show',open);$('#menuBtn').setAttribute('aria-expanded',open?'true':'false')};$('#sidebarBackdrop').onclick=closeSidebar;document.addEventListener('click',e=>{const side=$('#sidebar'),menu=$('#menuBtn');if(side?.classList.contains('open')&&!side.contains(e.target)&&!menu?.contains(e.target))closeSidebar()});$('#nav').onclick=e=>{const b=e.target.closest('[data-view]');if(b){closeSidebar();navigate(b.dataset.view)}};
 function setHeader(view){const[t,s]=titles[view]||[view,''];$('#pageTitle').textContent=t;$('#pageSubtitle').textContent=s;$$('#nav [data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===view))}
-async function initialize(){state.me=(await api('/api/admin/me')).user;showApp();await navigate('dashboard');await refreshNotifications();if(!state.notificationTimer)state.notificationTimer=setInterval(()=>refreshNotifications(true),60000);startVpsCountdown();}
+async function initialize(){
+  const token=state.token;
+  const dashboard=api('/api/admin/dashboard?include_overview=1').then(value=>({value}),error=>({error}));
+  const me=await api('/api/admin/me');
+  if(state.token!==token)return;
+  state.me=me.user;state.dashboardPrefetch=dashboard;showApp();await navigate('dashboard');
+  if(!state.notificationTimer)state.notificationTimer=setInterval(()=>{if(!document.hidden)refreshNotifications(true)},60000);
+  startVpsCountdown();
+}
 function isVpsReminderEnabled(s = {}) {
   const v = s.vps_reminder_enabled;
   if (v === false || v === 'false' || v === 0 || v === '0') return false;
@@ -225,8 +234,11 @@ function productCard(p,i=0){
 }
 
 async function loadDashboard(){
-  const [overview,dash]=await Promise.all([api('/api/admin/overview'),api('/api/admin/dashboard')]);
-  applyShell(overview);
+  const pending=state.dashboardPrefetch;state.dashboardPrefetch=null;
+  const prefetched=pending?await pending:null;
+  if(prefetched?.error)throw prefetched.error;
+  const dash=prefetched?prefetched.value:await api('/api/admin/dashboard?include_overview=1');
+  applyShell(dash.stats?dash:await api('/api/admin/overview'));
   const d=dash.data||{},t=d.today||{},daily=d.last7||[],top=d.top_products||[];
   const max=Math.max(1,...daily.map(x=>Number(x.revenue||0)));
   $('#content').innerHTML=`
@@ -935,6 +947,20 @@ function bindBackupActions(){$$('[data-download-backup]').forEach(b=>b.onclick=(
 async function saveSimpleSettings(e,boolKeys=[],numberKeys=[],message='Pengaturan disimpan'){e.preventDefault();const x=Object.fromEntries(new FormData(e.target).entries());for(const k of boolKeys)x[k]=x[k]==='true';for(const k of numberKeys)x[k]=Number(x[k]||0);try{state.cache.settings=await api('/api/admin/settings',{method:'PATCH',body:x}).then(r=>r.settings||x);toast(message)}catch(err){toast(err.message,true)}}
 async function saveStoreSettings(e){e.preventDefault();const x=Object.fromEntries(new FormData(e.target).entries());['store_balance'].forEach(k=>x[k]=Number(x[k]||0));x.show_total_users=x.show_total_users==='true';try{await api('/api/admin/settings',{method:'PATCH',body:x});toast('Pengaturan toko disimpan');applyShell(await api('/api/admin/overview'))}catch(err){toast(err.message,true)}}
 async function savePaymentSettings(e){e.preventDefault();const x=Object.fromEntries(new FormData(e.target).entries());const method=x.autogopay_payment_method||'gopay';const url=String(x.shoppepay_gateway_url||'internal').trim();const key=String(x.shoppepay_gateway_key||'').trim();const qrisStatic=String(x.shoppepay_qris_static||'').trim();const uniqueCode=x.shoppepay_unique_code==='true';try{await api('/api/admin/settings',{method:'PATCH',body:{autogopay_payment_method:method,shoppepay_gateway_url:url,shoppepay_gateway_key:key,shoppepay_qris_static:qrisStatic,shoppepay_unique_code:uniqueCode}});if(state.cache.settings){state.cache.settings.autogopay_payment_method=method;state.cache.settings.shoppepay_gateway_url=url;state.cache.settings.shoppepay_gateway_key=key;state.cache.settings.shoppepay_qris_static=qrisStatic;state.cache.settings.shoppepay_unique_code=uniqueCode;}toast('Pengaturan pembayaran & QRIS disimpan')}catch(err){toast(err.message,true)}}
+let qrDecoderLoading;
+function ensureQrDecoder(){
+  if(typeof window.jsQR==='function')return Promise.resolve();
+  if(qrDecoderLoading)return qrDecoderLoading;
+  qrDecoderLoading=new Promise((resolve,reject)=>{
+    const script=document.createElement('script');
+    const timer=setTimeout(()=>{script.remove();reject(new Error('Pemindai QR belum dapat dimuat. Coba lagi.'));},10000);
+    script.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';script.async=true;
+    script.onload=()=>{clearTimeout(timer);if(typeof window.jsQR==='function')resolve();else reject(new Error('Pemindai QR tidak tersedia.'));};
+    script.onerror=()=>{clearTimeout(timer);script.remove();reject(new Error('Gagal memuat pemindai QR. Periksa koneksi lalu coba lagi.'));};
+    document.head.appendChild(script);
+  }).catch(error=>{qrDecoderLoading=null;throw error;});
+  return qrDecoderLoading;
+}
 async function scanQrCodeFromFile(file) {
   if (!file) return null;
   return new Promise((resolve) => {
@@ -953,6 +979,7 @@ async function scanQrCodeFromFile(file) {
             } catch {}
           }
 
+          await ensureQrDecoder();
           if (typeof jsQR !== 'undefined') {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d', { willReadFrequently: true });

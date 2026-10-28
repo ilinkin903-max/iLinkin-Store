@@ -320,15 +320,17 @@ if (modalEl) {
   });
 }
 
-async function api(path, options = {}) {
+function api(path,options={}){const copy={...options};const token=state.token;return window.ilinkRequests.run(path,copy,token,()=>apiRequest(path,copy,token));}
+
+async function apiRequest(path, options = {}, requestToken = state.token) {
   const url = '/api/gateway?path=' + encodeURIComponent(path);
   const headers = { ...(options.headers || {}) };
-  if (state.token) headers.authorization = 'Bearer ' + state.token;
+  if (requestToken) headers.authorization = 'Bearer ' + requestToken;
   if (options.body && typeof options.body !== 'string' && !(options.body instanceof Blob)) {
     headers['content-type'] = 'application/json';
     options.body = JSON.stringify(options.body);
   }
-  const res = await fetch(url, { ...options, headers });
+  const res = await fetch(url, { ...options, headers, cache: 'no-store' });
   if (options.raw) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res;
@@ -336,9 +338,7 @@ async function api(path, options = {}) {
   const ct = res.headers.get('content-type') || '';
   const data = ct.includes('json') ? await res.json() : { ok: res.ok, message: await res.text() };
   if (res.status === 401 || (res.status === 403 && (data.error === 'RESELLER_INACTIVE' || data.error === 'UNAUTHORIZED' || String(data.message || '').includes('tidak ditemukan') || String(data.message || '').includes('belum aktif')))) {
-    sessionStorage.removeItem('ilink_reseller_token');
-    localStorage.removeItem('ilink_reseller_token');
-    state.token = '';
+    if(state.token===requestToken){sessionStorage.removeItem('ilink_reseller_token');localStorage.removeItem('ilink_reseller_token');state.token='';}
     if (res.status === 401) {
       throw new Error('Sesi kedaluwarsa. Silakan buka kembali dari bot Telegram.');
     }
@@ -2152,9 +2152,9 @@ function openFreshProductModal(r) {
 // ---------------------------------------------------------------------
 async function loadWithdraw(preserveScroll = false) {
   const scrollY = preserveScroll ? window.scrollY : 0;
-  const me = await api('/api/reseller/me');
+  const [me,withdrawals] = await Promise.all([api('/api/reseller/me'),api('/api/reseller/withdrawals')]);
   state.reseller = me.reseller;
-  state.withdrawals = await api('/api/reseller/withdrawals');
+  state.withdrawals = withdrawals;
   updateShellUI();
 
   const r = state.reseller || {};

@@ -622,10 +622,15 @@ async function loadBot(preserveScroll = false) {
           <small>Kosongkan agar otomatis diarahkan ke akun Telegram Anda.</small>
         </label>
 
-        <label class="full">
-          Banner Media / Gambar Start (Opsional)
-          <input name="start_media_url" placeholder="URL Foto / Gambar (https://...)" value="${esc(br.start_media_url || '')}" />
-        </label>
+        <div class="full">
+          <label for="bannerMediaValue">Banner Media / Gambar Start (Opsional)</label>
+          <input name="start_media_url" id="bannerMediaValue" placeholder="URL atau unggah file di bawah" value="${esc(br.start_media_url || '')}" />
+          <input type="file" id="bannerMediaFile" aria-label="Unggah file banner" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm" />
+          <small>JPG, PNG, WEBP, GIF maksimal 8 MB; video MP4/WEBM maksimal 40 MB. Klik Simpan setelah upload selesai.</small>
+          <span id="bannerUploadStatus" role="status"></span>
+          <div id="bannerMediaPreview"></div>
+          <button type="button" id="removeBannerMedia" class="neo-btn white small">Hapus Banner</button>
+        </div>
 
         <label class="full">
           Pesan Pembuka /start (Opsional)
@@ -647,6 +652,21 @@ async function loadBot(preserveScroll = false) {
       </form>
     </div>
   `;
+
+  const previewBanner=()=>{
+    const value=$('#bannerMediaValue').value.trim();const host=$('#bannerMediaPreview');
+    host.innerHTML=!value?'':/\.(mp4|webm)(?:\?|$)/i.test(value)?`<video src="${esc(mediaSrc(value))}" controls preload="metadata" style="max-width:100%;max-height:220px"></video>`: `<img src="${esc(mediaSrc(value))}" alt="Preview banner" style="max-width:100%;max-height:220px;object-fit:contain">`;
+  };
+  previewBanner();$('#bannerMediaValue').onchange=previewBanner;
+  $('#removeBannerMedia').onclick=()=>{$('#bannerMediaValue').value='';$('#bannerMediaFile').value='';previewBanner();};
+  $('#bannerMediaFile').onchange=async event=>{
+    const file=event.target.files?.[0];if(!file)return;
+    const save=$('#btnSaveBot'),upload=event.target,status=$('#bannerUploadStatus');
+    save.disabled=true;upload.disabled=true;$('#removeBannerMedia').disabled=true;
+    try{status.textContent='Mengunggah banner…';const result=await uploadMedia(file,'banner',value=>status.textContent=`Mengunggah ${value}%`);$('#bannerMediaValue').value=result.item.key;previewBanner();status.textContent='Upload selesai. Klik Simpan & Jalankan Bot untuk menerapkan.';}
+    catch(error){status.textContent=error.message;toast(error.message,true);}
+    finally{save.disabled=false;upload.disabled=false;$('#removeBannerMedia').disabled=false;}
+  };
 
   $('#btnCheckToken').onclick = async () => {
     const token = $('#resellerBotToken').value.trim();
@@ -3004,7 +3024,7 @@ function userCards(rows) {
       </div>
       <div class="user-actions">
         ${u.status === 'blocked' ? `<button class="neo-btn green small" data-unblock-user="${esc(u.telegram_id)}">Aktifkan</button>` : ''}
-        <button class="neo-btn yellow small" data-wallet-user="${esc(u.telegram_id)}">Saldo</button>
+        <button class="neo-btn yellow small" data-wallet-user="${esc(u.telegram_id)}">↩ Refund Komplain</button>
         <button class="neo-btn blue small" data-chat-user="${esc(u.telegram_id)}">Chat</button>
         <button class="neo-btn red small" data-delete-user="${esc(u.telegram_id)}">Hapus</button>
       </div>
@@ -3071,23 +3091,24 @@ function bindUserActions() {
   $$('[data-delete-user]').forEach(b => b.onclick = () => remove(`/api/reseller/users/${encodeURIComponent(b.dataset.deleteUser)}`, 'Hapus pengguna ini dari database bot Anda?', () => loadUsers(true)));
 }
 
-function openWallet(u) {
-  if (!u) return;
-  modal('Atur Saldo · ' + (u.first_name || u.username || u.telegram_id), `
-    <div class="form-grid">
-      <label class="full">Saldo Pengguna
-        <input name="balance_main" type="number" min="0" value="${Number(u.balance_main ?? u.balance ?? 0)}" required />
-      </label>
-      <label class="full">Telegram ID
-        <input value="${esc(u.telegram_id)}" disabled />
-      </label>
-    </div>
-  `, async b => {
-    b.balance_main = Number(b.balance_main || 0);
-    await api(`/api/reseller/users/${encodeURIComponent(u.telegram_id)}/wallet`, { method: 'POST', body: b });
-    toast('Saldo pengguna diperbarui');
-    loadUsers(true);
-  });
+async function openWallet(u) {
+  if(!u)return;
+  try{
+    const data=await api(`/api/reseller/users/${encodeURIComponent(u.telegram_id)}/refundable-orders`);
+    const orders=data.items||[];
+    if(!orders.length)return toast('Tidak ada pesanan dibayar yang dapat direfund untuk pembeli ini.',true);
+    const requestId=crypto.randomUUID();
+    modal('Refund Komplain · '+(u.first_name||u.telegram_id),`<div class="form-grid">
+      <p class="full">Refund diambil dari saldo profit reseller. Saldo top-up pembeli tidak dapat diedit langsung.</p>
+      <label class="full">Pesanan<select name="order_ref" required>${orders.map(o=>`<option value="${esc(o.order_ref)}">${esc(o.order_ref)} · ${esc(o.product_name)} · Sisa ${money(o.refundable)}</option>`).join('')}</select></label>
+      <label>Nominal refund<input name="amount" type="number" min="1" step="1" required></label>
+      <label class="full">Alasan komplain<textarea name="reason" minlength="5" maxlength="500" required></textarea></label>
+      <p class="full">Saldo profit saat ini: <b>${money(data.profit_balance)}</b>. Bila tidak mencukupi, hubungi owner.</p>
+    </div>`,async values=>{
+      const result=await api(`/api/reseller/users/${encodeURIComponent(u.telegram_id)}/refunds`,{method:'POST',body:{order_ref:values.order_ref,amount:Number(values.amount),reason:values.reason,request_id:requestId}});
+      if(state.reseller)state.reseller.profit_balance=result.profit_balance;updateShellUI();toast('Refund komplain berhasil dicatat');await loadUsers(true);
+    },{submit:'Proses Refund'});
+  }catch(error){toast(error.message,true);}
 }
 
 function openSendMessage(id) {

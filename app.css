@@ -1222,3 +1222,184 @@ body{overflow-x:hidden}.app-shell{min-height:100vh;display:grid;grid-template-co
     white-space: nowrap !important;
   }
 }
+
+/* ==========================================================================
+   NokTel (Nomor Telegram Ready Stock) Dashboard Styles
+   ========================================================================== */
+.noktel-subnav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0 16px;
+}
+.noktel-subnav .subnav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 15px;
+  border: 2px solid var(--ink);
+  border-radius: 11px;
+  background: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  box-shadow: 2px 2px 0 var(--ink);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.noktel-subnav .subnav-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.noktel-subnav .subnav-btn.active {
+  background: var(--yellow) !important;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.noktel-login-card {
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+  background: #fdfaff;
+  padding: 18px;
+  box-shadow: 4px 4px 0 var(--ink);
+  margin-bottom: 16px;
+}
+.noktel-login-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.noktel-login-head h3 {
+  margin: 0;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.noktel-login-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.noktel-verify-box {
+  margin-top: 14px;
+  padding: 14px;
+  border: 2px dashed var(--purple);
+  border-radius: 12px;
+  background: #f8f2ff;
+  display: grid;
+  gap: 10px;
+}
+.noktel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 350px), 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.noktel-card {
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px;
+  box-shadow: 3px 4px 0 var(--ink);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+.noktel-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+.noktel-card-body {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+}
+.noktel-phone-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 800;
+}
+.noktel-phone-row code {
+  background: #f0e6ff;
+  color: var(--purple);
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: monospace;
+}
+.noktel-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  color: #555;
+}
+.noktel-pricing-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: #f8f8f8;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.noktel-card-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(0,0,0,0.12);
+}
+.noktel-otp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #e9fbf0;
+  border: 2px solid #7be314;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #116823;
+}
+.noktel-otp-badge b {
+  font-size: 17px;
+  letter-spacing: 2px;
+  font-family: monospace;
+  background: #fff;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.noktel-guide-card {
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  background: #fff;
+  padding: 16px;
+  box-shadow: 3px 4px 0 var(--ink);
+  margin-bottom: 14px;
+}
+.noktel-guide-card h4 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.noktel-guide-card p, .noktel-guide-card ol, .noktel-guide-card ul {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #333;
+}
+.noktel-guide-card ol, .noktel-guide-card ul {
+  padding-left: 20px;
+}
+

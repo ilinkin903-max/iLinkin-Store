@@ -1,6 +1,6 @@
 const $=(s)=>document.querySelector(s);const $$=(s)=>[...document.querySelectorAll(s)];
-const state={token:sessionStorage.getItem('ilink_owner_token')||localStorage.getItem('ilink_owner_token')||'',view:'dashboard',cache:{supplierCatalogs:{}},me:null,overview:null,couponTab:'coupon',settingsTab:'',botTab:'',resellerTab:'resellers',resellerFilter:'',invitationTab:'emails',invitationSearch:'',invitationStatus:'',invitationSessionFilter:'',invitationsData:{items:[],sessions:[]},selectedEmailIds:new Set(),promoData:{items:[],store:{}},promoTemplate:'wa',promoCategoryFilter:'',promoSearch:'',promoSelectedIds:new Set(),promoOptions:{showPrice:true,showStock:true,showBot:true,showCs:true,showWarranty:true,customHeader:'',customCs:'',customFooter:''},report:{type:'monthly'},legacyMigration:null,notifications:[],notificationTimer:null};
-const titles={nokos:['Nokos','Katalog nomor virtual, OTP dan riwayat pesanan'],smm:['SMM','Katalog layanan media sosial dan riwayat pesanan'],dashboard:['Dashboard','Ringkasan performa toko hari ini'],products:['Produk','Katalog, varian, deskripsi, SNK, dan stok'],fresh:['Jaspay Fresh','Produk fresh, harga, mode, setting akun, dan perpanjang'],orders:['Pesanan','Pantau seluruh detail transaksi tanpa tabel horizontal'],invitations:['List Email & Sesi Undangan','Daftar email pembeli produk undangan (Canva, Gemini, dsb.) dan kelola sesi tim'],promotions:['Promosi Stok Ready','Daftar produk ready dan generator template promosi WhatsApp, Telegram, Flash Sale, & Story'],reports:['Laporan','Omzet, profit, dan performa penjualan'],coupons:['Kupon','Voucher promo dan kode redeem'],settings:['Pengaturan','Toko, referral, TopUp, pembayaran, supplier, dan backup'],bot:['Bot & Notifikasi','Bot, /start, link, transaksi, dan diagnostik'],broadcast:['Broadcast & Promosi','Kirim broadcast bot dan buat promosi stok ready media sosial'],users:['User','Data pengguna Telegram, saldo, referral, dan aktivitas'],resellers:['Reseller Bot','Kelola reseller, bot toko white-label, komisi profit, dan penarikan saldo']};
+const state={token:sessionStorage.getItem('ilink_owner_token')||localStorage.getItem('ilink_owner_token')||'',view:'dashboard',cache:{supplierCatalogs:{}},me:null,overview:null,couponTab:'coupon',settingsTab:'',botTab:'',resellerTab:'resellers',resellerFilter:'',invitationTab:'emails',invitationSearch:'',invitationStatus:'',invitationSessionFilter:'',invitationsData:{items:[],sessions:[]},selectedEmailIds:new Set(),promoData:{items:[],store:{}},promoTemplate:'wa',promoCategoryFilter:'',promoSearch:'',promoSelectedIds:new Set(),promoOptions:{showPrice:true,showStock:true,showBot:true,showCs:true,showWarranty:true,customHeader:'',customCs:'',customFooter:''},report:{type:'monthly'},legacyMigration:null,notifications:[],notificationTimer:null,noktelTab:'stock',noktelFilterVariant:'',noktelFilterStatus:'',noktelSearch:'',noktelOrderFilterStatus:'',noktelOrderSearch:'',noktelLoginId:'',noktelLoginExpiresAt:''};
+const titles={noktel:['NokTel','Katalog varian, login & stok akun Telegram, dan riwayat pesanan'],nokos:['Nokos','Katalog nomor virtual, OTP dan riwayat pesanan'],smm:['SMM','Katalog layanan media sosial dan riwayat pesanan'],dashboard:['Dashboard','Ringkasan performa toko hari ini'],products:['Produk','Katalog, varian, deskripsi, SNK, dan stok'],fresh:['Jaspay Fresh','Produk fresh, harga, mode, setting akun, dan perpanjang'],orders:['Pesanan','Pantau seluruh detail transaksi tanpa tabel horizontal'],invitations:['List Email & Sesi Undangan','Daftar email pembeli produk undangan (Canva, Gemini, dsb.) dan kelola sesi tim'],promotions:['Promosi Stok Ready','Daftar produk ready dan generator template promosi WhatsApp, Telegram, Flash Sale, & Story'],reports:['Laporan','Omzet, profit, dan performa penjualan'],coupons:['Kupon','Voucher promo dan kode redeem'],settings:['Pengaturan','Toko, referral, TopUp, pembayaran, supplier, dan backup'],bot:['Bot & Notifikasi','Bot, /start, link, transaksi, dan diagnostik'],broadcast:['Broadcast & Promosi','Kirim broadcast bot dan buat promosi stok ready media sosial'],users:['User','Data pengguna Telegram, saldo, referral, dan aktivitas'],resellers:['Reseller Bot','Kelola reseller, bot toko white-label, komisi profit, dan penarikan saldo']};
 function esc(v=''){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}function money(v){return'Rp '+Number(v||0).toLocaleString('id-ID')}function date(v){if(!v)return'-';try{return new Date(v).toLocaleString('id-ID')}catch{return String(v)}}function bytes(v){const n=Number(v||0);if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(1)+' KB';return(n/1048576).toFixed(1)+' MB'}function toast(msg,bad=false){const t=$('#toast');if(!t)return;const m=$('#modal');if(m&&m.open){if(t.parentElement!==m)m.appendChild(t);}else{if(t.parentElement!==document.body)document.body.appendChild(t);}t.textContent=msg;t.className='toast show'+(bad?' bad':'');clearTimeout(toast.t);toast.t=setTimeout(()=>{t.className='toast';if(!m||!m.open){if(t.parentElement!==document.body)document.body.appendChild(t);}},2800);}function badge(status){const s=String(status||'').toLowerCase();const cls=['completed','paid','success','active','running','waiting_delivery'].includes(s)?'ok':['pending','pending_payment','pending_approval','awaiting_payment','awaiting_token','supplier_pending','fresh_processing','fresh_attention','inactive'].includes(s)?'warn':['failed','blocked','canceled','cancelled','expired','rejected','suspended'].includes(s)?'bad':'purple';const labelMap={pending_approval:'Menunggu Persetujuan',awaiting_payment:'Menunggu Pembayaran',awaiting_token:'Menunggu Bot Token',active:'Aktif',suspended:'Ditangguhkan',rejected:'Ditolak'};const label=labelMap[s]||status||'-';return`<span class="badge ${cls}">${esc(label)}</span>`}function firstLetter(v){return esc(String(v||'?').trim().charAt(0).toUpperCase()||'?')}
 function bulkTiers(value){let rows=value;if(typeof rows==='string'){try{rows=JSON.parse(rows)}catch{rows=[]}}if(!Array.isArray(rows))rows=[];const byQty=new Map();for(const row of rows){const min=Math.max(2,Math.floor(Number(row?.min_qty??row?.minQty??row?.qty??0)||0)),price=Math.max(0,Math.floor(Number(row?.price??row?.unit_price??0)||0));if(min>=2&&price>0)byQty.set(min,{min_qty:min,price})}return[...byQty.values()].sort((a,b)=>a.min_qty-b.min_qty)}
 function bulkUnitPrice(base,tiers,qty=1){let price=Math.max(0,Number(base||0)),q=Math.max(1,Number(qty||1));for(const t of bulkTiers(tiers)){if(q>=t.min_qty)price=t.price;else break}return price}
@@ -204,7 +204,7 @@ function vpsRenewalInfo(settings = {}) {
 async function navigate(view){
   if(view&&typeof view==='string'&&view.startsWith('settings:')){state.settingsTab=view.split(':')[1];view='settings';}
   if(view==='promotions'){state.broadcastTab='promo';view='broadcast';}
-  if(state.broadcastPollTimer){clearInterval(state.broadcastPollTimer);state.broadcastPollTimer=null;}state.view=view;closeNotifications();setHeader(view);$('#content').innerHTML='<div class="empty-product">Memuat data...</div>';try{await({nokos:()=>loadServiceMenu('otp'),smm:()=>loadServiceMenu('smm'),dashboard:loadDashboard,products:loadProducts,fresh:loadFresh,orders:loadOrders,invitations:loadInvitations,promotions:loadPromotions,reports:loadReports,coupons:loadCoupons,settings:loadSettings,bot:loadBot,broadcast:loadBroadcast,users:loadUsers,resellers:loadResellers}[view]||loadDashboard)();$('#lastUpdated').textContent='Terakhir diperbarui: '+new Date().toLocaleString('id-ID');refreshNotifications(true)}catch(e){$('#content').innerHTML=`<div class="empty-product">${esc(e.message)}</div>`;toast(e.message,true)}}
+  if(state.broadcastPollTimer){clearInterval(state.broadcastPollTimer);state.broadcastPollTimer=null;}state.view=view;closeNotifications();setHeader(view);$('#content').innerHTML='<div class="empty-product">Memuat data...</div>';try{await({nokos:()=>loadServiceMenu('otp'),noktel:loadNoktel,smm:()=>loadServiceMenu('smm'),dashboard:loadDashboard,products:loadProducts,fresh:loadFresh,orders:loadOrders,invitations:loadInvitations,promotions:loadPromotions,reports:loadReports,coupons:loadCoupons,settings:loadSettings,bot:loadBot,broadcast:loadBroadcast,users:loadUsers,resellers:loadResellers}[view]||loadDashboard)();$('#lastUpdated').textContent='Terakhir diperbarui: '+new Date().toLocaleString('id-ID');refreshNotifications(true)}catch(e){$('#content').innerHTML=`<div class="empty-product">${esc(e.message)}</div>`;toast(e.message,true)}}
 function applyShell(r){const s=r.settings||{};const o=r.stats||{};state.overview=r;if(r.settings)state.cache.settings=Object.assign({},state.cache.settings||{},r.settings);updateVpsHeaderTimer();$('#brandName').innerHTML=esc(String(s.store_name||'AUTO ORDER')).replace(/\s+/g,'<br>');$('#brandTagline').textContent=s.store_tagline||'Digital Store';$('#ownerName').textContent=s.owner_display_name||state.me?.display_name||'Owner';$('#ownerUsername').textContent='@'+String(s.owner_username||state.me?.owner_username||'owneradmin').replace(/^@/,'');const metric=String(s.store_balance_metric||o.store_balance_metric||'month_profit');const metricMap={month_profit:['Profit Bulan Ini',o.month_profit],month_revenue:['Omzet Bulan Ini',o.month_revenue],today_profit:['Profit Hari Ini',o.today_profit],today_revenue:['Omzet Hari Ini',o.today_revenue],manual:['Saldo Manual',s.store_balance??o.store_balance]};const selected=metricMap[metric]||metricMap.month_profit;$('#storeBalanceLabel').textContent=selected[0];$('#storeBalance').textContent=money(selected[1]||0);const badgeEl=$('#orderBadge');const pending=Number(o.pending_orders||0);badgeEl.textContent=pending;badgeEl.classList.toggle('hidden',pending<1);const resBadgeEl=$('#resellerBadge');if(resBadgeEl){api('/api/admin/resellers/overview').then(ro=>{const pWd=Number(ro?.stats?.pending_withdrawals||0);const pRes=Number(ro?.stats?.pending_resellers||0);const pTotal=pWd+pRes;resBadgeEl.textContent=pTotal;resBadgeEl.classList.toggle('hidden',pTotal<1);}).catch(()=>null);}const username=state.overview?.bot?.username;$('#telegramBtn').href=username?`https://t.me/${username}`:'#';$('#telegramBtn').textContent='✈ Telegram Mini App';$('#systemSafe').textContent=state.overview?.bot?.running?'Semua sistem berjalan dengan aman':'Dashboard aktif · Bot Telegram offline'}
 function stat(icon,color,label,value,small){return`<div class="stat-card"><div class="stat-icon ${color}">${icon}</div><div><small>${esc(label)}</small><strong>${esc(value)}</strong><em>${esc(small)}</em></div></div>`}
 function productStockState(p={}){const all=Array.isArray(p.variants)?p.variants:[],vars=all.filter(v=>v.active);if(all.length){if(vars.some(v=>v.delivery_mode!=='preorder'&&Number(v.stock||0)>0))return'ready';if(vars.some(v=>v.delivery_mode==='preorder'))return'preorder';return'empty'}if(p.delivery_mode==='preorder'&&Number(p.stock||0)<1)return'preorder';return Number(p.sale_stock??p.stock??0)>0?'ready':'empty'}
@@ -247,6 +247,16 @@ async function loadDashboard(){
       ${stat('💵','green','Profit Hari Ini',money(t.profit),'Profit bersih hari ini')}
       ${stat('🛒','purple','Total Order',t.orders||0,'Order hari ini')}
       ${stat('📦','yellow','Total Stok',d.total_stock||0,'Stok siap kirim')}
+    </div>
+    <div class="noktel-quick-banner" style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;background:#f8f2ff;border:2px solid var(--ink);border-radius:14px;box-shadow:3px 3px 0 var(--ink);flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:28px">✈️</span>
+        <div>
+          <b style="font-size:14px;display:block">Layanan NokTel (Nomor Telegram Ready Stock)</b>
+          <small style="color:var(--muted);font-weight:700">Login otomatis MTProto, stok siap kirim & cek OTP mandiri 5-digit Telegram.</small>
+        </div>
+      </div>
+      <button class="neo-btn purple small" type="button" onclick="navigate('noktel')">Kelola NokTel →</button>
     </div>
     <div class="dashboard-grid" style="margin-top:14px">
       <section class="report-card chart-card"><div class="card-heading"><div><h3>📊 Grafik 7 Hari Terakhir</h3></div></div><div class="seven-chart">${daily.map(x=>{const h=Math.max(5,Math.round(Number(x.revenue||0)/max*100));const lbl=new Date(x.day+'T00:00:00').toLocaleDateString('id-ID',{day:'2-digit',month:'short'});return `<div class="day-col"><div class="day-value">${Number(x.revenue||0)?money(x.revenue):'Rp 0'}</div><div class="day-track"><div class="day-bar" style="height:${h}%"></div></div><div class="day-label">${esc(lbl)}</div></div>`}).join('')}</div></section>
@@ -3888,4 +3898,992 @@ async function renderServiceSettings(){
 async function loadServiceMenu(kind){
   const view=kind==='otp'?'nokos':'smm';
   return window.ilinkServices.render({api,base:'/api/admin/services',host:$('#content'),kind,isCurrent:()=>state.view===view,owner:true,onSettings:()=>{state.settingsTab='services';navigate('settings');}});
+}
+
+// ==========================================
+// NOKTEL (NOMOR TELEGRAM READY STOCK)
+// ==========================================
+
+function ntDebounce(fn, ms = 350) {
+  let timer;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
+
+async function loadNoktel(){
+  $('#content').innerHTML='<div class="empty-product">Memuat data NokTel...</div>';
+  try{
+    const [overviewRes, variantsRes, stockRes, ordersRes] = await Promise.all([
+      api('/api/admin/noktel/overview').catch(()=>({data:{}})),
+      api('/api/admin/noktel/variants').catch(()=>({items:[]})),
+      api(`/api/admin/noktel/stock?limit=100&variant_id=${encodeURIComponent(state.noktelFilterVariant||'')}&status=${encodeURIComponent(state.noktelFilterStatus||'')}&search=${encodeURIComponent(state.noktelSearch||'')}`).catch(()=>({items:[]})),
+      api(`/api/admin/noktel/orders?limit=50&status=${encodeURIComponent(state.noktelOrderFilterStatus||'')}&search=${encodeURIComponent(state.noktelOrderSearch||'')}`).catch(()=>({items:[]}))
+    ]);
+
+    state.cache.noktelOverview = overviewRes.data || {};
+    state.cache.noktelVariants = variantsRes.items || [];
+    state.cache.noktelStock = stockRes.items || [];
+    state.cache.noktelOrders = ordersRes.items || [];
+
+    renderNoktel();
+  }catch(err){
+    $('#content').innerHTML=`<div class="empty-product">${esc(err.message)}</div>`;
+    toast(err.message,true);
+  }
+}
+
+function renderNoktel(){
+  const overview = state.cache.noktelOverview || {};
+  const variants = state.cache.noktelVariants || [];
+  const stock = state.cache.noktelStock || [];
+  const orders = state.cache.noktelOrders || [];
+  const tab = state.noktelTab || 'stock';
+
+  let bodyHtml = '';
+  if (tab === 'stock') bodyHtml = renderNoktelStockTab(stock, variants);
+  else if (tab === 'products') bodyHtml = renderNoktelProductsTab(variants);
+  else if (tab === 'orders') bodyHtml = renderNoktelOrdersTab(orders);
+  else if (tab === 'guide') bodyHtml = renderNoktelGuideTab();
+
+  $('#content').innerHTML = `
+    <div class="noktel-admin-page">
+      <div class="section-title product-section-title">
+        <div>
+          <h2>✈️ NokTel (Nomor Telegram Ready Stock)</h2>
+          <p>Login akun otomatis via Telegram MTProto, stok siap kirim, katalog varian &amp; cek OTP mandiri.</p>
+        </div>
+        <div class="section-actions product-title-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button id="ntOpenLoginBtn" type="button" class="neo-btn purple small">✈️ Login Akun</button>
+          <button id="ntManualStockBtn" type="button" class="neo-btn blue small">📥 Input Manual</button>
+          <button id="ntAddVariantBtn" type="button" class="neo-btn green small">＋ Tambah Varian</button>
+          <button id="ntRefreshBtn" type="button" class="neo-btn white small">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div class="dashboard-kpis" style="margin-top:12px">
+        ${stat('📦','green','Stok Ready',overview.stock_available||0,'Akun siap dikirim')}
+        ${stat('🛍️','purple','Stok Terjual',overview.stock_sold||0,'Akun sukses terjual')}
+        ${stat('🏷️','blue','Varian Produk',variants.length,'Pilihan negara/jenis')}
+        ${stat('💰','pink','Omzet NokTel',money(overview.total_revenue||0),'Total omzet NokTel')}
+        ${stat('💵','yellow','Profit Bersih',money(overview.total_profit||0),'Laba bersih')}
+      </div>
+
+      <nav class="noktel-subnav" aria-label="Navigasi NokTel">
+        <button type="button" class="subnav-btn ${tab==='stock'?'active':''}" data-nt-tab="stock">
+          <span>📱</span> Stok Akun (${stock.length})
+        </button>
+        <button type="button" class="subnav-btn ${tab==='products'?'active':''}" data-nt-tab="products">
+          <span>🏷️</span> Produk &amp; Varian (${variants.length})
+        </button>
+        <button type="button" class="subnav-btn ${tab==='orders'?'active':''}" data-nt-tab="orders">
+          <span>🧾</span> Pesanan NokTel (${orders.length})
+        </button>
+        <button type="button" class="subnav-btn ${tab==='guide'?'active':''}" data-nt-tab="guide">
+          <span>📖</span> Panduan &amp; Sistem
+        </button>
+      </nav>
+
+      <div class="noktel-tab-body">
+        ${bodyHtml}
+      </div>
+    </div>
+  `;
+
+  bindNoktelEvents();
+}
+
+function renderNoktelStockTab(stock, variants) {
+  const currentVariant = state.noktelFilterVariant || '';
+  const currentStatus = state.noktelFilterStatus || '';
+  const searchVal = state.noktelSearch || '';
+
+  return `
+    <!-- Interactive Telegram Login Box -->
+    <section class="noktel-login-card" id="noktelLoginSection">
+      <div class="noktel-login-head">
+        <div>
+          <h3>✈️ Login Akun Telegram Langsung ke Stok</h3>
+          <p>Login akun otomatis seperti bot Auto-Promo. Kode login dikirim ke aplikasi Telegram akun tersebut tanpa perlu copy-paste session manual.</p>
+        </div>
+        <span class="badge purple">MTProto GramJS</span>
+      </div>
+      <form id="ntLoginForm" class="form-grid">
+        <label>Pilih Produk / Varian
+          <select id="ntLoginVariant" required>
+            <option value="">Pilih varian produk...</option>
+            ${variants.map(v=>`<option value="${v.id}" data-cost="${v.cost_price_idr||0}">${esc(v.country)} / ${esc(v.variant_name)} — Jual ${money(v.price_idr)} (Modal default: ${money(v.cost_price_idr||0)})</option>`).join('')}
+          </select>
+        </label>
+        <label>Nomor Telepon Telegram
+          <input id="ntLoginPhone" placeholder="+628123456789" required autocomplete="tel">
+          <small>Gunakan format internasional diawali tanda + dan kode negara.</small>
+        </label>
+        <label>Modal Akun (Rp)
+          <input id="ntLoginCost" type="number" min="0" placeholder="0">
+          <small>Privat untuk owner menghitung profit bersih akun.</small>
+        </label>
+        <div class="full form-actions" style="margin-top:4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <button type="button" class="neo-btn purple" id="ntSendCodeBtn">✈️ Kirim Kode Telegram</button>
+          <span id="ntLoginStatus" style="font-weight:700;font-size:12px;display:none;padding:6px 10px;border-radius:8px"></span>
+        </div>
+        <div id="ntVerifyBox" class="full noktel-verify-box hidden">
+          <div style="font-weight:800;color:var(--purple);font-size:13px">🔑 Masukkan Kode Verifikasi Telegram</div>
+          <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+            <label>Kode dari Telegram (5 digit)
+              <input id="ntLoginCode" inputmode="numeric" placeholder="Contoh: 12345" autocomplete="one-time-code">
+              <small>Cek chat resmi dari Telegram (Service Notifications 777000).</small>
+            </label>
+            <label>Password 2FA (Opsional)
+              <input id="ntLoginPassword" type="text" placeholder="Kosongkan jika akun tanpa 2FA">
+              <small>Jika akun memakai Two-Step Verification, isi agar pembeli menerima password saat order.</small>
+            </label>
+          </div>
+          <div class="form-actions" style="margin-top:8px">
+            <button type="button" class="neo-btn green" id="ntVerifyBtn">💾 Verifikasi &amp; Simpan ke Stok</button>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- Toolbar & Filter -->
+    <div class="toolbar product-toolbar" style="margin-top:14px">
+      <div class="searchbox">
+        <input id="ntStockSearchInput" placeholder="Cari nomor, username, kode stok..." value="${esc(searchVal)}">
+      </div>
+      <select id="ntStockVariantSelect">
+        <option value="">Semua Varian (${stock.length})</option>
+        ${variants.map(v=>{
+          const count = stock.filter(x=>String(x.catalog_variant_id)===String(v.id)).length;
+          return `<option value="${v.id}" ${String(v.id)===String(currentVariant)?'selected':''}>${esc(v.country)} / ${esc(v.variant_name)} (${count})</option>`;
+        }).join('')}
+      </select>
+      <select id="ntStockStatusSelect">
+        <option value="">Semua Status</option>
+        <option value="available" ${currentStatus==='available'?'selected':''}>Tersedia (Ready)</option>
+        <option value="sold" ${currentStatus==='sold'?'selected':''}>Terjual (Sold)</option>
+        <option value="disabled" ${currentStatus==='disabled'?'selected':''}>Nonaktif (Hidden)</option>
+        <option value="reserved" ${currentStatus==='reserved'?'selected':''}>Reserved (Order Aktif)</option>
+      </select>
+    </div>
+
+    <!-- Stock Accounts Grid -->
+    <div class="noktel-grid">
+      ${stock.length ? stock.map(renderNoktelStockCard).join('') : '<div class="empty-product full" style="grid-column:1/-1"><h3>Belum ada stok akun</h3><p>Gunakan form Kirim Kode Telegram di atas atau tombol Input Manual.</p></div>'}
+    </div>
+  `;
+}
+
+function renderNoktelStockCard(item) {
+  const isAvailable = item.status === 'available';
+  const isSold = item.status === 'sold';
+  const isDisabled = item.status === 'disabled';
+  const isReserved = item.status === 'reserved';
+
+  const statusBadge = isAvailable
+    ? '<span class="badge ok">Tersedia</span>'
+    : isSold
+    ? '<span class="badge blue">Terjual</span>'
+    : isDisabled
+    ? '<span class="badge warn">Nonaktif</span>'
+    : '<span class="badge bad">Reserved</span>';
+
+  const profit = Number(item.price_idr || 0) - Number(item.cost_price_idr || 0);
+
+  return `
+    <article class="noktel-card" data-nt-stock-id="${item.id}">
+      <div class="noktel-card-head">
+        <div>
+          <b style="font-size:14px">${esc(item.country || 'NokTel')} / ${esc(item.variant_name || '-')}</b>
+          <div class="muted" style="font-size:11px;margin-top:2px">Kode: <code>${esc(item.inventory_code)}</code></div>
+        </div>
+        ${statusBadge}
+      </div>
+
+      <div class="noktel-card-body">
+        <div class="noktel-phone-row">
+          <span>📱</span>
+          <code>${esc(item.phone_number || item.phone_masked || '-')}</code>
+          <button type="button" class="neo-btn white tiny" onclick="navigator.clipboard.writeText('${esc(item.phone_number||item.phone_masked||'')}');toast('Nomor disalin!')" title="Salin nomor">📋</button>
+        </div>
+
+        <div class="noktel-meta-row">
+          ${item.telegram_username ? `<span>👤 <a href="https://t.me/${esc(item.telegram_username)}" target="_blank" style="color:var(--purple);font-weight:700">@${esc(item.telegram_username)}</a></span>` : ''}
+          ${item.telegram_first_name ? `<span>(${esc(item.telegram_first_name)})</span>` : ''}
+          ${item.telegram_user_id ? `<span class="muted">ID: ${esc(item.telegram_user_id)}</span>` : ''}
+        </div>
+
+        <div class="noktel-pricing-row">
+          <div><small style="color:var(--muted)">Harga Jual</small><br><b>${money(item.price_idr)}</b></div>
+          <div><small style="color:var(--muted)">Modal Akun</small><br><b>${money(item.cost_price_idr)}</b></div>
+          <div><small style="color:var(--muted)">Profit</small><br><b style="color:var(--ok)">${money(profit)}</b></div>
+        </div>
+
+        <div class="noktel-meta-row">
+          ${item.has_session ? '<span class="badge ok" style="font-size:10px">🔐 Sesi Login Siap</span>' : '<span class="badge bad" style="font-size:10px">⚠️ Tanpa Sesi</span>'}
+          ${item.has_2fa ? `<span class="badge purple" style="font-size:10px">🔑 2FA: <code>${esc(item.two_fa_plain || 'Aktif')}</code></span>` : '<span class="badge muted" style="font-size:10px">2FA: -</span>'}
+          <span class="muted" style="font-size:10px">Waktu: ${date(item.created_at)}</span>
+        </div>
+
+        ${item.notes ? `<div style="font-size:11px;background:#f5f5f5;padding:6px 8px;border-radius:6px;color:#555"><b>Catatan:</b> ${esc(item.notes)}</div>` : ''}
+      </div>
+
+      <div class="noktel-card-actions">
+        ${item.has_session ? `<button type="button" class="neo-btn blue tiny" data-nt-check-session="${item.id}">🔍 Cek Sesi</button>` : ''}
+        <button type="button" class="neo-btn purple tiny" data-nt-edit-cost="${item.id}">✏️ Modal</button>
+        <button type="button" class="neo-btn yellow tiny" data-nt-edit-2fa="${item.id}">${item.has_2fa ? '🔐 Ubah 2FA' : '＋ 2FA'}</button>
+        ${isAvailable ? `<button type="button" class="neo-btn white tiny" data-nt-set-status="${item.id}" data-nt-target="disabled">Hide</button>` : ''}
+        ${isDisabled ? `<button type="button" class="neo-btn green tiny" data-nt-set-status="${item.id}" data-nt-target="available">Aktifkan</button>` : ''}
+        ${!isReserved ? `<button type="button" class="neo-btn red tiny" data-nt-delete-stock="${item.id}">🗑️ Hapus</button>` : '<span class="muted" style="font-size:11px">Order berlangsung</span>'}
+      </div>
+    </article>
+  `;
+}
+
+function renderNoktelProductsTab(variants) {
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <div>
+        <h3 style="margin:0">🏷️ Katalog Produk &amp; Varian NokTel</h3>
+        <p style="margin:4px 0 0;color:var(--muted);font-size:13px">Atur negara, jenis varian (Fresh Reg, Free Spam, Limper, dll), harga jual dan modal.</p>
+      </div>
+      <button type="button" class="neo-btn green" id="ntCreateVariantTopBtn">＋ Tambah Varian Baru</button>
+    </div>
+
+    <div class="noktel-grid">
+      ${variants.length ? variants.map(renderNoktelVariantCard).join('') : '<div class="empty-product full" style="grid-column:1/-1"><h3>Belum ada varian produk</h3><p>Tekan Tambah Varian Baru untuk membuat katalog NokTel pertama.</p></div>'}
+    </div>
+  `;
+}
+
+function renderNoktelVariantCard(v) {
+  const profit = Number(v.price_idr || 0) - Number(v.cost_price_idr || 0);
+  const marginPct = v.cost_price_idr ? Math.round((profit / v.cost_price_idr) * 100) : 100;
+
+  return `
+    <article class="noktel-card">
+      <div class="noktel-card-head">
+        <div>
+          <b style="font-size:15px">${esc(v.country)} / ${esc(v.variant_name)}</b>
+          <div class="muted" style="font-size:11px;margin-top:2px">Kode: <code>${esc(v.country_code || v.country_key || '-')}</code> · Urutan: ${v.sort_order || 0}</div>
+        </div>
+        <span class="badge ${v.is_visible ? 'ok' : 'warn'}">${v.is_visible ? 'Tampil di Bot' : 'Disembunyikan'}</span>
+      </div>
+
+      <div class="noktel-card-body">
+        <div class="noktel-pricing-row">
+          <div><small style="color:var(--muted)">Harga Jual</small><br><b style="font-size:14px;color:var(--purple)">${money(v.price_idr)}</b></div>
+          <div><small style="color:var(--muted)">Modal Default</small><br><b>${money(v.cost_price_idr)}</b></div>
+          <div><small style="color:var(--muted)">Estimasi Profit</small><br><b style="color:var(--ok)">${money(profit)} (${marginPct}%)</b></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;background:#fdfaff;border:2px solid var(--ink);border-radius:10px;padding:8px">
+          <div><small style="color:var(--muted);font-size:10px">Ready</small><br><b style="font-size:15px;color:var(--ok)">${v.stock_available || 0}</b></div>
+          <div><small style="color:var(--muted);font-size:10px">Terjual</small><br><b style="font-size:15px;color:var(--blue)">${v.stock_sold || 0}</b></div>
+          <div><small style="color:var(--muted);font-size:10px">Total</small><br><b style="font-size:15px">${v.stock_total || 0}</b></div>
+        </div>
+      </div>
+
+      <div class="noktel-card-actions">
+        <button type="button" class="neo-btn purple small" data-nt-edit-variant="${v.id}">✏️ Edit Varian</button>
+        <button type="button" class="neo-btn white small" data-nt-toggle-variant="${v.id}" data-nt-vis="${v.is_visible ? '0' : '1'}">${v.is_visible ? 'Hide' : 'Tampilkan'}</button>
+        <button type="button" class="neo-btn red small" data-nt-delete-variant="${v.id}">🗑️ Hapus</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderNoktelOrdersTab(orders) {
+  const currentStatus = state.noktelOrderFilterStatus || '';
+  const searchVal = state.noktelOrderSearch || '';
+
+  return `
+    <div class="toolbar product-toolbar">
+      <div class="searchbox">
+        <input id="ntOrderSearchInput" placeholder="Cari invoice, pembeli, nomor HP..." value="${esc(searchVal)}">
+      </div>
+      <select id="ntOrderStatusSelect">
+        <option value="">Semua Status Order (${orders.length})</option>
+        <option value="paid" ${currentStatus==='paid'?'selected':''}>Dibayar / Siap OTP</option>
+        <option value="otp_sent" ${currentStatus==='otp_sent'?'selected':''}>Kode Login Aktif</option>
+        <option value="fulfilled" ${currentStatus==='fulfilled'?'selected':''}>Selesai (Handover)</option>
+        <option value="cancelled" ${currentStatus==='cancelled'?'selected':''}>Dibatalkan</option>
+      </select>
+      <button type="button" class="neo-btn purple" id="ntRefreshOrdersBtn">↻ Refresh Pesanan</button>
+    </div>
+
+    <div class="order-list" style="margin-top:14px">
+      ${orders.length ? orders.map(renderNoktelOrderCard).join('') : '<div class="empty-product"><h3>Belum ada pesanan NokTel</h3><p>Pesanan yang dibuat oleh pembeli di bot akan muncul di sini.</p></div>'}
+    </div>
+  `;
+}
+
+function renderNoktelOrderCard(o) {
+  const isPaid = o.status === 'paid';
+  const isOtpSent = o.status === 'otp_sent';
+  const isFulfilled = o.status === 'fulfilled';
+  const isCancelled = o.status === 'cancelled';
+
+  const statusBadge = isFulfilled
+    ? '<span class="badge ok">Selesai (Handover)</span>'
+    : isOtpSent
+    ? '<span class="badge green">Kode Login Aktif</span>'
+    : isPaid
+    ? '<span class="badge warn">Dibayar · Siap Ambil OTP</span>'
+    : isCancelled
+    ? '<span class="badge bad">Dibatalkan</span>'
+    : badge(o.status);
+
+  return `
+    <article class="order-card" data-nt-order-id="${o.id}">
+      <div class="order-head">
+        <div>
+          <small>Invoice NokTel</small>
+          <b class="mono" style="font-size:15px;color:var(--purple)">${esc(o.order_code)}</b>
+        </div>
+        ${statusBadge}
+      </div>
+
+      <div class="order-grid">
+        <div>
+          <small>Pembeli</small>
+          <strong>${esc(o.buyer_name || '-')}</strong>
+          <span>${o.buyer_username ? '@' + esc(o.buyer_username) + ' · ' : ''}ID: ${esc(o.buyer_telegram_id || '-')}</span>
+        </div>
+        <div>
+          <small>Produk Akun</small>
+          <strong>${esc(o.product_country || '-')} / ${esc(o.product_variant || '-')}</strong>
+          <span class="mono" style="font-weight:700">${esc(o.phone_number || o.phone_masked || '-')}</span>
+        </div>
+        <div>
+          <small>Total Bayar</small>
+          <strong style="color:var(--purple)">${money(o.price_idr)}</strong>
+          <span style="color:var(--ok)">Profit: ${money(o.profit_idr || (o.price_idr - o.cost_price_idr))}</span>
+        </div>
+        <div>
+          <small>Metode Pembayaran</small>
+          <strong>${o.payment_method === 'balance' ? '👛 Saldo Bot' : '💳 QRIS Bot'}</strong>
+          <span>Ref: ${esc(o.payment_ref || '-')}</span>
+        </div>
+        <div class="wide">
+          <small>Waktu Pembelian</small>
+          <strong>${date(o.created_at)}</strong>
+        </div>
+
+        ${o.two_fa ? `
+          <div class="wide" style="background:#fdf4ff;padding:8px 10px;border-radius:8px;border:1px solid rgba(112,37,255,.2)">
+            <small style="color:var(--purple);font-weight:800">🔐 Password 2FA Akun:</small>
+            <b class="mono" style="font-size:13px;margin-left:6px">${esc(o.two_fa)}</b>
+          </div>
+        ` : ''}
+
+        ${o.last_login_code ? `
+          <div class="wide noktel-otp-badge">
+            <span>🔑 Kode Login Telegram:</span>
+            <b>${esc(o.last_login_code)}</b>
+            <small style="color:#555;font-weight:600">(${date(o.last_login_code_at)})</small>
+            <button type="button" class="neo-btn white tiny" onclick="navigator.clipboard.writeText('${esc(o.last_login_code)}');toast('Kode disalin!')">📋 Salin</button>
+          </div>
+        ` : `
+          <div class="wide" style="font-size:12px;color:var(--muted);background:#f9f9f9;padding:6px 10px;border-radius:8px">
+            ⏳ Pembeli belum menekan tombol cek OTP di bot, atau admin dapat mengecek langsung via tombol di bawah.
+          </div>
+        `}
+      </div>
+
+      <div class="order-actions">
+        <button type="button" class="neo-btn blue small" data-nt-check-otp="${o.id}">🔑 Cek Kode OTP</button>
+        ${!isFulfilled && !isCancelled ? `
+          <button type="button" class="neo-btn green small" data-nt-terminate-session="${o.id}" title="Cabut sesi server agar akun hanya aktif di perangkat pembeli">🔓 Lepaskan Sesi &amp; Selesai</button>
+          <button type="button" class="neo-btn purple small" data-nt-fulfill-order="${o.id}">✅ Tandai Selesai</button>
+          <button type="button" class="neo-btn red small" data-nt-cancel-order="${o.id}">❌ Batalkan</button>
+        ` : ''}
+      </div>
+    </article>
+  `;
+}
+
+function renderNoktelGuideTab() {
+  return `
+    <div class="noktel-guide-stack">
+      <section class="noktel-guide-card">
+        <h4><span>✈️</span> Apa itu Sistem NokTel?</h4>
+        <p><b>NokTel</b> (Nomor Telegram Ready Stock) adalah sistem penyediaan akun Telegram aktif yang siap dijual langsung kepada customer. Berbeda dengan NoKos (yang hanya menyediakan nomor virtual untuk 1x SMS), NokTel menyimpan akun Telegram yang telah terotorisasi sehingga customer bisa login ke perangkat mereka dan membaca kode login 5-digit resmi dari <code>Telegram Service Notifications (777000)</code> secara mandiri di bot.</p>
+      </section>
+
+      <section class="noktel-guide-card">
+        <h4><span>🔄</span> Alur Kerja Lengkap (End-to-End)</h4>
+        <ol>
+          <li><b>Admin Login Akun ke Stok</b>: Masukkan nomor Telegram internasional di form login &amp; tekan <i>Kirim Kode Telegram</i>. Node.js server MTProto (GramJS) meminta kode ke Telegram API. Admin memasukkan kode 5-digit (dan password 2FA jika ada). Akun otomatis tersimpan aman ke database SQLite lokal.</li>
+          <li><b>Customer Membeli via Bot (/noktel)</b>: Customer memilih negara &amp; varian produk (misal: ID7, Fresh Reg, Free Spam). Pembayaran dilakukan melalui saldo bot atau QRIS otomatis.</li>
+          <li><b>Penyerahan Akun Instan</b>: Bot menyerahkan nomor telepon akun &amp; password 2FA (jika akun memakai 2FA). Customer login ke aplikasi Telegram mereka menggunakan nomor tersebut.</li>
+          <li><b>Cek OTP Mandiri (Self-Service)</b>: Customer menekan tombol <b>[ 🔑 Cek Kode Login / OTP ]</b> di bot Telegram. Server membaca pesan masuk dari Telegram (777000) secara live via MTProto dan menampilkan kode 5-digit ke pembeli.</li>
+          <li><b>Lepaskan Sesi (Handover Selesai)</b>: Customer (atau Admin) menekan <b>[ 🔓 Lepaskan Sesi ]</b>. Sistem memanggil <code>client.logOut()</code> sehingga akun 100% aman dan hanya aktif di perangkat customer.</li>
+        </ol>
+      </section>
+
+      <section class="noktel-guide-card">
+        <h4><span>🛡️</span> Keamanan &amp; Enkripsi (AES-256-GCM)</h4>
+        <p>Seluruh StringSession Telegram dan Password 2FA disimpan dalam bentuk terenkripsi menggunakan algoritma standar militer <b>AES-256-GCM</b> dengan format <code>enc:v1:&lt;iv&gt;.&lt;tag&gt;.&lt;ciphertext&gt;</code>. Data akun tetap aman terlindungi bahkan jika database di-backup.</p>
+      </section>
+    </div>
+  `;
+}
+
+function bindNoktelEvents() {
+  $$('[data-nt-tab]').forEach(btn => {
+    btn.onclick = () => {
+      state.noktelTab = btn.dataset.ntTab;
+      renderNoktel();
+    };
+  });
+
+  if ($('#ntOpenLoginBtn')) {
+    $('#ntOpenLoginBtn').onclick = () => {
+      state.noktelTab = 'stock';
+      renderNoktel();
+      $('#noktelLoginSection')?.scrollIntoView({ behavior: 'smooth' });
+      $('#ntLoginPhone')?.focus();
+    };
+  }
+  if ($('#ntManualStockBtn')) {
+    $('#ntManualStockBtn').onclick = () => openNoktelManualStockModal();
+  }
+  if ($('#ntAddVariantBtn')) {
+    $('#ntAddVariantBtn').onclick = () => openNoktelVariantModal();
+  }
+  if ($('#ntCreateVariantTopBtn')) {
+    $('#ntCreateVariantTopBtn').onclick = () => openNoktelVariantModal();
+  }
+  if ($('#ntRefreshBtn')) {
+    $('#ntRefreshBtn').onclick = () => loadNoktel();
+  }
+
+  const vSelect = $('#ntLoginVariant');
+  if (vSelect) {
+    vSelect.onchange = () => {
+      const opt = vSelect.selectedOptions?.[0];
+      if (opt && opt.dataset.cost) {
+        $('#ntLoginCost').value = opt.dataset.cost;
+      }
+    };
+  }
+
+  const sendBtn = $('#ntSendCodeBtn');
+  if (sendBtn) {
+    sendBtn.onclick = async () => {
+      const variantId = $('#ntLoginVariant').value;
+      const phone = $('#ntLoginPhone').value.trim();
+      const cost = Number($('#ntLoginCost').value || 0);
+      const statusEl = $('#ntLoginStatus');
+
+      if (!variantId) return toast('Pilih varian produk terlebih dahulu', true);
+      if (!phone) return toast('Masukkan nomor telepon Telegram', true);
+
+      try {
+        sendBtn.disabled = true;
+        sendBtn.textContent = 'Mengirim kode...';
+        if (statusEl) {
+          statusEl.style.display = 'inline-flex';
+          statusEl.textContent = 'Meminta kode login ke Telegram...';
+          statusEl.style.background = '#eef8ff';
+          statusEl.style.color = 'var(--purple)';
+        }
+
+        const res = await api('/api/admin/noktel/auth/start', {
+          method: 'POST',
+          body: { catalog_variant_id: variantId, phone, cost_price_idr: cost }
+        });
+
+        state.noktelLoginId = res.loginId || res.login_id;
+        state.noktelLoginExpiresAt = res.expiresAt || res.expires_at;
+
+        if (statusEl) {
+          statusEl.textContent = `✅ ${res.message || 'Kode login terkirim!'}`;
+          statusEl.style.background = '#e9fbf0';
+          statusEl.style.color = '#116823';
+        }
+
+        $('#ntVerifyBox')?.classList.remove('hidden');
+        $('#ntLoginCode')?.focus();
+        toast(res.message || 'Kode login berhasil dikirim!');
+      } catch (err) {
+        if (statusEl) {
+          statusEl.style.display = 'inline-flex';
+          statusEl.textContent = `❌ ${err.message}`;
+          statusEl.style.background = '#fff0f1';
+          statusEl.style.color = 'var(--red)';
+        }
+        toast(err.message, true);
+      } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = '✈️ Kirim Kode Telegram';
+      }
+    };
+  }
+
+  const verifyBtn = $('#ntVerifyBtn');
+  if (verifyBtn) {
+    verifyBtn.onclick = async () => {
+      const code = $('#ntLoginCode').value.trim();
+      const password = $('#ntLoginPassword').value.trim();
+      const statusEl = $('#ntLoginStatus');
+
+      if (!state.noktelLoginId) {
+        return toast('Mulai login dari tombol Kirim Kode Telegram terlebih dahulu', true);
+      }
+
+      try {
+        verifyBtn.disabled = true;
+        verifyBtn.textContent = 'Memverifikasi...';
+        if (statusEl) {
+          statusEl.style.display = 'inline-flex';
+          statusEl.textContent = 'Memverifikasi sesi & menyimpan...';
+          statusEl.style.background = '#eef8ff';
+          statusEl.style.color = 'var(--purple)';
+        }
+
+        const res = await api('/api/admin/noktel/auth/verify', {
+          method: 'POST',
+          body: { loginId: state.noktelLoginId, code, password }
+        });
+
+        if (res.needs2FA || res.needs_2fa) {
+          if (statusEl) {
+            statusEl.textContent = '⚠️ Akun memakai 2FA. Masukkan password Two-Step Verification.';
+            statusEl.style.background = '#fff9cf';
+            statusEl.style.color = '#9a6700';
+          }
+          $('#ntLoginPassword')?.focus();
+          return toast(res.message || 'Akun memakai 2FA. Masukkan password 2FA.');
+        }
+
+        toast(res.message || 'Akun berhasil disimpan ke stok!');
+        state.noktelLoginId = '';
+        await loadNoktel();
+      } catch (err) {
+        if (statusEl) {
+          statusEl.style.display = 'inline-flex';
+          statusEl.textContent = `❌ ${err.message}`;
+          statusEl.style.background = '#fff0f1';
+          statusEl.style.color = 'var(--red)';
+        }
+        toast(err.message, true);
+      } finally {
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = '💾 Verifikasi & Simpan ke Stok';
+      }
+    };
+  }
+
+  const stockSearch = $('#ntStockSearchInput');
+  if (stockSearch) {
+    stockSearch.oninput = ntDebounce(() => {
+      state.noktelSearch = stockSearch.value.trim();
+      loadNoktel();
+    }, 400);
+  }
+  const stockVarSelect = $('#ntStockVariantSelect');
+  if (stockVarSelect) {
+    stockVarSelect.onchange = () => {
+      state.noktelFilterVariant = stockVarSelect.value;
+      loadNoktel();
+    };
+  }
+  const stockStatSelect = $('#ntStockStatusSelect');
+  if (stockStatSelect) {
+    stockStatSelect.onchange = () => {
+      state.noktelFilterStatus = stockStatSelect.value;
+      loadNoktel();
+    };
+  }
+
+  $$('[data-nt-check-session]').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.ntCheckSession;
+      const old = btn.textContent;
+      try {
+        btn.disabled = true;
+        btn.textContent = 'Mengecek...';
+        const res = await api('/api/admin/noktel/auth/check', {
+          method: 'POST',
+          body: { inventory_id: id }
+        });
+        if (res.authorized) {
+          const userStr = res.account?.username ? ` (@${res.account.username})` : '';
+          toast(`✅ Sesi akun aktif!${userStr}`);
+        } else {
+          toast(`⚠️ Sesi tidak lagi aktif: ${res.reason || 'Expired / Unauthorized'}`, true);
+        }
+      } catch (e) {
+        toast(`Gagal cek sesi: ${e.message}`, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = old;
+      }
+    };
+  });
+
+  $$('[data-nt-edit-cost]').forEach(btn => {
+    btn.onclick = () => {
+      const item = state.cache.noktelStock.find(x => String(x.id) === String(btn.dataset.ntEditCost));
+      if (item) openNoktelEditCostModal(item);
+    };
+  });
+
+  $$('[data-nt-edit-2fa]').forEach(btn => {
+    btn.onclick = () => {
+      const item = state.cache.noktelStock.find(x => String(x.id) === String(btn.dataset.ntEdit2fa));
+      if (item) openNoktelEdit2FaModal(item);
+    };
+  });
+
+  $$('[data-nt-set-status]').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.ntSetStatus;
+      const target = btn.dataset.ntTarget;
+      try {
+        await api('/api/admin/noktel/stock', {
+          method: 'PATCH',
+          body: { id, status: target }
+        });
+        toast(`Status stok diubah menjadi ${target}`);
+        await loadNoktel();
+      } catch (e) {
+        toast(e.message, true);
+      }
+    };
+  });
+
+  $$('[data-nt-delete-stock]').forEach(btn => {
+    btn.onclick = () => {
+      remove(`/api/admin/noktel/stock?id=${btn.dataset.ntDeleteStock}`, 'Hapus akun dari stok?', () => loadNoktel());
+    };
+  });
+
+  $$('[data-nt-edit-variant]').forEach(btn => {
+    btn.onclick = () => {
+      const v = state.cache.noktelVariants.find(x => String(x.id) === String(btn.dataset.ntEditVariant));
+      if (v) openNoktelVariantModal(v);
+    };
+  });
+
+  $$('[data-nt-toggle-variant]').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.ntToggleVariant;
+      const vis = btn.dataset.ntVis === '1';
+      try {
+        await api('/api/admin/noktel/variants/toggle', {
+          method: 'POST',
+          body: { id, is_visible: vis }
+        });
+        toast(`Status tampil varian diperbarui`);
+        await loadNoktel();
+      } catch (e) {
+        toast(e.message, true);
+      }
+    };
+  });
+
+  $$('[data-nt-delete-variant]').forEach(btn => {
+    btn.onclick = () => {
+      remove(`/api/admin/noktel/variants?id=${btn.dataset.ntDeleteVariant}`, 'Hapus varian ini? Stok terkait juga akan terpengaruh.', () => loadNoktel());
+    };
+  });
+
+  const orderSearch = $('#ntOrderSearchInput');
+  if (orderSearch) {
+    orderSearch.oninput = ntDebounce(() => {
+      state.noktelOrderSearch = orderSearch.value.trim();
+      loadNoktel();
+    }, 400);
+  }
+  const orderStatSelect = $('#ntOrderStatusSelect');
+  if (orderStatSelect) {
+    orderStatSelect.onchange = () => {
+      state.noktelOrderFilterStatus = orderStatSelect.value;
+      loadNoktel();
+    };
+  }
+  if ($('#ntRefreshOrdersBtn')) {
+    $('#ntRefreshOrdersBtn').onclick = () => loadNoktel();
+  }
+
+  $$('[data-nt-check-otp]').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.ntCheckOtp;
+      const old = btn.textContent;
+      try {
+        btn.disabled = true;
+        btn.textContent = 'Mengecek OTP...';
+        const res = await api('/api/admin/noktel/orders/check-otp', {
+          method: 'POST',
+          body: { order_id: id }
+        });
+        if (res.ok && res.code) {
+          toast(`✅ Kode Login Ditemukan: ${res.code}`);
+        } else {
+          toast(res.reason === 'NO_RECENT_CODE' ? 'ℹ️ Belum ada pesan kode login masuk dari Telegram.' : (res.message || 'Tidak ada kode login baru.'));
+        }
+        await loadNoktel();
+      } catch (e) {
+        toast(`Gagal cek OTP: ${e.message}`, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = old;
+      }
+    };
+  });
+
+  $$('[data-nt-terminate-session]').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('Putuskan sesi Telegram milik bot? Tindakan ini akan memanggil logOut() pada akun tersebut dan menandai pesanan selesai.')) return;
+      const id = btn.dataset.ntTerminateSession;
+      try {
+        btn.disabled = true;
+        const res = await api('/api/admin/noktel/orders/terminate-session', {
+          method: 'POST',
+          body: { order_id: id }
+        });
+        toast(res.message || 'Sesi diputuskan & pesanan selesai!');
+        await loadNoktel();
+      } catch (e) {
+        toast(`Gagal: ${e.message}`, true);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  });
+
+  $$('[data-nt-fulfill-order]').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.ntFulfillOrder;
+      try {
+        await api('/api/admin/noktel/orders', {
+          method: 'PATCH',
+          body: { id, status: 'fulfilled' }
+        });
+        toast('Pesanan ditandai selesai (handover)');
+        await loadNoktel();
+      } catch (e) {
+        toast(e.message, true);
+      }
+    };
+  });
+
+  $$('[data-nt-cancel-order]').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('Batalkan pesanan NokTel ini? Jika akun di-reserved, stok akan dikembalikan ke status tersedia.')) return;
+      const id = btn.dataset.ntCancelOrder;
+      try {
+        await api('/api/admin/noktel/orders', {
+          method: 'PATCH',
+          body: { id, status: 'cancelled' }
+        });
+        toast('Pesanan dibatalkan');
+        await loadNoktel();
+      } catch (e) {
+        toast(e.message, true);
+      }
+    };
+  });
+}
+
+function openNoktelVariantModal(variant = null) {
+  const isEdit = Boolean(variant && variant.id);
+  const title = isEdit ? `Edit Varian · ${esc(variant.country)} / ${esc(variant.variant_name)}` : 'Tambah Varian NokTel Baru';
+
+  const html = `
+    <div class="form-grid">
+      <input type="hidden" name="id" value="${variant?.id || ''}">
+      <label>Negara
+        <input name="country" value="${esc(variant?.country || '')}" placeholder="Contoh: Indonesia, USA, Rusia" required>
+      </label>
+      <label>Nama Varian
+        <input name="variant_name" value="${esc(variant?.variant_name || '')}" placeholder="Contoh: ID7, Fresh Reg, Free Spam, Limper" required>
+      </label>
+      <label>Kode Negara (Opsional)
+        <input name="country_code" value="${esc(variant?.country_code || '')}" placeholder="Contoh: ID, US, RU">
+      </label>
+      <label>Urutan Tampilan
+        <input name="sort_order" type="number" value="${variant?.sort_order || 0}">
+      </label>
+      <label>Harga Jual Customer (Rp)
+        <input name="price_idr" type="number" min="0" value="${variant?.price_idr || 25000}" required>
+      </label>
+      <label>Modal Default (Rp)
+        <input name="cost_price_idr" type="number" min="0" value="${variant?.cost_price_idr || 0}">
+        <small>Modal awal per akun saat menambahkan stok baru.</small>
+      </label>
+      <label class="full" style="display:flex;align-items:center;gap:10px">
+        <input type="checkbox" name="is_visible" style="width:20px;height:20px" ${variant?.is_visible !== false ? 'checked' : ''}>
+        <b>Tampilkan varian ini di menu bot Telegram (/noktel)</b>
+      </label>
+    </div>
+  `;
+
+  modal(title, html, async (e) => {
+    e.preventDefault();
+    const fd = new FormData($('#modalForm'));
+    const body = {
+      id: fd.get('id') || undefined,
+      country: String(fd.get('country') || '').trim(),
+      variant_name: String(fd.get('variant_name') || '').trim(),
+      country_code: String(fd.get('country_code') || '').trim().toUpperCase(),
+      sort_order: Number(fd.get('sort_order') || 0),
+      price_idr: Number(fd.get('price_idr') || 0),
+      cost_price_idr: Number(fd.get('cost_price_idr') || 0),
+      is_visible: fd.get('is_visible') !== null
+    };
+
+    if (!body.country || !body.variant_name) {
+      return toast('Negara dan Nama Varian wajib diisi', true);
+    }
+
+    try {
+      await api('/api/admin/noktel/variants', {
+        method: 'POST',
+        body
+      });
+      toast(`Varian NokTel berhasil ${isEdit ? 'diperbarui' : 'disimpan'}!`);
+      $('#modal')?.close();
+      await loadNoktel();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }, { submit: isEdit ? 'Simpan Perubahan' : 'Tambah Varian' });
+}
+
+function openNoktelManualStockModal() {
+  const variants = state.cache.noktelVariants || [];
+  if (!variants.length) {
+    return toast('Buat varian produk terlebih dahulu sebelum menambahkan stok', true);
+  }
+
+  const html = `
+    <div class="form-grid">
+      <label class="full">Pilih Varian Produk
+        <select name="variant_id" id="manualVariantSelect" required>
+          ${variants.map(v=>`<option value="${v.id}" data-cost="${v.cost_price_idr||0}">${esc(v.country)} / ${esc(v.variant_name)} — Jual ${money(v.price_idr)}</option>`).join('')}
+        </select>
+      </label>
+      <label class="full">Nomor Telepon Telegram
+        <input name="phone_number" placeholder="+628123456789" required autocomplete="tel">
+        <small>Format internasional dengan kode negara (cth: +628...)</small>
+      </label>
+      <label class="full">StringSession Telegram (Opsional)
+        <textarea name="session_data" placeholder="String session GramJS / Telethon jika sudah memiliki session..." style="min-height:70px"></textarea>
+        <small>Jika diisi, sesi akan dienkripsi dan disimpan untuk cek OTP otomatis.</small>
+      </label>
+      <label>Password 2FA (Opsional)
+        <input name="two_fa" placeholder="Kosongkan jika akun tanpa 2FA">
+      </label>
+      <label>Modal Akun (Rp)
+        <input name="cost_price" type="number" min="0" value="${variants[0]?.cost_price_idr || 0}">
+      </label>
+      <label class="full">Catatan Internal
+        <input name="notes" placeholder="Catatan opsional untuk admin...">
+      </label>
+    </div>
+  `;
+
+  modal('Input Stok NokTel Manual', html, async (e) => {
+    e.preventDefault();
+    const fd = new FormData($('#modalForm'));
+    const body = {
+      variantId: Number(fd.get('variant_id')),
+      phoneNumber: String(fd.get('phone_number') || '').trim(),
+      sessionData: String(fd.get('session_data') || '').trim(),
+      twoFa: String(fd.get('two_fa') || '').trim(),
+      costPrice: Number(fd.get('cost_price') || 0),
+      notes: String(fd.get('notes') || '').trim()
+    };
+
+    if (!body.variantId) return toast('Pilih varian produk', true);
+    if (!body.phoneNumber) return toast('Nomor telepon wajib diisi', true);
+
+    try {
+      await api('/api/admin/noktel/stock', {
+        method: 'POST',
+        body
+      });
+      toast('Akun berhasil ditambahkan ke stok!');
+      $('#modal')?.close();
+      await loadNoktel();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }, { submit: 'Simpan ke Stok' });
+
+  const mSel = $('#manualVariantSelect');
+  if (mSel) {
+    mSel.onchange = () => {
+      const opt = mSel.selectedOptions?.[0];
+      if (opt && opt.dataset.cost) {
+        const costInput = document.querySelector('input[name="cost_price"]');
+        if (costInput) costInput.value = opt.dataset.cost;
+      }
+    };
+  }
+}
+
+function openNoktelEditCostModal(item) {
+  const html = `
+    <div class="form-grid">
+      <div class="full info-note">
+        <b>Akun:</b> ${esc(item.country)} / ${esc(item.variant_name)} — <code>${esc(item.phone_number || item.phone_masked)}</code><br>
+        <small>Modal akun digunakan untuk menghitung laba/profit bersih penjualan NokTel.</small>
+      </div>
+      <label class="full">Modal Akun (Rp)
+        <input id="editCostInput" type="number" min="0" value="${item.cost_price_idr || 0}" required>
+      </label>
+    </div>
+  `;
+
+  modal('Ubah Modal Akun NokTel', html, async (e) => {
+    e.preventDefault();
+    const cost = Number($('#editCostInput').value || 0);
+    try {
+      await api('/api/admin/noktel/stock', {
+        method: 'PATCH',
+        body: { id: item.id, cost_price_idr: cost }
+      });
+      toast('Modal akun berhasil diperbarui!');
+      $('#modal')?.close();
+      await loadNoktel();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }, { submit: 'Simpan Modal' });
+}
+
+function openNoktelEdit2FaModal(item) {
+  const html = `
+    <div class="form-grid">
+      <div class="full info-note">
+        <b>Akun:</b> ${esc(item.country)} / ${esc(item.variant_name)} — <code>${esc(item.phone_number || item.phone_masked)}</code><br>
+        <small>Password Two-Step Verification (2FA) akan otomatis diberikan ke pembeli saat akun dibeli.</small>
+      </div>
+      <label class="full">Password 2FA Akun
+        <input id="edit2FaInput" type="text" value="${esc(item.two_fa_plain || '')}" placeholder="Kosongkan jika akun tidak memakai 2FA">
+      </label>
+    </div>
+  `;
+
+  modal('Atur Password 2FA Akun', html, async (e) => {
+    e.preventDefault();
+    const val = $('#edit2FaInput').value.trim();
+    try {
+      await api('/api/admin/noktel/stock', {
+        method: 'PATCH',
+        body: { id: item.id, two_fa: val }
+      });
+      toast('Password 2FA berhasil disimpan!');
+      $('#modal')?.close();
+      await loadNoktel();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }, { submit: 'Simpan 2FA' });
 }

@@ -2473,8 +2473,8 @@ function renderOrdersView(filterStatus = '', search = '') {
   const ordersHtml = rows.map(o => {
     const isWaitingEmail = o.status === 'paid' && o.require_email && !o.customer_email;
     const emailRow = o.customer_email
-      ? `<div><small>📧 Email Pembeli</small><strong class="mono" style="color:var(--purple);font-size:12px">${esc(o.customer_email)}</strong></div>`
-      : (o.require_email ? `<div><small>📧 Email Pembeli</small><span style="color:#b45309;font-weight:700;font-size:11px">⏳ Menunggu input</span></div>` : '');
+      ? `<div class="order-cell full"><small>📧 Email Pembeli</small><strong class="mono" style="color:var(--purple);font-size:12px">${esc(o.customer_email)}</strong></div>`
+      : (o.require_email ? `<div class="order-cell full"><small>📧 Email Pembeli</small><span style="color:#b45309;font-weight:700;font-size:11px">⏳ Menunggu input</span></div>` : '');
     return `
     <article class="order-card">
       <div class="order-head">
@@ -2488,14 +2488,17 @@ function renderOrdersView(filterStatus = '', search = '') {
         </div>
       </div>
       <div class="order-grid">
-        <div><small>Produk</small><strong>${esc(o.product_name)}</strong><span>${esc(o.variant_name || 'Default')}</span></div>
-        <div><small>Qty</small><strong>${o.quantity || 1}</strong></div>
-        ${emailRow}
+        <div class="order-cell full">
+          <small>Produk</small>
+          <strong>${esc(o.product_name)}</strong>
+          <span class="order-variant">${esc(o.variant_name || 'Default')} · <b>Qty: ${o.quantity || 1}</b></span>
+        </div>
         <div><small>Harga Jual</small><strong>${money(o.total_price)}</strong></div>
         <div><small>Modal Owner</small><strong>${money(o.cost_amount)}</strong></div>
-        <div style="background:#edffdc"><small>Profit Masuk</small><strong style="color:#1a5e00">+${money(o.reseller_profit)}</strong></div>
+        <div class="profit-highlight"><small>Profit Masuk</small><strong class="profit-val">+${money(o.reseller_profit)}</strong></div>
         <div><small>Metode Bayar</small><strong>${esc(o.payment_method || 'QRIS')}</strong></div>
-        <div class="wide"><small>Waktu Transaksi</small><strong>${date(o.created_at)}</strong></div>
+        ${emailRow}
+        <div class="order-cell full"><small>Waktu Transaksi</small><strong>${date(o.created_at)}</strong></div>
       </div>
     </article>
   `;
@@ -3016,16 +3019,18 @@ async function loadBroadcast() {
 function userCards(rows) {
   return rows.length ? rows.map(u => `
     <article class="user-card">
-      <div class="user-avatar">${firstLetter(u.first_name || u.username || u.telegram_id)}</div>
-      <div class="user-main">
-        <h3>${esc([u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || u.telegram_id)}</h3>
-        <p>${u.username ? '@' + esc(u.username) + ' · ' : ''}<span class="mono">${esc(u.telegram_id)}</span></p>
-        <div class="user-meta">
-          <span>Saldo <b>${money(u.balance_main ?? u.balance ?? 0)}</b></span>
-          <span>Status ${badge(u.status)}</span>
-          <span>Terakhir Aktif <b>${esc(date(u.last_seen_at))}</b></span>
-          <span>Bergabung <b>${esc(date(u.first_seen_at))}</b></span>
+      <div class="user-head">
+        <div class="user-avatar">${firstLetter(u.first_name || u.username || u.telegram_id)}</div>
+        <div class="user-main">
+          <h3>${esc([u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || u.telegram_id)}</h3>
+          <p>${u.username ? '@' + esc(u.username) + ' · ' : ''}<span class="mono">${esc(u.telegram_id)}</span></p>
         </div>
+      </div>
+      <div class="user-meta">
+        <span><small>Saldo</small><b>${money(u.balance_main ?? u.balance ?? 0)}</b></span>
+        <span><small>Status</small><b class="user-badge-cell">${badge(u.status)}</b></span>
+        <span><small>Terakhir Aktif</small><b>${esc(date(u.last_seen_at))}</b></span>
+        <span><small>Bergabung</small><b>${esc(date(u.first_seen_at))}</b></span>
       </div>
       <div class="user-actions">
         ${u.status === 'blocked' ? `<button class="neo-btn green small" data-unblock-user="${esc(u.telegram_id)}">Aktifkan</button>` : ''}

@@ -424,11 +424,13 @@ function updateShellUI() {
   $('#profitBalance').textContent = money(r.profit_balance || 0);
 
   const botBtn = $('#botLinkBtn');
-  if (b.bot_username) {
-    botBtn.href = `https://t.me/${b.bot_username.replace(/^@+/, '')}`;
-    botBtn.classList.remove('hidden');
-  } else {
-    botBtn.classList.add('hidden');
+  if (botBtn) {
+    if (b.bot_username) {
+      botBtn.href = `https://t.me/${b.bot_username.replace(/^@+/, '')}`;
+      botBtn.classList.remove('hidden');
+    } else {
+      botBtn.classList.add('hidden');
+    }
   }
 
   const safeEl = $('#systemSafe');

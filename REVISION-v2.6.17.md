@@ -30,3 +30,21 @@ Pada versi v2.6.17, dilakukan perbaikan tuntas terhadap peringatan `[jaspay:fall
    - Memeriksa pengaturan `jaspay_enabled` (tidak berjalan jika fitur dinonaktifkan di dashboard).
    - Menggunakan interval default 5 menit tanpa memaksa bypass cache (`force: false`).
    - Menerapkan exponential backoff jika terjadi kegagalan jaringan sementara.
+
+---
+
+## Penataan Menu Dashboard Admin (Grouped Thematic Sidebar)
+
+Pada versi v2.6.17, sidebar menu dashboard admin telah ditata ulang secara terstruktur mengikuti **Opsi 1 (Grouped Sidebar with Section Headers)**:
+1. **Pengelompokan 14 Menu ke dalam 6 Seksi Tematik**:
+   - **📊 RINGKASAN**: `Dashboard`, `Laporan`
+   - **🛒 TRANSAKSI**: `Pesanan` (lengkap dengan badge jumlah pending order), `Undangan Tim`
+   - **📦 KATALOG**: `Produk`, `Jaspay Fresh`, `Nokos`, `SMM`
+   - **📢 PEMASARAN**: `Broadcast & Promosi`, `Kupon`
+   - **👥 PELANGGAN**: `User`, `Reseller Bot` (lengkap dengan badge alert pending request/WD)
+   - **⚙️ SISTEM**: `Bot & Notifikasi`, `Pengaturan`
+2. **Tipografi & Desain Ergonomis (Neo-Brutalism)**:
+   - Judul seksi dibuat dengan huruf kapital kecil (*uppercase muted*), letter-spacing lega, dan aksen icon yang kontras namun tidak mencolok.
+   - Dilengkapi garis pemisah halus (*subtle separator*) antar seksi dan padding proporsional sehingga nyaman dilihat tanpa membuat sidebar kepanjangan.
+   - Peningkatan scrollbar kustom ramping (*thin custom scrollbar*) di dalam sidebar agar tidak memakan ruang visual di layar laptop/tablet.
+

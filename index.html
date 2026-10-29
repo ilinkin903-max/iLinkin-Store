@@ -34,20 +34,43 @@
         <div><b id="brandName">AUTO<br>ORDER</b><span id="brandTagline">Digital Store</span></div>
       </div>
       <nav id="nav" class="nav-list">
-        <button data-view="dashboard" class="active"><span>🏠</span>Dashboard</button>
-        <button data-view="products"><span>📦</span>Produk</button>
-        <button data-view="fresh"><span>⚡</span>Jaspay Fresh</button>
-        <button data-view="nokos"><span>📱</span>Nokos</button>
-        <button data-view="smm"><span>📣</span>SMM</button>
-        <button data-view="orders"><span>🛒</span>Pesanan <em id="orderBadge" class="nav-badge hidden">0</em></button>
-        <button data-view="invitations"><span>📧</span>Undangan Tim</button>
-        <button data-view="reports"><span>📊</span>Laporan</button>
-        <button data-view="coupons"><span>🎟️</span>Kupon</button>
-        <button data-view="settings"><span>⚙️</span>Pengaturan</button>
-        <button data-view="bot"><span>🤖</span>Bot & Notifikasi</button>
-        <button data-view="broadcast"><span>📢</span>Broadcast & Promosi</button>
-        <button data-view="users"><span>👤</span>User</button>
-        <button data-view="resellers"><span>👥</span>Reseller Bot <em id="resellerBadge" class="nav-badge hidden">0</em></button>
+        <div class="nav-section">
+          <div class="nav-section-title"><span>📊</span> Ringkasan</div>
+          <button data-view="dashboard" class="active"><span>🏠</span>Dashboard</button>
+          <button data-view="reports"><span>📈</span>Laporan</button>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title"><span>🛒</span> Transaksi</div>
+          <button data-view="orders"><span>🛒</span>Pesanan <em id="orderBadge" class="nav-badge hidden">0</em></button>
+          <button data-view="invitations"><span>📧</span>Undangan Tim</button>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title"><span>📦</span> Katalog</div>
+          <button data-view="products"><span>📦</span>Produk</button>
+          <button data-view="fresh"><span>⚡</span>Jaspay Fresh</button>
+          <button data-view="nokos"><span>📱</span>Nokos</button>
+          <button data-view="smm"><span>📣</span>SMM</button>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title"><span>📢</span> Pemasaran</div>
+          <button data-view="broadcast"><span>📢</span>Broadcast & Promosi</button>
+          <button data-view="coupons"><span>🎟️</span>Kupon</button>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title"><span>👥</span> Pelanggan</div>
+          <button data-view="users"><span>👤</span>User</button>
+          <button data-view="resellers"><span>👥</span>Reseller Bot <em id="resellerBadge" class="nav-badge hidden">0</em></button>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title"><span>⚙️</span> Sistem</div>
+          <button data-view="bot"><span>🤖</span>Bot & Notifikasi</button>
+          <button data-view="settings"><span>⚙️</span>Pengaturan</button>
+        </div>
       </nav>
       <div class="sidebar-spacer"></div>
       <div class="owner-card">

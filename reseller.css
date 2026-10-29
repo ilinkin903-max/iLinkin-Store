@@ -1,59 +1,617 @@
-/* Supplementary Styling for Reseller Mini App (Extends app.css) */
+/* ==========================================================================
+   Supplementary Responsive Styling for Reseller Mini App (Extends app.css)
+   Clean multi-device reflow: Desktop, Tablet, and Mobile (Phone)
+   ========================================================================== */
 
-.floating-save-bar {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--ink, #0c0c0f);
-  color: #fff;
-  padding: 10px 18px;
-  border-radius: var(--radius, 16px);
-  border: 3px solid #000;
+/* -------------------------------------------------------------------------
+   1. GLOBAL & APP SHELL RESPONSIVE REFINEMENT
+   ------------------------------------------------------------------------- */
+.app-shell {
+  min-height: 100vh;
+  min-width: 0;
+}
+
+.content {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* -------------------------------------------------------------------------
+   2. TOPBAR & NAVIGATION HEADER
+   ------------------------------------------------------------------------- */
+.topbar {
+  min-height: 76px;
+  height: auto;
+  padding: 12px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45), 4px 5px 0 var(--ink, #0c0c0f);
-  z-index: 999;
-  width: min(520px, calc(100vw - 28px));
-  animation: slideUpFloat 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  gap: 12px;
+  background: #ffffff;
+  border-bottom: var(--border, 3px solid #0c0c0f);
+  box-sizing: border-box;
+  flex-wrap: wrap;
 }
 
-@keyframes slideUpFloat {
-  from { transform: translate(-50%, 100px); opacity: 0; }
-  to { transform: translate(-50%, 0); opacity: 1; }
+.topbar .page-title {
+  flex: 1 1 200px;
+  min-width: 0;
 }
 
-.save-bar-info {
+.topbar .page-title h1 {
+  margin: 0;
+  font-size: clamp(20px, 2.5vw, 30px);
+  font-weight: 900;
+  line-height: 1.15;
+  color: var(--ink, #0c0c0f);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar .page-title p {
+  margin: 3px 0 0;
+  font-size: clamp(11px, 1.2vw, 13px);
+  color: var(--muted, #6e6e75);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.topbar .top-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  font-weight: 700;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex-shrink: 0;
 }
 
-.save-bar-actions {
-  display: flex;
+.membership-timer {
+  border: 2px solid var(--ink, #0c0c0f);
+  box-shadow: 2.5px 3px 0 var(--ink, #0c0c0f);
+  border-radius: 10px;
+  background: #c5ff38;
+  color: var(--ink, #0c0c0f);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  padding: 8px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform .15s, box-shadow .15s;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
-/* Pricing & Variant Management Cards */
-.pricing-toolbar {
+.membership-timer:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3.5px 4px 0 var(--ink, #0c0c0f);
+}
+
+.membership-timer.expired {
+  background: #ffb3cd;
+}
+
+.membership-timer:focus-visible {
+  outline: 3px solid #a271ff;
+  outline-offset: 3px;
+}
+
+.membership-detail {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) 180px auto;
+  gap: 14px;
+}
+
+.membership-detail p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.membership-detail .form-actions {
+  display: flex;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.membership-detail .info-note {
+  padding: 14px;
+  border: 2px solid #171717;
+  border-radius: 8px;
+  background: #f0e4ff;
+}
+
+.membership-qr {
+  text-align: center;
+}
+
+.membership-qr img {
+  display: block;
+  width: min(100%, 340px);
+  height: auto;
+  margin: 12px auto;
+  background: #fff;
+  border: 2px solid #171717;
+}
+
+.membership-qr strong {
+  font-size: 24px;
+}
+
+.topbar .telegram-btn {
+  display: inline-flex;
   align-items: center;
-  margin-bottom: 16px;
-  padding: 12px 14px;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 850;
+  border-radius: 10px;
+  white-space: nowrap;
 }
 
-.pricing-list {
+/* -------------------------------------------------------------------------
+   3. RESPONSIVE SUBMENU TABS
+   ------------------------------------------------------------------------- */
+.main-product-tabs,
+.product-tabs,
+.reseller-tabs {
   display: grid;
-  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
+.main-product-tabs .tab-btn,
+.product-tabs .tab-btn,
+.reseller-tabs .tab-btn {
+  width: 100%;
+  text-align: center;
+  padding: 11px 12px;
+  font-size: 13.5px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 10px;
+  border: var(--border, 2px solid #0c0c0f);
+  box-shadow: 2px 3px 0 var(--ink, #0c0c0f);
+  transition: transform 0.12s ease, background 0.12s ease;
+  box-sizing: border-box;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.main-product-tabs .tab-btn:hover,
+.product-tabs .tab-btn:hover,
+.reseller-tabs .tab-btn:hover {
+  transform: translateY(-1px);
+}
+
+.main-product-tabs .tab-btn.active,
+.product-tabs .tab-btn.active,
+.reseller-tabs .tab-btn.active {
+  background: var(--yellow, #ffd91a);
+  color: var(--ink, #0c0c0f);
+  box-shadow: 3px 3.5px 0 var(--ink, #0c0c0f);
+}
+
+/* -------------------------------------------------------------------------
+   4. DASHBOARD KPIS & STAT CARDS
+   ------------------------------------------------------------------------- */
+.dashboard-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.dashboard-kpis .stat-card {
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 94px;
+  border: var(--border, 3px solid #0c0c0f);
+  border-radius: var(--radius, 14px);
+  box-shadow: var(--shadow, 3.5px 4.5px 0 #0c0c0f);
+  background: #ffffff;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.dashboard-kpis .stat-icon {
+  width: 50px;
+  height: 50px;
+  border: 2px solid var(--ink, #0c0c0f);
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  box-shadow: 2px 2px 0 var(--ink, #0c0c0f);
+  flex-shrink: 0;
+}
+
+.dashboard-kpis .stat-card small {
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+  color: var(--muted, #6e6e75);
+  display: block;
+  letter-spacing: 0.3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-kpis .stat-card strong {
+  font-size: clamp(16px, 1.8vw, 22px);
+  font-weight: 950;
+  display: block;
+  margin: 3px 0 2px;
+  line-height: 1.15;
+  color: var(--ink, #0c0c0f);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.dashboard-kpis .stat-card em {
+  font-style: normal;
+  font-size: 11px;
+  color: #616168;
+  font-weight: 700;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------------------------------
+   5. 7-DAY CHART & TOP PRODUCTS
+   ------------------------------------------------------------------------- */
+.reseller-chart-card {
+  width: 100%;
+  margin-top: 8px;
+  box-sizing: border-box;
+}
+
+.seven-chart {
+  height: 270px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
+  padding: 16px 8px 4px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.day-col {
+  height: 100%;
+  display: grid;
+  grid-template-rows: 26px 1fr 24px;
+  gap: 6px;
+  min-width: 0;
+  text-align: center;
+}
+
+.day-value {
+  font-size: clamp(8px, 1.1vw, 11px);
+  font-weight: 900;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.day-track {
+  height: 100%;
+  min-height: 150px;
+  border: 2px solid var(--ink, #0c0c0f);
+  border-radius: 10px;
+  background: #f0eaff;
+  display: flex;
+  align-items: flex-end;
+  padding: 3px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.day-bar {
+  width: 100%;
+  min-height: 5px;
+  border: 2px solid var(--ink, #0c0c0f);
+  border-radius: 7px 7px 4px 4px;
+  background: linear-gradient(180deg, #9d66ff, #6e2cff);
+  box-shadow: 2px 2px 0 var(--ink, #0c0c0f);
+  transition: height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.day-label {
+  font-size: clamp(9px, 1.1vw, 11.5px);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.chart-summary-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.chart-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 9px;
+  border: 2px solid var(--ink, #0c0c0f);
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 2px 2px 0 var(--ink, #0c0c0f);
+}
+
+.chart-pill.purple { background: #ecdfff; color: #3c1285; }
+.chart-pill.green { background: #edffdc; color: #1a5e00; }
+.chart-pill.blue { background: #dff4ff; color: #005085; }
+
+.reseller-top-products-card .top-list {
+  display: grid;
+  gap: 10px;
+}
+
+.top-products-card .top-item,
+.reseller-top-products-card .top-item {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 2px solid var(--ink, #0c0c0f);
+  border-radius: 12px;
+  background: #fff7c8;
+  box-shadow: 2.5px 3px 0 var(--ink, #0c0c0f);
+  box-sizing: border-box;
+}
+
+.top-products-card .top-item .rank,
+.reseller-top-products-card .top-item .rank {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--ink, #0c0c0f);
+  border-radius: 8px;
+  background: var(--yellow, #ffd91a);
+  display: grid;
+  place-items: center;
+  font-weight: 1000;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* -------------------------------------------------------------------------
+   6. MODAL & PRODUCT EDITING (PERSIS DASHBOARD OWNER & USER-FRIENDLY)
+   ------------------------------------------------------------------------- */
+.neo-modal {
+  width: min(880px, calc(100vw - 20px));
+  max-width: 880px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  border: 3px solid var(--ink, #0c0c0f);
+  box-shadow: 5px 6px 0 var(--ink, #0c0c0f);
+  background: #fff;
+  padding: 0;
+}
+
+.neo-modal form {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+.neo-modal header {
+  padding: 14px 18px;
+  border-bottom: 2px solid var(--ink, #0c0c0f);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #faf9ff;
+  border-radius: 13px 13px 0 0;
+}
+
+.neo-modal header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.modal-body {
+  padding: 16px 18px;
+  max-height: 72vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.neo-modal footer {
+  padding: 12px 18px;
+  border-top: 2px solid var(--ink, #0c0c0f);
+  background: #faf9ff;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  border-radius: 0 0 13px 13px;
+}
+
+/* Responsive 3-Box Calculation Grid in Product Modals */
+.modal-calc-grid,
+.calc-boxes-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+  margin: 8px 0;
+  box-sizing: border-box;
+}
+
+.modal-calc-grid .calc-box,
+.calc-boxes-grid .calc-box {
+  border: 2px solid var(--ink, #0c0c0f);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fbfbfb;
+  min-width: 0;
+  box-sizing: border-box;
+  box-shadow: 2px 2px 0 var(--ink, #0c0c0f);
+}
+
+.modal-calc-grid .calc-box.cost-box {
+  background: #f5f5f7;
+  border-color: #0c0c0f;
+}
+
+.modal-calc-grid .calc-box.margin-box {
+  background: #edffdc;
+  border-color: #0c0c0f;
+}
+
+.modal-calc-grid .calc-box.sell-box {
+  background: #fffbd4;
+  border-color: #0c0c0f;
+}
+
+.modal-calc-grid .calc-box small,
+.calc-boxes-grid .calc-box small {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 850;
+  color: var(--muted, #6e6e75);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+
+.modal-calc-grid .calc-box.margin-box small {
+  color: #1a5e00;
+}
+
+.modal-calc-grid .calc-box.sell-box small {
+  color: #705300;
+}
+
+.modal-calc-grid .calc-box b,
+.modal-calc-grid .calc-box strong,
+.calc-boxes-grid .calc-box strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--ink, #0c0c0f);
+  overflow-wrap: anywhere;
+}
+
+.modal-var-margin,
+.modal-fresh-margin,
+.margin-input {
+  width: 100%;
+  border: 2px solid var(--ink, #0c0c0f) !important;
+  border-radius: 6px !important;
+  padding: 5px 8px !important;
+  font-size: 13.5px !important;
+  font-weight: 900 !important;
+  background: #ffffff !important;
+  box-sizing: border-box !important;
+  font-family: inherit;
+  color: var(--ink, #0c0c0f) !important;
+}
+
+.modal-var-margin:focus,
+.modal-fresh-margin:focus,
+.margin-input:focus {
+  outline: none;
+  border-color: #7025ff !important;
+  box-shadow: 0 0 0 2px rgba(112, 37, 255, 0.25) !important;
+}
+
+.modal-var-sell,
+.modal-fresh-sell {
+  color: #705300;
+  font-weight: 900;
+}
+
+/* Variant Edit Cards in Modal */
+.variant-edit-card {
+  border: 2px solid var(--ink, #0c0c0f);
+  border-radius: 12px;
+  background: #faf7ff;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+  box-shadow: 2px 2.5px 0 var(--ink, #0c0c0f);
+  box-sizing: border-box;
+}
+
+.variant-edit-card.disabled {
+  opacity: 0.65;
+  background: #f5f5f5;
+}
+
+.modal-var-desc,
+.modal-var-terms {
+  font-family: inherit;
+  resize: vertical;
+  min-height: 52px;
+  line-height: 1.45;
+  outline: none;
+  border: 2px solid var(--ink, #0c0c0f);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.modal-var-desc:focus,
+.modal-var-terms:focus {
+  border-color: #7025ff !important;
+  box-shadow: 0 0 0 2px rgba(112, 37, 255, 0.2) !important;
+}
+
+.back-modal-btn {
+  background: var(--ink, #111);
+  color: #fff;
+  border: 2px solid var(--ink, #111);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  vertical-align: middle;
+  transition: transform .1s;
+}
+
+.back-modal-btn:hover {
+  background: #333;
+  transform: translateX(-2px);
+}
+
+/* Pricing & Custom Product Cards */
 .price-product-card {
   background: #fff;
   border: var(--border, 3px solid #0c0c0f);
@@ -61,6 +619,7 @@
   box-shadow: var(--shadow, 4px 5px 0 #0c0c0f);
   padding: 16px;
   transition: transform 0.15s ease;
+  box-sizing: border-box;
 }
 
 .price-product-card.disabled {
@@ -133,64 +692,6 @@
   color: #777;
 }
 
-/* 3-Box Calculation Grid */
-.calc-boxes-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.calc-box {
-  border: 2px solid var(--ink, #0c0c0f);
-  border-radius: 10px;
-  padding: 8px 10px;
-  background: #fafafa;
-  min-width: 0;
-}
-
-.calc-box small {
-  display: block;
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--muted, #6e6e75);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin-bottom: 3px;
-}
-
-.calc-box strong {
-  display: block;
-  font-size: 14px;
-  font-weight: 800;
-  color: var(--ink, #0c0c0f);
-}
-
-.calc-box.highlight {
-  background: #fffbd4;
-}
-
-.calc-box.profit {
-  background: #edffdc;
-}
-
-.calc-box input.margin-input {
-  width: 100%;
-  border: 2px solid var(--ink, #0c0c0f);
-  border-radius: 6px;
-  padding: 5px 8px;
-  font-size: 13px;
-  font-weight: 800;
-  background: #fff;
-  box-sizing: border-box;
-}
-
-.calc-box input.margin-input:focus {
-  outline: none;
-  background: #fff;
-  border-color: #6e2cff;
-}
-
-/* Variant List Container */
 .variants-container {
   margin-top: 14px;
   padding-top: 14px;
@@ -246,7 +747,6 @@
   color: var(--ink, #0c0c0f);
 }
 
-/* Verification Feedback */
 .verify-feedback {
   margin-top: 8px;
   padding: 8px 12px;
@@ -266,115 +766,629 @@
   color: #8c0006;
 }
 
-/* 7-Day Chart Styling in Reseller Dashboard */
-.reseller-chart-card {
+/* -------------------------------------------------------------------------
+   7. LAPORAN (REPORTS) RESPONSIVE REFINEMENT
+   ------------------------------------------------------------------------- */
+.report-filter {
+  margin-bottom: 16px;
+  background: #fff;
+  border: var(--border, 3px solid #0c0c0f);
+  border-radius: var(--radius, 16px);
+  box-shadow: var(--shadow, 4px 5px 0 #0c0c0f);
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.report-filter-grid {
+  display: grid;
+  grid-template-columns: 220px minmax(220px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
   width: 100%;
-  margin-top: 4px;
+  box-sizing: border-box;
 }
 
-.chart-summary-pills {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.chart-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 11px;
-  border-radius: 9px;
-  border: 2px solid var(--ink, #0c0c0f);
+.report-filter-grid label {
+  display: grid;
+  gap: 6px;
   font-size: 12px;
-  font-weight: 800;
-  box-shadow: 2px 2px 0 var(--ink, #0c0c0f);
+  font-weight: 900;
 }
 
-.chart-pill.purple { background: #ecdfff; color: #3c1285; }
-.chart-pill.green { background: #edffdc; color: #1a5e00; }
-.chart-pill.blue { background: #dff4ff; color: #005085; }
+.report-filter-grid select,
+.report-filter-grid input {
+  width: 100%;
+  border: 2px solid var(--ink, #0c0c0f);
+  border-radius: 11px;
+  padding: 10px 12px;
+  background: #fff;
+  font: inherit;
+  box-sizing: border-box;
+}
 
-/* Responsive Overrides */
-@media (max-width: 620px) {
-  .pricing-toolbar {
+.report-kpis,
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 14px;
+  margin-bottom: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.report-grid-2,
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.report-series {
+  display: grid;
+  gap: 10px;
+}
+
+.series-row {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) 115px;
+  gap: 12px;
+  align-items: center;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.series-row > span {
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.series-row > b {
+  text-align: right;
+  white-space: nowrap;
+  font-weight: 900;
+}
+
+.series-track {
+  height: 20px;
+  border: 2px solid var(--ink, #0c0c0f);
+  border-radius: 10px;
+  background: #ffffff;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.series-track i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #7c2cff, #b56bff);
+  min-width: 3px;
+  border-radius: 8px;
+}
+
+/* -------------------------------------------------------------------------
+   8. TOOLBARS & FILTERS (PRODUK, PESANAN, USER)
+   ------------------------------------------------------------------------- */
+.toolbar,
+.pricing-toolbar,
+.product-toolbar,
+.order-toolbar,
+.user-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: var(--border, 3px solid #0c0c0f);
+  border-radius: var(--radius, 16px);
+  box-shadow: var(--shadow, 4px 5px 0 #0c0c0f);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  box-sizing: border-box;
+}
+
+.toolbar .searchbox,
+.pricing-toolbar .searchbox,
+.product-toolbar .searchbox,
+.order-toolbar .searchbox,
+.user-toolbar .searchbox {
+  flex: 1 1 240px;
+  min-width: 220px;
+  position: relative;
+}
+
+.toolbar select,
+.pricing-toolbar select,
+.product-toolbar select,
+.order-toolbar select,
+.user-toolbar select {
+  flex: 0 1 180px;
+  min-width: 140px;
+  border: 2px solid var(--ink, #0c0c0f);
+  border-radius: 11px;
+  background: #fff;
+  padding: 10px 12px;
+  font: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.toolbar .neo-btn,
+.product-toolbar .neo-btn,
+.order-toolbar .neo-btn,
+.user-toolbar .neo-btn {
+  flex-shrink: 0;
+}
+
+/* -------------------------------------------------------------------------
+   9. ORDER CARDS & GRIDS
+   ------------------------------------------------------------------------- */
+.order-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  box-sizing: border-box;
+}
+
+.order-card {
+  background: #fff;
+  border: var(--border, 3px solid #0c0c0f);
+  border-radius: var(--radius, 16px);
+  box-shadow: var(--shadow, 4px 5px 0 #0c0c0f);
+  padding: 14px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.order-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 2px solid var(--ink, #0c0c0f);
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}
+
+.order-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.order-grid > div {
+  min-width: 0;
+  padding: 9px 11px;
+  border: 2px solid var(--ink, #0c0c0f);
+  border-radius: 10px;
+  background: #fafafa;
+  box-sizing: border-box;
+  box-shadow: 1.5px 2px 0 var(--ink, #0c0c0f);
+}
+
+.order-grid .wide {
+  grid-column: 1 / -1;
+}
+
+/* -------------------------------------------------------------------------
+   10. USER CARDS & USER META
+   ------------------------------------------------------------------------- */
+.user-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  box-sizing: border-box;
+}
+
+.user-card {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  background: #fff;
+  border: var(--border, 3px solid #0c0c0f);
+  border-radius: var(--radius, 16px);
+  box-shadow: var(--shadow, 4px 5px 0 #0c0c0f);
+  padding: 14px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* -------------------------------------------------------------------------
+   11. FLOATING SAVE BAR
+   ------------------------------------------------------------------------- */
+.floating-save-bar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink, #0c0c0f);
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: var(--radius, 16px);
+  border: 3px solid #000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45), 4px 5px 0 var(--ink, #0c0c0f);
+  z-index: 999;
+  width: min(540px, calc(100vw - 28px));
+  animation: slideUpFloat 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+@keyframes slideUpFloat {
+  from { transform: translate(-50%, 100px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
+}
+
+.save-bar-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.save-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* -------------------------------------------------------------------------
+   12. TABLET RESPONSIVE BREAKPOINT (621px - 1024px)
+   ------------------------------------------------------------------------- */
+@media (min-width: 621px) and (max-width: 1024px) {
+  .topbar {
+    padding: 10px 14px;
+    gap: 10px;
+  }
+  .dashboard-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px;
+  }
+  .dashboard-kpis .stat-card {
+    min-height: 88px;
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  .report-kpis,
+  .stats-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px;
+  }
+  .report-grid-2,
+  .grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 14px;
+  }
+  .report-filter-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .report-filter-grid button#applyReport {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  .product-grid,
+  .order-list,
+  .user-list {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
-  .calc-boxes-grid {
-    grid-template-columns: 1fr;
-    gap: 6px;
+  .order-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
-  .product-head-row {
-    flex-direction: column;
-    align-items: stretch;
+  .user-card {
+    grid-template-columns: 46px minmax(0, 1fr);
   }
-  .toggle-switch-group {
-    justify-content: space-between;
-  }
-  .chart-summary-pills {
+  .user-actions {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
     width: 100%;
     margin-top: 8px;
   }
+  .toolbar select,
+  .pricing-toolbar select,
+  .product-toolbar select,
+  .order-toolbar select,
+  .user-toolbar select {
+    flex: 1 1 calc(50% - 6px);
+  }
+  .seven-chart {
+    height: 230px;
+    gap: 8px;
+  }
+  .neo-modal {
+    width: min(720px, calc(100vw - 24px));
+  }
 }
 
-/* Modal Variant & Fresh Product Editor Enhancements */
-.variant-edit-card {
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.modal-var-margin, .modal-fresh-margin {
-  font-family: inherit;
-  outline: none;
-}
-.modal-var-margin:focus, .modal-fresh-margin:focus {
-  border-color: var(--primary, #6c2cff) !important;
-  box-shadow: 0 0 0 2px rgba(108, 44, 255, 0.25);
-}
-.modal-var-sell, .modal-fresh-sell {
-  color: #705300;
-  letter-spacing: -0.2px;
-}
-.modal-var-desc, .modal-var-terms {
-  font-family: inherit;
-  resize: vertical;
-  min-height: 48px;
-  line-height: 1.4;
-  outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-.modal-var-desc:focus, .modal-var-terms:focus {
-  border-color: var(--primary, #6c2cff) !important;
-  box-shadow: 0 0 0 2px rgba(108, 44, 255, 0.2);
+/* -------------------------------------------------------------------------
+   13. MOBILE RESPONSIVE BREAKPOINT (<= 620px)
+   ------------------------------------------------------------------------- */
+@media (max-width: 620px) {
+  .topbar {
+    padding: 9px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .topbar .page-title h1 {
+    font-size: 20px;
+  }
+  .topbar .page-title p {
+    display: none;
+  }
+  .topbar .top-actions {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .membership-timer {
+    margin-right: auto;
+    font-size: 11px;
+    padding: 7px 10px;
+  }
+  .topbar .telegram-btn {
+    font-size: 11px;
+    padding: 7px 10px;
+  }
+  
+  /* Tabs */
+  .main-product-tabs,
+  .product-tabs,
+  .reseller-tabs {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .main-product-tabs .tab-btn,
+  .product-tabs .tab-btn,
+  .reseller-tabs .tab-btn {
+    padding: 10px;
+    font-size: 12.5px;
+    min-height: 40px;
+  }
+
+  /* KPIs */
+  .dashboard-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px;
+  }
+  .dashboard-kpis .stat-card {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px 10px;
+    min-height: 78px;
+  }
+  .dashboard-kpis .stat-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+    border-radius: 10px;
+  }
+  .dashboard-kpis .stat-card small {
+    font-size: 9.5px;
+  }
+  .dashboard-kpis .stat-card strong {
+    font-size: 16px;
+  }
+  .dashboard-kpis .stat-card em {
+    font-size: 9.5px;
+  }
+
+  /* 7-Day Chart */
+  .seven-chart {
+    height: 195px;
+    gap: 4px;
+    padding: 10px 2px 0;
+  }
+  .day-col {
+    grid-template-rows: 20px 1fr 20px;
+    gap: 3px;
+  }
+  .day-value {
+    font-size: 8px;
+  }
+  .day-track {
+    min-height: 120px;
+    border-radius: 7px;
+    padding: 2px;
+  }
+  .day-label {
+    font-size: 9px;
+  }
+
+  /* Top products */
+  .top-products-card .top-item,
+  .reseller-top-products-card .top-item {
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 8px;
+    padding: 9px 10px;
+  }
+  .top-products-card .top-item strong,
+  .reseller-top-products-card .top-item strong {
+    grid-column: 2;
+    font-size: 12px;
+  }
+
+  /* Product Catalog & Cards */
+  .product-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .product-card {
+    grid-template-columns: 80px minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px;
+  }
+  .product-info {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  /* Toolbars */
+  .toolbar,
+  .pricing-toolbar,
+  .product-toolbar,
+  .order-toolbar,
+  .user-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px;
+  }
+  .toolbar .searchbox,
+  .pricing-toolbar .searchbox,
+  .product-toolbar .searchbox,
+  .order-toolbar .searchbox,
+  .user-toolbar .searchbox,
+  .toolbar select,
+  .pricing-toolbar select,
+  .product-toolbar select,
+  .order-toolbar select,
+  .user-toolbar select,
+  .toolbar .neo-btn,
+  .pricing-toolbar .neo-btn,
+  .product-toolbar .neo-btn,
+  .order-toolbar .neo-btn,
+  .user-toolbar .neo-btn {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  /* Orders */
+  .order-list {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .order-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .order-grid > div {
+    padding: 7px 8px;
+  }
+  .order-grid strong {
+    font-size: 12px;
+  }
+
+  /* Laporan */
+  .report-filter-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .report-filter-grid button#applyReport {
+    width: 100%;
+    padding: 11px;
+  }
+  .report-kpis,
+  .stats-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px;
+  }
+  .report-grid-2,
+  .grid-2 {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+  .series-row {
+    grid-template-columns: 56px minmax(0, 1fr) 84px;
+    gap: 6px;
+    font-size: 9.5px;
+  }
+
+  /* Modal Edit Produk */
+  .neo-modal {
+    width: calc(100vw - 12px);
+    border-width: 2.5px;
+    border-radius: 14px;
+  }
+  .modal-body {
+    padding: 12px;
+    max-height: 76vh;
+  }
+  .form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  .form-grid .full {
+    grid-column: auto !important;
+  }
+  .modal-calc-grid,
+  .calc-boxes-grid {
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
+  }
+  .neo-modal footer {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .neo-modal footer .neo-btn {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+  }
+
+  /* Floating Save Bar */
+  .floating-save-bar {
+    width: calc(100vw - 16px);
+    bottom: 10px;
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .save-bar-info {
+    width: 100%;
+    justify-content: center;
+    font-size: 11.5px;
+  }
+  .save-bar-actions {
+    width: 100%;
+    justify-content: center;
+    gap: 8px;
+  }
+  .save-bar-actions .neo-btn {
+    flex: 1;
+    padding: 8px 10px;
+    font-size: 11.5px;
+  }
 }
 
-.back-modal-btn {
-  background: var(--ink, #111);
-  color: #fff;
-  border: 2px solid var(--ink, #111);
-  border-radius: 8px;
-  width: 32px;
-  height: 32px;
-  font-size: 16px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 8px;
-  vertical-align: middle;
-  transition: transform .1s;
+/* -------------------------------------------------------------------------
+   14. VERY SMALL PHONES (<= 390px)
+   ------------------------------------------------------------------------- */
+@media (max-width: 390px) {
+  .dashboard-kpis {
+    grid-template-columns: 1fr !important;
+  }
+  .report-kpis,
+  .stats-row {
+    grid-template-columns: 1fr !important;
+  }
+  .product-card {
+    grid-template-columns: 66px minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px;
+  }
+  .order-grid {
+    grid-template-columns: 1fr;
+  }
 }
-.back-modal-btn:hover {
-  background: #333;
-  transform: translateX(-2px);
+
+@media (prefers-reduced-motion: reduce) {
+  .membership-timer {
+    transition: none;
+  }
+  .floating-save-bar {
+    animation: none;
+  }
 }
-
-
-
-
-/* Membership status shares the compact top action area on mobile. */
-.membership-timer{border:2px solid #171717;box-shadow:3px 3px 0 #171717;border-radius:8px;background:#c5ff38;color:#171717;font:inherit;font-size:12px;font-weight:800;padding:9px 11px;cursor:pointer;white-space:nowrap;transition:transform .18s,box-shadow .18s}
-.membership-timer:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 #171717}
-.membership-timer.expired{background:#ffb3cd}.membership-timer:focus-visible{outline:3px solid #a271ff;outline-offset:4px}
-.membership-detail{display:grid;gap:14px}.membership-detail p{margin:0;line-height:1.6}.membership-detail .form-actions{display:flex;gap:10px;flex-wrap:wrap}.membership-detail .info-note{padding:14px;border:2px solid #171717;border-radius:8px;background:#f0e4ff}
-.membership-qr{text-align:center}.membership-qr img{display:block;width:min(100%,340px);height:auto;margin:12px auto;background:#fff;border:2px solid #171717}.membership-qr strong{font-size:24px}
-@media(max-width:640px){.topbar{flex-wrap:wrap}.topbar .page-title{flex:1;min-width:0}.topbar .top-actions{width:100%;justify-content:flex-end;gap:8px}.membership-timer{margin-right:auto;font-size:11px;padding:8px}.topbar .telegram-btn{font-size:11px;padding:8px}}
-@media(prefers-reduced-motion:reduce){.membership-timer{transition:none}}

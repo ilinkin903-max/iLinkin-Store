@@ -1403,3 +1403,30 @@ body{overflow-x:hidden}.app-shell{min-height:100vh;display:grid;grid-template-co
   padding-left: 20px;
 }
 
+
+@media (max-width: 620px) {
+  .noktel-subnav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .noktel-subnav .subnav-btn {
+    padding: 8px 10px;
+    font-size: 11px;
+    justify-content: center;
+    width: 100%;
+  }
+  .noktel-login-card {
+    padding: 12px;
+  }
+  .noktel-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .noktel-card-actions .neo-btn {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+}
